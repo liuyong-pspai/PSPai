@@ -1,0 +1,65 @@
+name: Build & Release — 三平台闭源引擎 + 开源层
+
+on:
+  push:
+    tags: ['v*']
+
+jobs:
+  # ============ 闭源引擎三平台编译 ============
+  build-engine:
+    strategy:
+      matrix:
+        include:
+          - name: linux-x86_64
+            os: ubuntu-22.04
+            suffix: ""
+          - name: macos
+            os: macos-14
+            suffix: ""
+          - name: windows
+            os: windows-2022
+            suffix: ".exe"
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - run: pip install pyinstaller pyyaml
+
+      - name: Build
+        run: |
+          cd engine
+          pyinstaller --onefile --name xiaolongren-engine-${{ matrix.name }} \
+            --add-data "skills:skills" \
+            --add-data "scripts:scripts" \
+            --add-data "pspai_search.py:." \
+            --hidden-import yaml \
+            pspai_server.py
+
+      - name: Upload binary to Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: engine/dist/xiaolongren-engine-${{ matrix.name }}${{ matrix.suffix }}
+
+  # ============ 开源应用层打包 ============
+  pack-open-source:
+    needs: build-engine
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Package open-source layer
+        run: |
+          tar czf xiaolongren-open-source-v1.0.0.tar.gz \
+            --exclude='engine' \
+            --exclude='.git' \
+            --exclude='.github' \
+            .
+
+      - name: Upload to Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: xiaolongren-open-source-v1.0.0.tar.gz
