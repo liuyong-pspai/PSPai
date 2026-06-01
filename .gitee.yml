@@ -1,0 +1,46 @@
+# Gitee CI 流水线 — 小龙人三平台自动编译
+# 文档: https://gitee.com/help/articles/4352
+
+name: build-engine
+display_name: 三平台引擎编译
+on:
+  push:
+    tags: ['v*']
+
+jobs:
+  build:
+    name: 编译 ${{ matrix.name }}
+    strategy:
+      matrix:
+        - name: linux-x86_64
+          image: ubuntu-22.04
+        - name: windows
+          image: windows-2022
+    runs-on: ${{ matrix.image }}
+    steps:
+      - name: 检出代码
+        uses: checkout@v1
+
+      - name: 安装Python
+        run: |
+          apt-get update && apt-get install -y python3 python3-pip || true
+          python3 --version
+
+      - name: 安装依赖
+        run: pip3 install pyinstaller pyyaml
+
+      - name: 编译引擎
+        run: |
+          cd engine
+          pyinstaller --onefile --name xiaolongren-engine-${{ matrix.name }} \
+            --add-data "skills:skills" \
+            --add-data "scripts:scripts" \
+            --add-data "pspai_search.py:." \
+            --hidden-import yaml \
+            pspai_server.py
+          ls -lh dist/
+
+      - name: 上传产物
+        uses: upload-artifact@v1
+        with:
+          path: engine/dist/*
