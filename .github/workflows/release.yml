@@ -15,14 +15,17 @@ jobs:
         include:
           - name: linux-x86_64
             os: ubuntu-22.04
-            suffix: ""
+            sep: ":"
           - name: macos
             os: macos-14
-            suffix: ""
+            sep: ":"
           - name: windows
             os: windows-2022
-            suffix: ".exe"
+            sep: ";"
     runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
     steps:
       - uses: actions/checkout@v4
 
@@ -36,9 +39,9 @@ jobs:
         run: |
           cd engine
           pyinstaller --onefile --name xiaolongren-engine-${{ matrix.name }} \
-            --add-data "skills:skills" \
-            --add-data "scripts:scripts" \
-            --add-data "pspai_search.py:." \
+            --add-data "skills${{ matrix.sep }}skills" \
+            --add-data "scripts${{ matrix.sep }}scripts" \
+            --add-data "pspai_search.py${{ matrix.sep }}." \
             --hidden-import yaml \
             pspai_server.py
           ls -lh dist/
@@ -46,10 +49,11 @@ jobs:
       - name: Upload
         uses: softprops/action-gh-release@v2
         with:
-          files: engine/dist/xiaolongren-engine-${{ matrix.name }}${{ matrix.suffix }}
+          files: engine/dist/xiaolongren-engine-${{ matrix.name }}${{ matrix.name == 'windows' && '.exe' || '' }}
 
   pack-open-source:
     needs: build-engine
+    if: always() && !cancelled()
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
