@@ -119,8 +119,14 @@ jobs:
 
       - name: Build installer (Windows)
         if: matrix.platform == 'windows'
-        shell: cmd
-        run: python installer/make_installer.py
+        shell: pwsh
+        run: |
+          python --version
+          python installer/make_installer.py 2>&1
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host "Trying python3..."
+            python3 installer/make_installer.py 2>&1
+          }
 
       - name: Build installer (macOS/Linux)
         if: matrix.platform != 'windows'
