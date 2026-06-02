@@ -41,55 +41,56 @@ cd PSPai
 
 ### 🪟 Windows
 
-#### 安装 Python · Install Python
+#### 1. 下载 · Download
+
+1. 打开 https://github.com/liuyong-pspai/PSPai/releases
+2. 下载 **两个文件**：
+   - `xiaolongren-open-source.tar.gz`（开源层，213KB）
+   - `xiaolongren-engine-windows.exe`（引擎，8.91MB）
+3. 把两个文件解压/放到同一个文件夹，比如 `C:\Users\你的用户名\Desktop\小龙人\`
+4. 解压 `xiaolongren-open-source.tar.gz`（用7-Zip或WinRAR，Win11自带解压）
+5. 确保 `start.bat` 和 `xiaolongren-engine-windows.exe` 在同一目录
+
+#### 2. 安装 Python · Install Python
 
 1. 打开 https://www.python.org/downloads/
-2. 点黄色 **Download Python 3.12.x** · Click yellow button
-3. 运行安装程序 · Run installer
-4. ⚠️ **必须勾选 · Must check**: "Add Python to PATH"
-5. 点 Install → 等待 · Wait
+2. 点黄色 **Download Python 3.12.x**
+3. 运行安装程序
+4. ⚠️ **底部必须勾选 "Add Python to PATH"**（不勾后面全报错）
+5. 点 Install Now → 等待完成
 
-验证 · Verify: 按 `Win+R` → 输入 `cmd` → 回车 → 输入:
+验证：按 `Win+R` → 输入 `cmd` → 回车 → 输入：
 ```
 python --version
 ```
-应显示 · Should show: `Python 3.12.x`
+应显示 `Python 3.12.x`
 
-#### 配置 · Configure
+#### 3. 配置 API Key · Configure
 
-1. 复制 `.env.example` → 重命名为 `.env` · Copy & rename to `.env`
-2. 用记事本打开 `.env` · Open with Notepad
-3. 把 `PSPAI_API_KEY=***` 改成你的 Key · Replace with your key
-4. 保存 · Save
+1. 复制 `.env.example` → 重命名为 `.env`
+2. 用记事本打开 `.env`
+3. 把 `PSPAI_API_KEY=***` 改成你的 Key（去 https://platform.deepseek.com 注册免费拿）
+4. 保存
 
-> Key 获取 · Get key: https://platform.deepseek.com（注册即送 · free on signup）
+#### 4. 启动 · Launch
 
-#### 安装依赖 · Install Dependencies
+**双击 `start.bat`**
 
-按 `Win+R` → 输入 `cmd` → 回车
+浏览器会自动打开 http://localhost:8088
 
-```cmd
-cd 桌面\PSPai
-pip install PyYAML Pillow requests
-```
+> 如果杀毒软件弹窗拦截引擎exe，点「更多信息」→「仍要运行」
 
-#### 启动 · Launch
+#### 5. Windows 常见问题 · FAQ
 
-```cmd
-cd 桌面\PSPai
-start.sh
-```
-
-浏览器打开 · Open: **http://localhost:8088**
-
-#### Windows 常见问题 · FAQ
-
-| 问题 · Problem | 解决 · Solution |
+| 问题 | 解决 |
 |:--|:--|
-| `python 不是内部命令` | 重装 Python，必须勾选 "Add to PATH" · Reinstall with PATH checked |
-| `pip 不是内部命令` | `python -m pip install PyYAML Pillow requests` |
-| 杀毒软件报警 Antivirus alert | 引擎是 PyInstaller 打包的 exe，点"允许" · Click "Allow" |
-| 端口占用 Port in use | 关掉占用程序，或改 `UI原型/server.py` 里的 `PORT` |
+| `python 不是内部或外部命令` | 重装Python，**必须勾选 "Add Python to PATH"** |
+| `pip 不是内部或外部命令` | `python -m pip install PyYAML Pillow requests` |
+| 杀毒软件报警 | 引擎是PyInstaller打包的exe，点「更多信息」→「仍要运行」 |
+| 双击bat闪退 | 右键bat文件→编辑，看报错信息；或者在cmd里cd到目录再运行 `start.bat` |
+| `未找到引擎文件` | 检查 `xiaolongren-engine-windows.exe` 是否和 `start.bat` 在同一文件夹 |
+| 端口8088被占用 | 关掉占用程序，或改 `UI原型/server.py` 里的 `PORT` |
+| 浏览器打开空白 | 等5秒刷新，引擎启动需要时间 |
 
 ---
 
