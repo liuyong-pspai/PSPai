@@ -44,26 +44,27 @@ jobs:
             --add-data "pspai_search.py${{ matrix.sep }}." \
             --hidden-import yaml \
             pspai_server.py
-          ls -lh dist/
+          echo "BUILD_OK" && ls -lh dist/
 
-      - name: Upload
+      - name: Upload engine
         uses: softprops/action-gh-release@v2
         with:
           files: engine/dist/xiaolongren-engine-${{ matrix.name }}${{ matrix.name == 'windows' && '.exe' || '' }}
 
-  pack-open-source:
-    needs: build-engine
-    if: always()
-    runs-on: ubuntu-22.04
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Package
+      # 顺便在Linux job里打包开源层
+      - name: Pack open-source (Linux only)
+        if: matrix.name == 'linux-x86_64'
         run: |
-          tar czf xiaolongren-open-source.tar.gz \
-            --exclude='engine' --exclude='.git' --exclude='.github' .
+          mkdir -p release-tmp
+          cp -r UI原型 release-tmp/
+          cp -r .env.example README.md LICENSE requirements.txt start.sh release-tmp/ 2>/dev/null || true
+          cd release-tmp
+          tar czf ../xiaolongren-open-source.tar.gz .
+          cd ..
+          ls -lh xiaolongren-open-source.tar.gz
 
-      - name: Upload
+      - name: Upload open-source (Linux only)
+        if: matrix.name == 'linux-x86_64'
         uses: softprops/action-gh-release@v2
         with:
           files: xiaolongren-open-source.tar.gz
