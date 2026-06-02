@@ -50,10 +50,18 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           body: |
-            ## 🚀 小龙人 ${{ github.ref_name }} 发布
+            ## 🐉 小龙人 ${{ github.ref_name }} 发布
 
-            革命性的数字生命体对话平台。
-            
+            一个有灵魂的数字生命体——有记忆、有性格、三平台可跑。
+
+            ### ✨ 新特性
+            - 🧠 八层永生记忆系统（L0-L7）
+            - 🎭 六个角色：龙渊、赤羽、凌、轻墨、霜华、夜影
+            - 🖥️ 三平台支持：Windows / macOS / Linux
+            - 🌍 多语言：中文 / English
+            - 🔧 开源应用层(AGPLv3) + 闭源引擎
+            - 📦 一键启动脚本
+
             ### 📦 下载
             | 文件 | 平台 |
             |:--|:--|
@@ -61,17 +69,25 @@ jobs:
             | `xiaolongren-engine-macos` | 🍎 macOS |
             | `xiaolongren-engine-windows.exe` | 🪟 Windows |
             | `xiaolongren-open-source.tar.gz` | 📂 开源层 |
-            
-            ### 🚀 快速开始
+
+            ### 🚀 30秒上手
             ```bash
-            tar xzf xiaolongren-open-source.tar.gz && cd PSPai && bash start.sh
-            # 浏览器打开 http://localhost:8088
+            git clone https://github.com/liuyong-pspai/PSPai.git
+            cd PSPai
+            # 从 Releases 下载对应平台引擎放到目录里
+            cp .env.example .env  # 填入 API Key
+            bash start.sh
             ```
-            
+
+            ### 📋 系统要求
+            - Python 3.10+
+            - 网络连接（首次启动自动安装依赖）
+
             📖 [完整更新日志](https://github.com/liuyong-pspai/PSPai/blob/master/CHANGELOG.md)
+
+            🏠 本地优先，隐私至上。你的对话留在你的机器上。
           files: engine/dist/xiaolongren-engine-${{ matrix.name }}${{ matrix.name == 'windows' && '.exe' || '' }}
 
-      # 顺便在Linux job里打包开源层
       - name: Pack open-source (Linux only)
         if: matrix.name == 'linux-x86_64'
         run: |
@@ -97,11 +113,11 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          # 设置 Topics
+          # 设置 Topics（四姐指定5个标签）
           curl -sL -X PUT \
             -H "Accept: application/vnd.github+json" \
             -H "Authorization: token $GH_TOKEN" \
-            -d '{"names":["ai","chatbot","digital-lifeform","agent","llm","memory","pwa","opensource","xiaolongren","chinese"]}' \
+            -d '{"names":["ai","digital-lifeform","chatbot","open-source","python"]}' \
             "https://api.github.com/repos/${{ github.repository }}/topics"
 
           # 设置 Homepage

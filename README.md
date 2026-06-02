@@ -16,6 +16,20 @@
 
 ---
 
+## 📸 截图预览
+
+<p align="center">
+  <img src="screenshots/screenshot-01.jpg" width="30%" alt="小龙人聊天界面">
+  <img src="screenshots/screenshot-02.jpg" width="30%" alt="小龙人UI展示">
+  <img src="screenshots/screenshot-03.jpg" width="30%" alt="小龙人对话">
+</p>
+<p align="center">
+  <img src="screenshots/screenshot-04.jpg" width="30%" alt="小龙人角色">
+  <img src="screenshots/screenshot-05.jpg" width="30%" alt="小龙人界面">
+</p>
+
+---
+
 ## 🚀 安装（三平台）
 
 ### 前置条件
