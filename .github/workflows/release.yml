@@ -123,10 +123,18 @@ jobs:
         shell: powershell
         run: |
           choco install 7zip -y --no-progress
-          echo "7-Zip installed"
-          & "C:\Program Files\7-Zip\7z.exe" --help
+          $7z = (Get-Command 7z).Source
+          echo "7Z_PATH=$7z" >> $env:GITHUB_ENV
+          echo "7-Zip installed at $7z"
 
-      - name: Build installer
+      - name: Build installer (Windows)
+        if: matrix.platform == 'windows'
+        shell: powershell
+        run: |
+          python installer/make_installer.py
+
+      - name: Build installer (Linux/macOS)
+        if: matrix.platform != 'windows'
         run: |
           python3 installer/make_installer.py
 

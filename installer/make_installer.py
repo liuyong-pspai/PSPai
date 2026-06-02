@@ -169,17 +169,30 @@ timeout /t 3 >nul & exit
 ''', encoding="gbk")
 
     # 创建SFX
-    # 多种方式查找7z（choco安装后路径 / 手动安装 / PATH）
+    # 多种方式查找7z
     seven_zip = None
-    for path in [
-        os.path.expandvars(r"%ProgramFiles%\7-Zip\7z.exe"),
-        os.path.expandvars(r"%ProgramFiles(x86)%\7-Zip\7z.exe"),
-        r"C:\Program Files\7-Zip\7z.exe",
-        r"C:\Program Files (x86)\7-Zip\7z.exe",
-    ]:
-        if os.path.exists(path):
-            seven_zip = path
-            break
+    
+    # 0. 环境变量显式指定（CI传入）
+    env_7z = os.environ.get("SEVENZIP_EXE") or os.environ.get("7Z_PATH")
+    if env_7z and os.path.exists(env_7z):
+        seven_zip = env_7z
+    
+    # 1. Windows标准路径
+    if not seven_zip:
+        for path in [
+            os.path.expandvars(r"%ProgramFiles%\7-Zip\7z.exe"),
+            os.path.expandvars(r"%ProgramFiles(x86)%\7-Zip\7z.exe"),
+            r"C:\Program Files\7-Zip\7z.exe",
+            r"C:\Program Files (x86)\7-Zip\7z.exe",
+        ]:
+            try:
+                if os.path.exists(path):
+                    seven_zip = path
+                    break
+            except Exception:
+                pass
+    
+    # 2. PATH查找
     if not seven_zip:
         seven_zip = shutil.which("7z") or shutil.which("7za")
     
