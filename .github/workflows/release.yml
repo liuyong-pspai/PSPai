@@ -1,14 +1,16 @@
-name: Build & Release — 三平台闭源引擎 + 开源层
+name: Build & Release
 
 on:
   push:
     tags: ['v*']
 
+permissions:
+  contents: write
+
 jobs:
-  # ============ 闭源引擎三平台编译 ============
   build-engine:
     strategy:
-      fail-fast: false   # 一个失败不取消其他
+      fail-fast: false
       matrix:
         include:
           - name: linux-x86_64
@@ -28,11 +30,9 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Install deps
-        run: pip install pyinstaller pyyaml
+      - run: pip install pyinstaller pyyaml
 
-      - name: Build engine
-        timeout-minutes: 15
+      - name: Build
         run: |
           cd engine
           pyinstaller --onefile --name xiaolongren-engine-${{ matrix.name }} \
@@ -43,30 +43,23 @@ jobs:
             pspai_server.py
           ls -lh dist/
 
-      - name: Upload to Release
+      - name: Upload
         uses: softprops/action-gh-release@v2
         with:
           files: engine/dist/xiaolongren-engine-${{ matrix.name }}${{ matrix.suffix }}
-          make_latest: true
 
-  # ============ 开源应用层打包 ============
   pack-open-source:
     needs: build-engine
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
 
-      - name: Package open-source
+      - name: Package
         run: |
-          tar czf xiaolongren-open-source-v1.0.0.tar.gz \
-            --exclude='engine' \
-            --exclude='.git' \
-            --exclude='.github' \
-            .
-          ls -lh xiaolongren-open-source-v1.0.0.tar.gz
+          tar czf xiaolongren-open-source.tar.gz \
+            --exclude='engine' --exclude='.git' --exclude='.github' .
 
-      - name: Upload to Release
+      - name: Upload
         uses: softprops/action-gh-release@v2
         with:
-          files: xiaolongren-open-source-v1.0.0.tar.gz
-          make_latest: true
+          files: xiaolongren-open-source.tar.gz
