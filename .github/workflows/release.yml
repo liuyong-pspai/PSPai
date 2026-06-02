@@ -53,7 +53,7 @@ jobs:
 
   pack-open-source:
     needs: build-engine
-    if: always() && !cancelled()
+    if: always()
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
