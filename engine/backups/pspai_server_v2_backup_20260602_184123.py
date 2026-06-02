@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 """
-PSPAI 后端服务 v3 — 基于 Hermes 引擎 + 记忆回路 + 错误恢复
+PSPAI 后端服务 v2 — 基于 Hermes 引擎
 端口 8089，运行在 Hermes AIAgent 上，拥有完整工具链
 
-v3.0 新增:
-  - OperationLogger: 每次对话自动记录结构化日志
-  - L1/L2/L3 错误恢复: 重试 + 降级提示 + 失败记录
+架构：
+  UI(8088) → pspai_server.py(8089) → Hermes AIAgent → DeepSeek API + 31工具
+                                            ↑
+                                    和玉龙同一套引擎
+                                    人格由PSPAI config控制
 """
 import http.server
 import json
@@ -32,7 +34,7 @@ load_hermes_dotenv(hermes_home=str(BASE_DIR))
 
 import yaml
 
-# 加载PSPAI配置
+# 加载PSPAI配置 — 优先当前目录（客户可编辑），兜底同目录（PyInstaller内）
 _config_paths = [
     Path.cwd() / 'config.yaml',
     BASE_DIR / 'config.yaml',
@@ -46,8 +48,9 @@ for _cp in _config_paths:
         _config_loaded = True
         break
 if not _config_loaded:
-    print("WARN: config.yaml not found, using defaults")
+    print("⚠ 未找到 config.yaml，使用默认配置")
 
+# 多语言人格 — 从 config.yaml 加载，加语言=加配置
 AGENT_CFG = CONFIG.get('agent', {})
 PSPAI_PROMPTS = {}
 for key in AGENT_CFG:
@@ -55,12 +58,14 @@ for key in AGENT_CFG:
         lang_code = key.replace('system_prompt_', '')
         PSPAI_PROMPTS[lang_code] = AGENT_CFG[key]
 
+# 兜底: system_prompt (旧命名兼容)
 if 'zh' not in PSPAI_PROMPTS and 'system_prompt' in AGENT_CFG:
     PSPAI_PROMPTS['zh'] = AGENT_CFG['system_prompt']
 
-DEFAULT_PROMPT = PSPAI_PROMPTS.get('zh', 'You are PSPAI.')
+DEFAULT_PROMPT = PSPAI_PROMPTS.get('zh', '你是PSPAI，平行时空AI。')
 PROVIDER = AGENT_CFG.get('provider', 'deepseek')
 
+# 多语言消息
 PSPAI_MSGS = {
     'zh': {'empty': '请说点什么吧。', 'thinking': '（思考中，请稍后再试）', 'error': '抱歉，出了点问题'},
     'en': {'empty': 'Please say something.', 'thinking': '(Thinking, please try again)', 'error': 'Sorry, something went wrong'},
@@ -72,15 +77,18 @@ API_KEY = os.environ.get('DEEPSEEK_API_KEY', '')
 BASE_URL = 'https://api.deepseek.com/v1'
 
 from run_agent import AIAgent
-import pspai_search
+
+# 覆盖web_search — 用HN API + Google News，免API Key
+import pspai_search  # noqa: F401 — side effect: 注册web_search工具
 
 # ============================================================
-# Agent 实例管理
+# Agent 实例管理 — 每个角色一个Agent（保持对话上下文）
 # ============================================================
-agents = {}
+agents = {}       # key: char_index -> AIAgent
 agent_lock = threading.Lock()
 
 def get_agent(char_index, char_name):
+    """获取或创建角色的AIAgent实例"""
     key = str(char_index)
     with agent_lock:
         if key not in agents:
@@ -135,7 +143,7 @@ def save_avatar(slot, data_url):
     return f"/api/avatars/{filename}"
 
 # ============================================================
-# 会话历史
+# 会话历史 — 持久化到JSON
 # ============================================================
 conversation_history = load_json('conversations', {})
 
@@ -150,86 +158,10 @@ def add_to_history(char_index, role, content):
     if key not in conversation_history:
         conversation_history[key] = []
     conversation_history[key].append({"role": role, "content": content})
+    # 最多保留40条
     if len(conversation_history[key]) > 40:
         conversation_history[key] = conversation_history[key][-40:]
     save_json('conversations', conversation_history)
-
-# ============================================================
-# 操作日志 - 记忆回路 v3.0
-# ============================================================
-class OperationLogger:
-    """每次对话自动记录结构化日志，供后续技能提炼使用"""
-    
-    def __init__(self, data_dir):
-        self.data_dir = Path(data_dir)
-        self.data_dir.mkdir(exist_ok=True)
-        self._ops = []
-        self._lock = threading.Lock()
-        self._write_lock = threading.Lock()
-        self._save_timer = None
-        self._load()
-    
-    def _path(self):
-        return self.data_dir / "chat_operations.json"
-    
-    def _load(self):
-        p = self._path()
-        if p.exists():
-            try:
-                with open(p) as f:
-                    raw = json.load(f)
-                self._ops = raw[-500:] if isinstance(raw, list) else []
-            except Exception:
-                self._ops = []
-    
-    def _save(self):
-        """线程安全写入，使用写锁防止竞争"""
-        with self._write_lock:
-            tmp = self._path().with_suffix('.tmp')
-            with open(tmp, 'w') as f:
-                json.dump(self._ops, f, ensure_ascii=False, indent=2)
-            tmp.replace(self._path())  # 原子替换
-
-    def _schedule_save(self):
-        """延迟保存，合并短时间内的多次写入"""
-        if self._save_timer:
-            self._save_timer.cancel()
-        self._save_timer = threading.Timer(1.0, self._save)
-        self._save_timer.daemon = True
-        self._save_timer.start()
-    
-    def record(self, tool="chat", params=None, success=True, summary="", latency_ms=0):
-        with self._lock:
-            record = {
-                "tool": tool,
-                "params": params or {},
-                "success": success,
-                "summary": summary[:200],
-                "latency_ms": latency_ms,
-                "timestamp": time.time(),
-            }
-            self._ops.append(record)
-            if len(self._ops) > 500:
-                self._ops = self._ops[-500:]
-            self._schedule_save()  # 延迟批量写入
-            return record
-    
-    def get_stats(self):
-        with self._lock:
-            total = len(self._ops)
-            if total == 0:
-                return {"total": 0, "success_rate": 0, "avg_latency_ms": 0}
-            success = sum(1 for r in self._ops if r.get("success"))
-            avg_latency = sum(r.get("latency_ms", 0) for r in self._ops) / total
-            return {
-                "total": total,
-                "success": success,
-                "failed": total - success,
-                "success_rate": round(success / total * 100, 1),
-                "avg_latency_ms": round(avg_latency, 0),
-            }
-
-op_logger = OperationLogger(DATA_DIR)
 
 # ============================================================
 # HTTP 请求处理
@@ -269,6 +201,7 @@ class PSPAIHandler(http.server.BaseHTTPRequestHandler):
         parsed = urllib.parse.urlparse(self.path)
         path = parsed.path
 
+        # 头像图片
         if path.startswith("/api/avatars/"):
             avatar_path = DATA_DIR / "avatars" / os.path.basename(path)
             if avatar_path.exists():
@@ -285,24 +218,25 @@ class PSPAIHandler(http.server.BaseHTTPRequestHandler):
                 self._send_json({"error": "not found"}, 404)
             return
 
+        # 状态
         if path == "/api/status":
-            stats = op_logger.get_stats()
             self._send_json({
                 "name": "PSPAI",
-                "version": "v3.0",
+                "version": "v2.0",
                 "engine": "Hermes",
                 "tools": 31,
                 "status": "running",
                 "time": time.strftime("%Y-%m-%d %H:%M:%S"),
-                "operations": stats,
             })
             return
 
+        # 获取名字
         if path == "/api/names":
             names = load_json("names", {})
             self._send_json(names)
             return
 
+        # 获取头像列表
         if path == "/api/avatars_list":
             avatars = []
             for i in range(3):
@@ -323,6 +257,7 @@ class PSPAIHandler(http.server.BaseHTTPRequestHandler):
         parsed = urllib.parse.urlparse(self.path)
         path = parsed.path
 
+        # 对话 — 通过 Hermes AIAgent 处理
         if path == "/api/chat":
             data = self._read_body()
             msg = data.get("message", "")
@@ -334,69 +269,41 @@ class PSPAIHandler(http.server.BaseHTTPRequestHandler):
                 self._send_json({"reply": t_msg(lang, 'empty')})
                 return
 
+            # 加载名字
             names = load_json("names", {})
             current_name = names.get(str(char_index), char_name)
-            system_prompt = PSPAI_PROMPTS.get(lang, DEFAULT_PROMPT)
-            context_msg = f"[当前角色名: {current_name}] {msg}"
 
-            # === chat handler with retry + memory (v3.0) ===
-            t_start = time.time()
+            # 语言选择 — 字典查找，加语言=加配置
+            system_prompt = PSPAI_PROMPTS.get(lang, DEFAULT_PROMPT)
+
+            # 添加上下文到消息
+            context_msg = f"[当前角色名：{current_name}] {msg}"
+
+            # 获取Agent并对话
             try:
                 agent = get_agent(char_index, current_name)
                 history = get_history(char_index)
 
-                # 改名意图检测
+                # 检测改名意图
                 rename_match = re.search(r"(?:叫你|叫你叫|把你叫|改名为|改名[为]?|叫)(.+)", msg)
                 if rename_match:
                     new_name = rename_match.group(1).strip()[:10]
                     names[str(char_index)] = new_name
                     save_json("names", names)
-                    context_msg = f"[当前角色名: {current_name}] 用户给你改名为「{new_name}」。请用新名字回应。用户说: {msg}"
+                    # 要求agent用新名字回复
+                    context_msg = f"[当前角色名：{current_name}] 用户给你改名为「{new_name}」。请用新名字回应。用户说：{msg}"
 
-                # L1+L2 retry
-                result = None
-                retries = 0
-                prompt = system_prompt
-                for attempt in range(2):
-                    try:
-                        result = agent.run_conversation(
-                            user_message=context_msg,
-                            system_message=prompt,
-                        )
-                        if result and result.get('final_response'):
-                            break
-                    except Exception as inner_e:
-                        retries += 1
-                        if attempt == 0:
-                            print(f"[PSPAI] L1 retry: {inner_e}")
-                            prompt = system_prompt + "\n(请简短回复)"
-                            time.sleep(1)
-                        else:
-                            raise inner_e
-
+                # 调用 Hermes AIAgent
+                result = agent.run_conversation(
+                    user_message=context_msg,
+                    system_message=system_prompt,
+                )
                 reply = result.get('final_response', '') if result else ''
+
                 if not reply:
                     reply = t_msg(lang, 'thinking')
 
-                latency_ms = int((time.time() - t_start) * 1000)
-
-                # 记忆回路: record successful operation
-                op_logger.record(
-                    tool="chat",
-                    params={
-                        "char_index": char_index,
-                        "char_name": current_name,
-                        "lang": lang,
-                        "msg_len": len(msg),
-                        "reply_len": len(reply),
-                        "retries": retries,
-                    },
-                    success=True,
-                    summary=reply[:100],
-                    latency_ms=latency_ms,
-                )
-
-                # NAME marker detection
+                # 检测回复中的改名标记 [NAME:新名字]
                 name_match = re.search(r'\[NAME:\s*([^\]]+)\]', reply)
                 if name_match:
                     new_name = name_match.group(1).strip()[:10]
@@ -415,20 +322,10 @@ class PSPAIHandler(http.server.BaseHTTPRequestHandler):
 
             except Exception as e:
                 print(f"[PSPAI Chat Error] {e}")
-                latency_ms = int((time.time() - t_start) * 1000)
-                try:
-                    op_logger.record(
-                        tool="chat",
-                        params={"char_index": char_index, "msg_len": len(msg)},
-                        success=False,
-                        summary=str(e)[:100],
-                        latency_ms=latency_ms,
-                    )
-                except Exception:
-                    pass
-                self._send_json({"reply": f"{t_msg(lang, 'error')}: {str(e)[:50]}"})
+                self._send_json({"reply": f"{t_msg(lang, 'error')}：{str(e)[:50]}"})
             return
 
+        # 改名
         if path == "/api/name":
             data = self._read_body()
             char_index = data.get("charIndex", 0)
@@ -442,6 +339,7 @@ class PSPAIHandler(http.server.BaseHTTPRequestHandler):
             self._send_json({"success": True, "name": new_name})
             return
 
+        # 上传头像
         if path == "/api/avatar":
             data = self._read_body()
             slot = data.get("slot", 0)
@@ -460,23 +358,22 @@ def main():
     port = 8089
 
     if not API_KEY:
-        print("ERROR: DEEPSEEK_API_KEY not set in .env")
+        print("❌ 未找到 DEEPSEEK_API_KEY，请在 .env 中配置")
         sys.exit(1)
 
-    print("PSPAI v3.0 backend starting - Hermes engine + memory loop + error recovery")
-    print(f"   Port: {port}")
-    print(f"   Engine: Hermes AIAgent")
-    print(f"   Tools: 31 (terminal/file/search/memory/git/ssh...)")
-    print(f"   Model: DeepSeek Chat")
-    print(f"   Memory: OperationLogger (500 records max)")
-    print(f"   Recovery: L1 retry + L2 fallback + L3 graceful")
-    print(f"   Data: {DATA_DIR}")
+    print("🟢 PSPAI v2 后端服务启动 — 基于 Hermes 引擎")
+    print(f"   端口: {port}")
+    print(f"   引擎: Hermes AIAgent")
+    print(f"   工具: 31个（terminal/file/search/memory/git/ssh...）")
+    print(f"   模型: DeepSeek Chat")
+    print(f"   人格: PSPAI 数字生命体")
+    print(f"   数据: {DATA_DIR}")
 
     server = http.server.HTTPServer(("0.0.0.0", port), PSPAIHandler)
     try:
         server.serve_forever()
     except KeyboardInterrupt:
-        print("\nPSPAI stopped")
+        print("\n🔴 PSPAI 已停止")
         server.shutdown()
 
 
