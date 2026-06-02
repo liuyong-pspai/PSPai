@@ -75,8 +75,8 @@ jobs:
             artifact: engine-windows
             engine_src: xiaolongren-engine-windows.exe
             engine_dest: xiaolongren-engine-windows.exe
-            output: xiaolongren-setup.exe
-            ext: .exe
+            output: xiaolongren-setup.zip
+            ext: .zip
           - platform: macos
             os: macos-14
             artifact: engine-macos
@@ -117,24 +117,7 @@ jobs:
           echo "=== Launcher ==="
           ls -lh launcher.py
 
-      # Windows需要7-Zip来生成自解压exe
-      - name: Install 7-Zip (Windows)
-        if: matrix.platform == 'windows'
-        shell: powershell
-        run: |
-          choco install 7zip -y --no-progress
-          $7z = (Get-Command 7z).Source
-          echo "7Z_PATH=$7z" >> $env:GITHUB_ENV
-          echo "7-Zip installed at $7z"
-
-      - name: Build installer (Windows)
-        if: matrix.platform == 'windows'
-        shell: powershell
-        run: |
-          python installer/make_installer.py
-
-      - name: Build installer (Linux/macOS)
-        if: matrix.platform != 'windows'
+      - name: Build installer
         run: |
           python3 installer/make_installer.py
 

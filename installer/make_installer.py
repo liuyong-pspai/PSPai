@@ -145,7 +145,7 @@ def bundle_python_windows():
 
 
 def build_windows():
-    """Windows: 生成 setup.exe"""
+    """Windows: 生成安装包（便携zip + install.bat）"""
     print("\n--- 🪟 Windows 安装包 ---")
     prepare_build_dir()
     bundle_python_windows()
@@ -156,97 +156,35 @@ def build_windows():
 title 🐉 小龙人 安装中...
 echo   🐉 小龙人 正在安装...
 set "D=C:\小龙人"
+echo [1/3] 复制文件...
 xcopy /E /I /Y /Q "%~dp0*" "%D%" >nul
 cd /d "%D%"
+echo [2/3] 配置Python...
 if exist "python\python.exe" (
     python\python.exe -m ensurepip >nul 2>&1
-    python\python.exe -m pip install -q -r requirements.txt >nul 2>&1
+    python\python.exe -m pip install -q PyYAML Pillow requests >nul 2>&1
 )
-powershell -NoProfile -ExecutionPolicy Bypass -Command "$WshShell=New-Object -ComObject WScript.Shell;$Shortcut=$WshShell.CreateShortcut([Environment]::GetFolderPath('Desktop')+'\🐉 小龙人.lnk');$Shortcut.TargetPath='%D%\python\pythonw.exe';$Shortcut.Arguments='%D%\launcher.py';$Shortcut.WorkingDirectory='%D%';$Shortcut.Save()"
+echo [3/3] 创建快捷方式...
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$WshShell=New-Object -ComObject WScript.Shell;$s=$WshShell.CreateShortcut([Environment]::GetFolderPath('Desktop')+'\🐉 小龙人.lnk');$s.TargetPath='%D%\python\pythonw.exe';$s.Arguments='%D%\launcher.py';$s.WorkingDirectory='%D%';$s.Description='🐉 小龙人';$s.Save()"
 start "" "%D%\python\pythonw.exe" "%D%\launcher.py"
 echo   安装完成！浏览器将自动打开配置向导。
 timeout /t 3 >nul & exit
 ''', encoding="gbk")
 
-    # 创建SFX
-    # 多种方式查找7z
-    seven_zip = None
-    
-    # 0. 环境变量显式指定（CI传入）
-    env_7z = os.environ.get("SEVENZIP_EXE") or os.environ.get("7Z_PATH")
-    if env_7z and os.path.exists(env_7z):
-        seven_zip = env_7z
-    
-    # 1. Windows标准路径
-    if not seven_zip:
-        for path in [
-            os.path.expandvars(r"%ProgramFiles%\7-Zip\7z.exe"),
-            os.path.expandvars(r"%ProgramFiles(x86)%\7-Zip\7z.exe"),
-            r"C:\Program Files\7-Zip\7z.exe",
-            r"C:\Program Files (x86)\7-Zip\7z.exe",
-        ]:
-            try:
-                if os.path.exists(path):
-                    seven_zip = path
-                    break
-            except Exception:
-                pass
-    
-    # 2. PATH查找
-    if not seven_zip:
-        seven_zip = shutil.which("7z") or shutil.which("7za")
-    
-    output = OUTPUT_DIR / "xiaolongren-setup.exe"
+    # 同时创建"点击安装.bat"（用户解压后双击这个）
+    click_install = BUILD_DIR / "点击安装.bat"
+    shutil.copy2(install_bat, click_install)
 
-    if seven_zip:
-        step("7z SFX 打包")
-        print(f"(7z={seven_zip})")
-        archive = OUTPUT_DIR / "xlr_tmp.7z"
-        subprocess.run([seven_zip, "a", "-mx=9", str(archive),
-                        str(BUILD_DIR / "*")], cwd=str(BUILD_DIR),
-                       check=True, capture_output=True)
-
-        # 查找7z.sfx模块
-        sfx_module = None
-        for path in [
-            os.path.expandvars(r"%ProgramFiles%\7-Zip\7z.sfx"),
-            r"C:\Program Files\7-Zip\7z.sfx",
-            r"C:\Program Files (x86)\7-Zip\7z.sfx",
-        ]:
-            if os.path.exists(path):
-                sfx_module = Path(path)
-                break
-        
-        if not sfx_module:
-            fail("未找到7z.sfx，请安装7-Zip")
-
-        with open(output, "wb") as out:
-            out.write(sfx_module.read_bytes())
-
-            config = (f';!@Install@!UTF-8!\n'
-                      f'Title="{APP_DISPLAY} 安装"\n'
-                      f'BeginPrompt="即将安装{APP_DISPLAY}到 C:\\\\小龙人\\\\，是否继续？"\n'
-                      f'RunProgram="cmd /c install.bat"\n'
-                      f'GUIMode="2"\n'
-                      f';!@InstallEnd@!\n')
-            out.write(config.encode("utf-8"))
-            out.write(archive.read_bytes())
-        archive.unlink()
-        size_mb = output.stat().st_size / (1024*1024)
-        print(f"({size_mb:.1f}MB)")
-        ok()
-    else:
-        # 降级：创建便携版zip（用户可以解压后运行install.bat）
-        step("创建便携版ZIP")
-        zip_path = OUTPUT_DIR / "xiaolongren-windows-portable.zip"
-        shutil.make_archive(str(zip_path.with_suffix("")), "zip", str(BUILD_DIR))
-        size_mb = zip_path.stat().st_size / (1024 * 1024)
-        print(f"({size_mb:.1f}MB)")
-        ok()
-        print(f"  ⚠️ 7z未找到，生成便携版zip代替setup.exe")
-        print(f"  → {zip_path}")
+    # 创建便携版zip
+    step("创建安装包ZIP")
+    output = OUTPUT_DIR / "xiaolongren-setup.zip"
+    shutil.make_archive(str(output.with_suffix("")), "zip", str(BUILD_DIR))
+    size_mb = output.stat().st_size / (1024 * 1024)
+    print(f"({size_mb:.1f}MB)")
+    ok()
 
     print(f"  → {output}")
+    print(f"  📋 用户安装: 解压zip → 双击「点击安装.bat」")
     return str(output)
 
 
