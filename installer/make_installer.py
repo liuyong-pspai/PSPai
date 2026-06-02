@@ -1,47 +1,26 @@
 #!/usr/bin/env python3
 """
 小龙人 三平台一键安装包制作工具
-   在CI上运行，自动检测当前系统，生成对应安装包
+在CI上运行，自动检测当前系统，生成对应安装包
 
-   Windows → xiaolongren-setup.exe (7z SFX)
-   macOS   → xiaolongren-installer.dmg (.app bundle)
-   Linux   → xiaolongren-installer.run (makeself 自解压)
+Windows → xiaolongren-setup.zip (解压→双击bat→桌面图标→浏览器配模型)
+macOS   → xiaolongren-installer.dmg (.app拖到Applications→启动台打开)
+Linux   → xiaolongren-installer.run (./运行→应用菜单图标)
 
-   用户安装流程（三平台统一）:
-   1. 双击安装包
-   2. 自动装到系统目录 → 桌面/启动台出现图标
-   3. 双击图标 → 浏览器打开配置向导
-   4. 选模型填Key → 开始聊天
+用户流程统一: 下载→双击→浏览器选模型填Key→开始聊天
 """
-import os
-import sys
-import shutil
-import json
-import zipfile
-import subprocess
-import tempfile
-import urllib.request
+import os, sys, shutil, zipfile, subprocess, tempfile, urllib.request
 from pathlib import Path
 
-# ============================================================
-# 配置
-# ============================================================
-APP_NAME = "XiaoLongRen"
 APP_DISPLAY = "🐉 小龙人"
-PYTHON_VERSION = "3.12.9"
-
+PYTHON_VER = "3.12.9"
 REPO_ROOT = Path(__file__).parent.parent.resolve()
-ENGINE_DIR = REPO_ROOT / "engine"
 FRONTEND_DIR = REPO_ROOT / "UI原型"
 OUTPUT_DIR = REPO_ROOT / "dist"
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+BUILD_DIR = Path(tempfile.mkdtemp(prefix="xlr_"))
 
-BUILD_DIR = Path(tempfile.mkdtemp(prefix="xlr_build_"))
 
-
-# ============================================================
-# 通用工具
-# ============================================================
 def step(msg):
     print(f"  [{msg}]", end=" ", flush=True)
 
@@ -53,54 +32,17 @@ def fail(msg):
     sys.exit(1)
 
 def download(url, dest):
-    print(f"    下载: {url.split('/')[-1]}")
+    print(f"    下载 {url.split('/')[-1]}...", end=" ", flush=True)
     try:
         urllib.request.urlretrieve(url, dest)
+        print("OK")
         return True
     except Exception as e:
-        print(f"    下载失败: {e}")
+        print(f"失败: {e}")
         return False
 
 
 # ============================================================
-# 各平台共用：准备构建内容
-# ============================================================
-def prepare_build_dir():
-    """准备构建目录——所有平台共用"""
-    step("准备构建内容")
-
-    # 前端
-    front_dest = BUILD_DIR / "frontend"
-    if FRONTEND_DIR.exists():
-        shutil.copytree(FRONTEND_DIR, front_dest, dirs_exist_ok=True)
-    else:
-        fail(f"前端目录不存在: {FRONTEND_DIR}")
-
-    # 启动器
-    launcher_src = REPO_ROOT / "launcher.py"
-    if launcher_src.exists():
-        shutil.copy2(launcher_src, BUILD_DIR / "launcher.py")
-    else:
-        fail(f"启动器不存在: {launcher_src}")
-
-    # 引擎
-    engine = find_engine()
-    if engine:
-        shutil.copy2(engine, BUILD_DIR / "xiaolongren-engine")
-        os.chmod(BUILD_DIR / "xiaolongren-engine", 0o755)
-    else:
-        print("    (未找到引擎，CI将补入)")
-
-    # requirements
-    req = REPO_ROOT / "requirements.txt"
-    if req.exists():
-        shutil.copy2(req, BUILD_DIR / "requirements.txt")
-
-    file_count = sum(1 for _ in BUILD_DIR.rglob("*") if _.is_file())
-    print(f"    ({file_count} 文件)")
-    ok()
-
-
 def find_engine():
     """查找当前平台引擎"""
     candidates = {
@@ -111,316 +53,232 @@ def find_engine():
         "linux": ["engine/dist/xiaolongren-engine-linux-x86_64",
                    "xiaolongren-engine-linux-x86_64"],
     }
-    platform = sys.platform
-    for name in candidates.get(platform, []):
-        path = REPO_ROOT / name
-        if path.exists():
-            return path
+    for name in candidates.get(sys.platform, []):
+        p = REPO_ROOT / name
+        if p.exists():
+            return p
     return None
 
 
-# ============================================================
-# Windows: 7z SFX → setup.exe
-# ============================================================
-def bundle_python_windows():
-    """Windows: 下载嵌入式Python"""
-    step("打包Python (Windows embeddable)")
-    url = f"https://www.python.org/ftp/python/{PYTHON_VERSION}/python-{PYTHON_VERSION}-embed-amd64.zip"
-    py_zip = BUILD_DIR / "python-embed.zip"
-    if not download(url, py_zip):
-        fail("下载失败")
-    with zipfile.ZipFile(py_zip) as zf:
-        zf.extractall(BUILD_DIR / "python")
-    py_zip.unlink()
-
-    # 启用 pip
-    pth = BUILD_DIR / "python" / "python312._pth"
-    if pth.exists():
-        content = pth.read_text()
-        content = content.replace("#import site", "import site")
-        if "Lib/site-packages" not in content:
-            content += "\nLib/site-packages\n"
-        pth.write_text(content)
+def prepare_build():
+    """准备构建内容（前端+启动器+引擎）——三平台共用"""
+    step("准备构建内容")
+    # 前端
+    shutil.copytree(FRONTEND_DIR, BUILD_DIR / "frontend", dirs_exist_ok=True)
+    # 启动器
+    shutil.copy2(REPO_ROOT / "launcher.py", BUILD_DIR / "launcher.py")
+    # 引擎
+    engine = find_engine()
+    if engine:
+        name = "xiaolongren-engine.exe" if sys.platform == "win32" else "xiaolongren-engine"
+        shutil.copy2(engine, BUILD_DIR / name)
+        os.chmod(BUILD_DIR / name, 0o755)
+    n = sum(1 for _ in BUILD_DIR.rglob("*") if _.is_file())
+    print(f"({n} 文件)")
     ok()
 
 
+# ============================================================
+# Windows
+# ============================================================
 def build_windows():
-    """Windows: 生成安装包（便携zip + install.bat）"""
     print("\n--- 🪟 Windows 安装包 ---")
-    prepare_build_dir()
-    bundle_python_windows()
+    prepare_build()
 
-    # 创建安装引导
-    install_bat = BUILD_DIR / "install.bat"
-    install_bat.write_text(r'''@echo off & chcp 65001 >nul
-title 🐉 小龙人 安装中...
-echo   🐉 小龙人 正在安装...
-set "D=C:\小龙人"
-echo [1/3] 复制文件...
-xcopy /E /I /Y /Q "%~dp0*" "%D%" >nul
-cd /d "%D%"
-echo [2/3] 配置Python...
-if exist "python\python.exe" (
-    python\python.exe -m ensurepip >nul 2>&1
-    python\python.exe -m pip install -q PyYAML Pillow requests >nul 2>&1
-)
-echo [3/3] 创建快捷方式...
-powershell -NoProfile -ExecutionPolicy Bypass -Command "$WshShell=New-Object -ComObject WScript.Shell;$s=$WshShell.CreateShortcut([Environment]::GetFolderPath('Desktop')+'\🐉 小龙人.lnk');$s.TargetPath='%D%\python\pythonw.exe';$s.Arguments='%D%\launcher.py';$s.WorkingDirectory='%D%';$s.Description='🐉 小龙人';$s.Save()"
-start "" "%D%\python\pythonw.exe" "%D%\launcher.py"
-echo   安装完成！浏览器将自动打开配置向导。
-timeout /t 3 >nul & exit
-''', encoding="gbk")
+    # 安装引导bat
+    bat = BUILD_DIR / "install.bat"
+    bat.write_bytes(b'@echo off\r\n'
+        b'chcp 65001 >nul\r\n'
+        b'title XiaoLongRen Setup\r\n'
+        b'echo ======================================\r\n'
+        b'echo   XiaoLongRen Setup\r\n'
+        b'echo ======================================\r\n'
+        b'echo.\r\n'
+        b'set "D=C:\\XiaoLongRen"\r\n'
+        b'echo [1/4] Copying files to %D%...\r\n'
+        b'xcopy /E /I /Y /Q "%~dp0*" "%D%" >nul\r\n'
+        b'cd /d "%D%"\r\n'
+        b'echo [2/4] Creating desktop shortcut...\r\n'
+        b'powershell -NoProfile -ExecutionPolicy Bypass -Command "$s=(New-Object -ComObject WScript.Shell).CreateShortcut([Environment]::GetFolderPath(\'Desktop\')+\'\\XiaoLongRen.lnk\');$s.TargetPath=\'pythonw\';$s.Arguments=\'%D%\\launcher.py\';$s.WorkingDirectory=\'%D%\';$s.Save()"\r\n'
+        b'echo [3/4] Installing Python dependencies...\r\n'
+        b'python -m pip install -q PyYAML Pillow requests >nul 2>&1\r\n'
+        b'echo [4/4] Launching...\r\n'
+        b'start "" pythonw "%D%\\launcher.py"\r\n'
+        b'echo.\r\n'
+        b'echo   Done! Browser opens for model setup.\r\n'
+        b'echo   Desktop shortcut created.\r\n'
+        b'timeout /t 3 >nul\r\n'
+        b'exit\r\n')
 
-    # 同时创建"点击安装.bat"（用户解压后双击这个）
-    click_install = BUILD_DIR / "点击安装.bat"
-    shutil.copy2(install_bat, click_install)
-
-    # 创建便携版zip
+    # 打包zip
     step("创建安装包ZIP")
     output = OUTPUT_DIR / "xiaolongren-setup.zip"
     shutil.make_archive(str(output.with_suffix("")), "zip", str(BUILD_DIR))
-    size_mb = output.stat().st_size / (1024 * 1024)
-    print(f"({size_mb:.1f}MB)")
+    mb = output.stat().st_size / (1024*1024)
+    print(f"({mb:.1f}MB)")
     ok()
-
-    print(f"  → {output}")
-    print(f"  📋 用户安装: 解压zip → 双击「点击安装.bat」")
+    print(f"  -> {output}")
     return str(output)
 
 
 # ============================================================
-# macOS: .app bundle → .dmg
+# macOS
 # ============================================================
 def build_macos():
-    """macOS: 生成 .dmg"""
     print("\n--- 🍎 macOS 安装包 ---")
-    prepare_build_dir()
-
-    app_name = f"{APP_DISPLAY}.app"
-    app_dir = BUILD_DIR / app_name
-    contents = app_dir / "Contents"
-    macos_dir = contents / "MacOS"
-    resources_dir = contents / "Resources"
-
-    for d in [macos_dir, resources_dir]:
-        d.mkdir(parents=True, exist_ok=True)
+    prepare_build()
 
     step("创建 .app bundle")
+    app = BUILD_DIR / "XiaoLongRen.app"
+    macos_dir = app / "Contents" / "MacOS"
+    res_dir = app / "Contents" / "Resources"
+    macos_dir.mkdir(parents=True, exist_ok=True)
+    res_dir.mkdir(parents=True, exist_ok=True)
 
     # Info.plist
-    plist = contents / "Info.plist"
-    plist.write_text(f'''<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
-  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-    <key>CFBundleExecutable</key>
-    <string>xiaolongren</string>
-    <key>CFBundleIdentifier</key>
-    <string>com.liuyong-pspai.xiaolongren</string>
-    <key>CFBundleName</key>
-    <string>{APP_DISPLAY}</string>
-    <key>CFBundleDisplayName</key>
-    <string>{APP_DISPLAY}</string>
-    <key>CFBundleVersion</key>
-    <string>1.0</string>
-    <key>CFBundleShortVersionString</key>
-    <string>1.0</string>
-    <key>CFBundlePackageType</key>
-    <string>APPL</string>
-    <key>LSMinimumSystemVersion</key>
-    <string>11.0</string>
-    <key>NSHighResolutionCapable</key>
-    <true/>
-</dict>
-</plist>''')
+    (app / "Contents" / "Info.plist").write_text(
+        '<?xml version="1.0" encoding="UTF-8"?>\n'
+        '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" '
+        '"http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n'
+        '<plist version="1.0"><dict>\n'
+        '<key>CFBundleExecutable</key><string>launch</string>\n'
+        '<key>CFBundleIdentifier</key><string>com.liuyong-pspai.xiaolongren</string>\n'
+        '<key>CFBundleName</key><string>XiaoLongRen</string>\n'
+        '<key>CFBundleDisplayName</key><string>XiaoLongRen</string>\n'
+        '<key>CFBundleVersion</key><string>1.0</string>\n'
+        '<key>CFBundleShortVersionString</key><string>1.0</string>\n'
+        '<key>CFBundlePackageType</key><string>APPL</string>\n'
+        '<key>LSMinimumSystemVersion</key><string>11.0</string>\n'
+        '<key>NSHighResolutionCapable</key><true/>\n'
+        '</dict></plist>')
 
     # 启动脚本
-    launcher_script = macos_dir / "xiaolongren"
-    launcher_script.write_text(f'''#!/bin/bash
-DIR="$(cd "$(dirname "$0")" && pwd)"
-RES="$DIR/../Resources"
-APP_DATA="$HOME/.xiaolongren"
-
-# 首次运行：复制文件
-if [ ! -f "$APP_DATA/config.json" ]; then
-    mkdir -p "$APP_DATA"
-    cp -R "$RES"/* "$APP_DATA/" 2>/dev/null
-fi
-
-cd "$APP_DATA"
-
-# 优先用系统Python3
-PYTHON=""
-for p in /usr/bin/python3 /usr/local/bin/python3 /opt/homebrew/bin/python3; do
-    if [ -x "$p" ]; then PYTHON="$p"; break; fi
-done
-[ -z "$PYTHON" ] && PYTHON="python3"
-
-exec "$PYTHON" launcher.py
-''')
-    os.chmod(launcher_script, 0o755)
+    launch = macos_dir / "launch"
+    launch.write_text('#!/bin/bash\n'
+        'DIR="$(cd "$(dirname "$0")" && pwd)/../Resources"\n'
+        'mkdir -p "$HOME/.xiaolongren"\n'
+        'cp -Rn "$DIR"/* "$HOME/.xiaolongren/" 2>/dev/null\n'
+        'cd "$HOME/.xiaolongren"\n'
+        'PYTHON="python3"\n'
+        '[ -x /opt/homebrew/bin/python3 ] && PYTHON=/opt/homebrew/bin/python3\n'
+        '[ -x /usr/local/bin/python3 ] && PYTHON=/usr/local/bin/python3\n'
+        'exec "$PYTHON" launcher.py\n')
+    os.chmod(launch, 0o755)
 
     # 复制资源
-    for item in (BUILD_DIR / "frontend").iterdir():
-        dest = resources_dir / item.name
-        if item.is_dir():
-            shutil.copytree(item, dest, dirs_exist_ok=True)
-        else:
-            shutil.copy2(item, dest)
+    for item in BUILD_DIR.iterdir():
+        if item.name != "XiaoLongRen.app":
+            dest = res_dir / item.name
+            if item.is_dir():
+                shutil.copytree(item, dest, dirs_exist_ok=True)
+            else:
+                shutil.copy2(item, dest)
 
-    engine = BUILD_DIR / "xiaolongren-engine"
-    if engine.exists():
-        shutil.copy2(engine, resources_dir / "xiaolongren-engine")
-
-    launcher = BUILD_DIR / "launcher.py"
-    if launcher.exists():
-        shutil.copy2(launcher, resources_dir / "launcher.py")
-
-    # 复制 .app 到 dist
-    dist_app = OUTPUT_DIR / app_name
+    # 移到dist
+    dist_app = OUTPUT_DIR / "XiaoLongRen.app"
     if dist_app.exists():
         shutil.rmtree(dist_app)
-    shutil.copytree(app_dir, dist_app)
+    shutil.copytree(app, dist_app)
     ok()
 
-    # 创建 DMG
+    # 创建DMG
     step("创建 DMG")
-    dmg_path = OUTPUT_DIR / "xiaolongren-installer.dmg"
-    if dmg_path.exists():
-        dmg_path.unlink()
-
-    result = subprocess.run([
-        "hdiutil", "create",
-        "-volname", APP_DISPLAY,
-        "-srcfolder", str(dist_app),
-        "-ov", "-format", "UDZO",
-        str(dmg_path)
-    ], capture_output=True, text=True)
-
-    if result.returncode == 0:
-        size_mb = dmg_path.stat().st_size / (1024*1024)
-        print(f"({size_mb:.1f}MB)")
+    dmg = OUTPUT_DIR / "xiaolongren-installer.dmg"
+    if dmg.exists():
+        dmg.unlink()
+    r = subprocess.run(["hdiutil", "create", "-volname", "XiaoLongRen",
+        "-srcfolder", str(dist_app), "-ov", "-format", "UDZO", str(dmg)],
+        capture_output=True, text=True)
+    if r.returncode == 0:
+        mb = dmg.stat().st_size / (1024*1024)
+        print(f"({mb:.1f}MB)")
         ok()
     else:
-        # 降级：ZIP
-        print("(降级为ZIP)")
-        shutil.make_archive(str(OUTPUT_DIR / "xiaolongren-macos"),
-                            "zip", str(dist_app))
+        print("(降级ZIP)")
+        shutil.make_archive(str(OUTPUT_DIR / "xiaolongren-macos"), "zip",
+                           str(dist_app))
         ok()
-
-    print(f"  → {OUTPUT_DIR}")
+    print(f"  -> {OUTPUT_DIR}")
     return str(OUTPUT_DIR)
 
 
 # ============================================================
-# Linux: makeself → .run
+# Linux
 # ============================================================
 def build_linux():
-    """Linux: 生成自解压 .run"""
     print("\n--- 🐧 Linux 安装包 ---")
-    prepare_build_dir()
+    prepare_build()
 
     step("创建自解压脚本")
+    payload = BUILD_DIR.parent / "payload.tar.gz"
+    subprocess.run(["tar", "czf", str(payload), "-C", str(BUILD_DIR), "."],
+                   check=True)
 
-    # 把所有内容打包成内嵌tar.gz
-    payload_tar = BUILD_DIR.parent / "payload.tar.gz"
-    subprocess.run(["tar", "czf", str(payload_tar),
-                    "-C", str(BUILD_DIR), "."], check=True)
-
-    # 创建自解压脚本
     run_path = OUTPUT_DIR / "xiaolongren-installer.run"
-
     with open(run_path, "w") as f:
         f.write("#!/bin/bash\n")
-        f.write("# 🐉 小龙人 Linux 一键安装\n")
-        f.write('set -e\n')
-        f.write(f'APP_DIR="$HOME/.xiaolongren"\n')
-        f.write(f'echo "🐉 {APP_DISPLAY} 安装中..."\n')
-        f.write(f'mkdir -p "$APP_DIR"\n')
-        f.write(f'echo "[1/3] 解压文件..."\n')
-        f.write(f'ARCHIVE=$(mktemp)\n')
-        f.write(f'sed "1,/^__PAYLOAD__$/d" "$0" > "$ARCHIVE"\n')
-        f.write(f'tar xzf "$ARCHIVE" -C "$APP_DIR"\n')
-        f.write(f'rm "$ARCHIVE"\n')
-        f.write(f'echo "[2/3] 安装依赖..."\n')
-        f.write(f'cd "$APP_DIR"\n')
-        f.write(f'if command -v python3 &>/dev/null; then\n')
-        f.write(f'    python3 -m pip install -q -r requirements.txt 2>/dev/null || true\n')
-        f.write(f'fi\n')
-        f.write(f'echo "[3/3] 创建桌面快捷方式..."\n')
-        f.write(f'mkdir -p "$HOME/.local/share/applications"\n')
-        f.write(f'cat > "$HOME/.local/share/applications/xiaolongren.desktop" << EOF\n')
-        f.write(f'[Desktop Entry]\n')
-        f.write(f'Name={APP_DISPLAY}\n')
-        f.write(f'Comment=一个有灵魂的数字生命体\n')
-        f.write(f'Exec=python3 {{{{APP_DIR}}}}/launcher.py\n')
-        f.write(f'Path={{{{APP_DIR}}}}\n')
-        f.write(f'Icon={{{{APP_DIR}}}}/frontend/img_longyuan.jpg\n')
-        f.write(f'Terminal=false\n')
-        f.write(f'Type=Application\n')
-        f.write(f'Categories=Utility;AI;\n')
-        f.write(f'EOF\n')
-        # 替换双花括号为单花括号
-        f.write(f'sed -i "s|{{{{APP_DIR}}}}|$APP_DIR|g" \\\n')
-        f.write(f'    "$HOME/.local/share/applications/xiaolongren.desktop"\n')
-        f.write(f'update-desktop-database "$HOME/.local/share/applications" 2>/dev/null || true\n')
-        f.write(f'echo ""\n')
-        f.write(f'echo "✅ 安装完成！正在启动..."\n')
-        f.write(f'cd "$APP_DIR" && python3 launcher.py &\n')
-        f.write(f'exit 0\n')
-        f.write(f'__PAYLOAD__\n')
-
+        f.write("set -e\n")
+        f.write('APP="$HOME/.xiaolongren"\n')
+        f.write('echo "Installing XiaoLongRen..."\n')
+        f.write('mkdir -p "$APP"\n')
+        f.write('ARCHIVE=$(mktemp)\n')
+        f.write('sed "1,/^__PAYLOAD__$/d" "$0" > "$ARCHIVE"\n')
+        f.write('tar xzf "$ARCHIVE" -C "$APP"\n')
+        f.write('rm "$ARCHIVE"\n')
+        f.write('cd "$APP"\n')
+        f.write('python3 -m pip install -q PyYAML Pillow requests 2>/dev/null || true\n')
+        f.write('mkdir -p "$HOME/.local/share/applications"\n')
+        f.write('cat > "$HOME/.local/share/applications/xiaolongren.desktop" << DESKTOPEOF\n')
+        f.write('[Desktop Entry]\n')
+        f.write('Name=XiaoLongRen\n')
+        f.write('Comment=AI Digital Companion\n')
+        f.write('Exec=python3 $HOME/.xiaolongren/launcher.py\n')
+        f.write('Path=$HOME/.xiaolongren\n')
+        f.write('Terminal=false\n')
+        f.write('Type=Application\n')
+        f.write('Categories=Utility;\n')
+        f.write('DESKTOPEOF\n')
+        f.write('echo "Done! Starting..."\n')
+        f.write('python3 launcher.py &\n')
+        f.write('exit 0\n')
+        f.write('__PAYLOAD__\n')
     os.chmod(run_path, 0o755)
 
-    # 追加payload
     with open(run_path, "ab") as f:
-        f.write(payload_tar.read_bytes())
+        f.write(payload.read_bytes())
+    payload.unlink()
 
-    payload_tar.unlink()
-
-    size_mb = run_path.stat().st_size / (1024*1024)
-    print(f"({size_mb:.1f}MB)")
+    mb = run_path.stat().st_size / (1024*1024)
+    print(f"({mb:.1f}MB)")
     ok()
-
-    print(f"  → {run_path}")
+    print(f"  -> {run_path}")
     return str(run_path)
 
 
 # ============================================================
-# 主入口：自动检测平台 → 调用对应构建函数
-# ============================================================
 def main():
-    print("=" * 60)
-    print(f"  🐉 小龙人 安装包制作工具")
-    print(f"  当前平台: {sys.platform}")
-    print("=" * 60)
-
     builders = {
         "win32": ("Windows", build_windows),
         "darwin": ("macOS", build_macos),
         "linux": ("Linux", build_linux),
     }
-
-    platform_name, builder = builders.get(sys.platform, (None, None))
-
-    if builder is None:
-        print(f"\n⚠️ 不支持的平台: {sys.platform}")
-        print("  可用: " + ", ".join(builders.keys()))
+    name, fn = builders.get(sys.platform, (None, None))
+    if not fn:
+        print(f"Unsupported: {sys.platform}")
         return 1
 
-    print(f"\n🎯 目标: {platform_name} 安装包\n")
+    print("=" * 60)
+    print(f"  XiaoLongRen Installer Builder - {name}")
+    print("=" * 60)
 
     try:
-        result = builder()
-        print(f"\n✅ {platform_name} 安装包已生成")
-        print(f"   📦 {result}")
-        return 0
+        result = fn()
+        print(f"\nDone: {result}")
     except Exception as e:
         import traceback
         traceback.print_exc()
-        print(f"\n❌ 构建失败: {e}")
         return 1
+    return 0
 
 
 if __name__ == "__main__":
