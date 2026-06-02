@@ -162,7 +162,7 @@ if exist "python\python.exe" (
     python\python.exe -m ensurepip >nul 2>&1
     python\python.exe -m pip install -q -r requirements.txt >nul 2>&1
 )
-powershell -NoProfile -ExecutionPolicy Bypass -Command "$W=$WshShell.CreateShortcut([Environment]::GetFolderPath('Desktop')+'\🐉 小龙人.lnk');$W.TargetPath='%D%\python\pythonw.exe';$W.Arguments='%D%\launcher.py';$W.WorkingDirectory='%D%';$W.Save()"
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$WshShell=New-Object -ComObject WScript.Shell;$Shortcut=$WshShell.CreateShortcut([Environment]::GetFolderPath('Desktop')+'\🐉 小龙人.lnk');$Shortcut.TargetPath='%D%\python\pythonw.exe';$Shortcut.Arguments='%D%\launcher.py';$Shortcut.WorkingDirectory='%D%';$Shortcut.Save()"
 start "" "%D%\python\pythonw.exe" "%D%\launcher.py"
 echo   安装完成！浏览器将自动打开配置向导。
 timeout /t 3 >nul & exit
@@ -201,23 +201,15 @@ timeout /t 3 >nul & exit
         print(f"({size_mb:.1f}MB)")
         ok()
     else:
-        # 降级：用PowerShell Compress-Archive + 自解压脚本
-        step("PowerShell 自解压打包")
-        # 创建自解压脚本
-        sfx_script = BUILD_DIR.parent / "sfx.ps1"
-        sfx_script.write_text(f'''
-$dest = "C:\\小龙人"
-Copy-Item -Path "{BUILD_DIR}\\*" -Destination $dest -Recurse -Force
-$WshShell = New-Object -ComObject WScript.Shell
-$Shortcut = $WshShell.CreateShortcut([Environment]::GetFolderPath("Desktop") + "\\🐉 小龙人.lnk")
-$Shortcut.TargetPath = "$dest\\python\\pythonw.exe"
-$Shortcut.Arguments = "$dest\\launcher.py"
-$Shortcut.WorkingDirectory = "$dest"
-$Shortcut.Save()
-Start-Process "$dest\\python\\pythonw.exe" "$dest\\launcher.py"
-''', encoding="utf-8")
-        print(f"(PowerShell脚本)")
+        # 降级：创建便携版zip（用户可以解压后运行install.bat）
+        step("创建便携版ZIP")
+        zip_path = OUTPUT_DIR / "xiaolongren-windows-portable.zip"
+        shutil.make_archive(str(zip_path.with_suffix("")), "zip", str(BUILD_DIR))
+        size_mb = zip_path.stat().st_size / (1024 * 1024)
+        print(f"({size_mb:.1f}MB)")
         ok()
+        print(f"  ⚠️ 7z未找到，生成便携版zip代替setup.exe")
+        print(f"  → {zip_path}")
 
     print(f"  → {output}")
     return str(output)

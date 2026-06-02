@@ -117,6 +117,15 @@ jobs:
           echo "=== Launcher ==="
           ls -lh launcher.py
 
+      # Windows需要7-Zip来生成自解压exe
+      - name: Install 7-Zip (Windows)
+        if: matrix.platform == 'windows'
+        shell: powershell
+        run: |
+          choco install 7zip -y --no-progress
+          echo "7-Zip installed"
+          & "C:\Program Files\7-Zip\7z.exe" --help
+
       - name: Build installer
         run: |
           python3 installer/make_installer.py
