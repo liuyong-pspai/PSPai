@@ -8,6 +8,7 @@ jobs:
   # ============ 闭源引擎三平台编译 ============
   build-engine:
     strategy:
+      fail-fast: false   # 一个失败不取消其他
       matrix:
         include:
           - name: linux-x86_64
@@ -27,9 +28,11 @@ jobs:
         with:
           python-version: '3.12'
 
-      - run: pip install pyinstaller pyyaml
+      - name: Install deps
+        run: pip install pyinstaller pyyaml
 
-      - name: Build
+      - name: Build engine
+        timeout-minutes: 15
         run: |
           cd engine
           pyinstaller --onefile --name xiaolongren-engine-${{ matrix.name }} \
@@ -38,11 +41,13 @@ jobs:
             --add-data "pspai_search.py:." \
             --hidden-import yaml \
             pspai_server.py
+          ls -lh dist/
 
-      - name: Upload binary to Release
+      - name: Upload to Release
         uses: softprops/action-gh-release@v2
         with:
           files: engine/dist/xiaolongren-engine-${{ matrix.name }}${{ matrix.suffix }}
+          make_latest: true
 
   # ============ 开源应用层打包 ============
   pack-open-source:
@@ -51,15 +56,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Package open-source layer
+      - name: Package open-source
         run: |
           tar czf xiaolongren-open-source-v1.0.0.tar.gz \
             --exclude='engine' \
             --exclude='.git' \
             --exclude='.github' \
             .
+          ls -lh xiaolongren-open-source-v1.0.0.tar.gz
 
       - name: Upload to Release
         uses: softprops/action-gh-release@v2
         with:
           files: xiaolongren-open-source-v1.0.0.tar.gz
+          make_latest: true
