@@ -117,9 +117,14 @@ jobs:
           echo "=== Launcher ==="
           ls -lh launcher.py
 
-      - name: Build installer
-        run: |
-          python3 installer/make_installer.py || python installer/make_installer.py
+      - name: Build installer (Windows)
+        if: matrix.platform == 'windows'
+        shell: cmd
+        run: python installer/make_installer.py
+
+      - name: Build installer (macOS/Linux)
+        if: matrix.platform != 'windows'
+        run: python3 installer/make_installer.py
 
       - name: List output
         run: |
