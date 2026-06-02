@@ -124,6 +124,7 @@ def config_to_env(cfg):
     language = cfg.get("language", "zh")
     character = cfg.get("character", "longyuan")
 
+    # === .env 文件 ===
     lines = [
         "# 小龙人配置 - 自动生成",
         f"PSPAI_PROVIDER={provider}",
@@ -135,16 +136,32 @@ def config_to_env(cfg):
         lines.append(f"PSPAI_MODEL={model}")
     if base_url:
         lines.append(f"PSPAI_BASE_URL={base_url}")
-
+    # Provider-specific key
     if provider == "deepseek":
         lines.append(f"DEEPSEEK_API_KEY={api_key}")
     elif provider == "openai":
         lines.append(f"OPENAI_API_KEY={api_key}")
-    elif provider == "anthropic":
-        lines.append(f"ANTHROPIC_API_KEY={api_key}")
 
     with open(ENV_FILE, "w") as f:
         f.write("\n".join(lines) + "\n")
+
+    # === config.yaml 文件（引擎读取的关键配置）===
+    yaml_lines = [
+        "# 小龙人配置 - 自动生成",
+        "agent:",
+        f"  provider: {provider}",
+        f"  model: {model or 'deepseek-chat'}",
+        f"  language: {language}",
+    ]
+    if base_url:
+        yaml_lines.append(f"  base_url: {base_url}")
+
+    config_yaml_path = APP_DIR / "config.yaml"
+    with open(config_yaml_path, "w") as f:
+        f.write("\n".join(yaml_lines) + "\n")
+
+    print(f"  ✅ .env 已生成")
+    print(f"  ✅ config.yaml 已生成")
 
 
 # ============================================================
