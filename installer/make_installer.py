@@ -169,24 +169,46 @@ timeout /t 3 >nul & exit
 ''', encoding="gbk")
 
     # 创建SFX
-    seven_zip = shutil.which("7z") or shutil.which("7za")
+    # 多种方式查找7z（choco安装后路径 / 手动安装 / PATH）
+    seven_zip = None
+    for path in [
+        os.path.expandvars(r"%ProgramFiles%\7-Zip\7z.exe"),
+        os.path.expandvars(r"%ProgramFiles(x86)%\7-Zip\7z.exe"),
+        r"C:\Program Files\7-Zip\7z.exe",
+        r"C:\Program Files (x86)\7-Zip\7z.exe",
+    ]:
+        if os.path.exists(path):
+            seven_zip = path
+            break
+    if not seven_zip:
+        seven_zip = shutil.which("7z") or shutil.which("7za")
+    
     output = OUTPUT_DIR / "xiaolongren-setup.exe"
 
     if seven_zip:
         step("7z SFX 打包")
+        print(f"(7z={seven_zip})")
         archive = OUTPUT_DIR / "xlr_tmp.7z"
         subprocess.run([seven_zip, "a", "-mx=9", str(archive),
                         str(BUILD_DIR / "*")], cwd=str(BUILD_DIR),
                        check=True, capture_output=True)
 
-        sfx_module = (Path(os.environ.get("ProgramFiles", "C:/Program Files")) /
-                      "7-Zip" / "7z.sfx")
+        # 查找7z.sfx模块
+        sfx_module = None
+        for path in [
+            os.path.expandvars(r"%ProgramFiles%\7-Zip\7z.sfx"),
+            r"C:\Program Files\7-Zip\7z.sfx",
+            r"C:\Program Files (x86)\7-Zip\7z.sfx",
+        ]:
+            if os.path.exists(path):
+                sfx_module = Path(path)
+                break
+        
+        if not sfx_module:
+            fail("未找到7z.sfx，请安装7-Zip")
+
         with open(output, "wb") as out:
-            if sfx_module.exists():
-                out.write(sfx_module.read_bytes())
-            else:
-                # 内联最小SFX stub (约100KB, 从7z源码编译)
-                fail("未找到7z.sfx，请安装7-Zip")
+            out.write(sfx_module.read_bytes())
 
             config = (f';!@Install@!UTF-8!\n'
                       f'Title="{APP_DISPLAY} 安装"\n'
