@@ -12,21 +12,35 @@
 <style>
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{width:100%;height:100%;overflow:hidden;font-family:'PingFang SC','Microsoft YaHei',sans-serif;background:#0a0a14;color:#e0d8c8;touch-action:manipulation;user-select:none;-webkit-user-select:none}
-:root{--gold:#c8a84e;--gold-dim:rgba(200,168,78,0.3)}
+:root{--gold:#c8a84e;--gold-dim:rgba(200,168,78,0.3);--bg:#0a0a14;--card:rgba(20,20,32,0.5);--text:#e0d8c8}
 
-#app{position:fixed;inset:0;display:flex;flex-direction:column}
+/* === 主题 === */
+.theme-tech{--gold:#00d4ff;--gold-dim:rgba(0,212,255,0.3);--bg:#0a0a1a;--card:rgba(0,20,40,0.5);--text:#c0e0f0}
+.theme-loft{--gold:#e8904a;--gold-dim:rgba(232,144,74,0.3);--bg:#1a1a14;--card:rgba(32,28,20,0.5);--text:#d8d0c0}
+
+#app{position:fixed;inset:0;display:flex;flex-direction:column;background:var(--bg);color:var(--text)}
 
 /* 顶部 */
 #top{height:44px;padding:0 14px;padding-top:env(safe-area-inset-top,0);display:flex;align-items:center;justify-content:space-between;z-index:10;flex-shrink:0}
 #top .t{font-size:15px;font-weight:bold;color:var(--gold)}
-#top .st{font-size:11px}
+#top .r{display:flex;align-items:center;gap:10px}
+#top .st{font-size:11px;cursor:pointer}
+#top .cfg-btn{width:28px;height:28px;border-radius:6px;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.04);color:var(--gold);font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center}
 
 /* 设置面板 */
-#settings{position:fixed;top:0;left:0;right:0;bottom:0;z-index:200;background:rgba(0,0,0,0.95);display:none;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:40px}
+#settings{position:fixed;top:0;left:0;right:0;bottom:0;z-index:200;background:rgba(0,0,0,0.95);display:none;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:40px;overflow-y:auto}
 #settings.show{display:flex}
-#settings input{width:100%;max-width:320px;padding:12px 14px;border-radius:10px;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.05);color:#fff;font-size:16px;text-align:center}
-#settings button{padding:12px 40px;border-radius:10px;border:none;background:var(--gold);color:#000;font-size:16px;font-weight:bold;cursor:pointer}
-#settings .close{color:#888;font-size:13px;cursor:pointer;margin-top:16px}
+#settings h3{color:var(--gold);font-size:15px;font-weight:bold;margin-bottom:4px}
+#settings label{color:#888;font-size:12px;align-self:flex-start;max-width:320px;width:100%;margin:0 auto;margin-bottom:-10px}
+#settings input,#settings select{width:100%;max-width:320px;padding:12px 14px;border-radius:10px;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.05);color:#fff;font-size:15px;text-align:center}
+#settings select{appearance:none;text-align:center;cursor:pointer}
+#settings select option{background:#1a1a2e;color:#fff}
+#settings button{padding:12px 40px;border-radius:10px;border:none;background:var(--gold);color:#000;font-size:16px;font-weight:bold;cursor:pointer;min-width:140px}
+#settings .close{color:#888;font-size:13px;cursor:pointer;margin-top:8px}
+#settings .sep{width:100%;max-width:320px;height:1px;background:rgba(255,255,255,0.06);margin:6px 0}
+.theme-row{display:flex;gap:8px;max-width:320px;width:100%}
+.theme-dot{flex:1;padding:8px;border-radius:8px;border:2px solid rgba(255,255,255,0.06);text-align:center;cursor:pointer;font-size:12px;color:#888;transition:all 0.2s}
+.theme-dot.sel{border-color:var(--gold);color:var(--gold)}
 
 /* 角色区 */
 #char-area{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center}
@@ -50,17 +64,17 @@ html,body{width:100%;height:100%;overflow:hidden;font-family:'PingFang SC','Micr
 #bubble .b.show{opacity:1;transform:translateY(0)}
 
 /* 底部 */
-#dock{flex-shrink:0;padding:10px 16px;padding-bottom:max(16px,env(safe-area-inset-bottom));display:flex;align-items:center;justify-content:center;gap:16px;z-index:10}
-#talk-btn{width:68px;height:68px;border-radius:50%;background:linear-gradient(135deg,var(--gold),#a08020);border:3px solid var(--gold-dim);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all 0.2s;position:relative;flex-shrink:0}
+#dock{flex-shrink:0;padding:8px 8px;padding-bottom:max(14px,env(safe-area-inset-bottom));display:flex;align-items:center;justify-content:center;gap:8px;z-index:10;flex-wrap:wrap}
+#talk-btn{width:64px;height:64px;border-radius:50%;background:linear-gradient(135deg,var(--gold),#a08020);border:3px solid var(--gold-dim);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all 0.2s;position:relative;flex-shrink:0}
 #talk-btn:active,#talk-btn.active{transform:scale(1.15)}
 #talk-btn.active{animation:tpulse 1.2s ease-in-out infinite}
 @keyframes tpulse{0%,100%{box-shadow:0 0 25px var(--gold-dim)}50%{box-shadow:0 0 60px var(--gold),0 0 100px var(--gold-dim)}}
-#talk-btn .icon{font-size:28px;color:#fff;pointer-events:none}
+#talk-btn .icon{font-size:26px;color:#fff;pointer-events:none}
 #talk-ripple{position:absolute;inset:-6px;border-radius:50%;border:2px solid var(--gold);opacity:0}
 #talk-btn.active #talk-ripple{opacity:1;animation:ripple 1.5s ease-out infinite}
 @keyframes ripple{0%{inset:-6px;opacity:0.8}100%{inset:-30px;opacity:0}}
 
-.char-btn{width:38px;height:38px;border-radius:50%;overflow:hidden;border:2px solid rgba(255,255,255,0.08);cursor:pointer;opacity:0.35;transition:all 0.2s;flex-shrink:0}
+.char-btn{width:34px;height:34px;border-radius:50%;overflow:hidden;border:2px solid rgba(255,255,255,0.08);cursor:pointer;opacity:0.35;transition:all 0.2s;flex-shrink:0}
 .char-btn:active,.char-btn.sel{opacity:1;border-color:var(--gold);transform:scale(1.12)}
 .char-btn img{width:100%;height:100%;object-fit:cover}
 
@@ -72,7 +86,10 @@ html,body{width:100%;height:100%;overflow:hidden;font-family:'PingFang SC','Micr
 <div id="app">
   <div id="top">
     <span class="t">🐉 小龙人</span>
-    <span class="st" id="conn-dot" style="color:#f44;cursor:pointer" onclick="showSettings()">● 离线</span>
+    <div class="r">
+      <button class="cfg-btn" onclick="location.href='config.html'" title="配置模型">⚙</button>
+      <span class="st" id="conn-dot" style="color:#f44;cursor:pointer" onclick="showSettings()">● 离线</span>
+    </div>
   </div>
 
   <div id="char-area">
@@ -84,24 +101,35 @@ html,body{width:100%;height:100%;overflow:hidden;font-family:'PingFang SC','Micr
   </div>
 
   <div id="dock">
-    <div class="char-btn sel" onclick="switchChar('longyuan')"><img src="img_longyuan.jpg"></div>
+    <div class="char-btn" onclick="switchChar('shuanghua')"><img src="img_shuanghua.jpg"></div>
     <div class="char-btn" onclick="switchChar('chiyu')"><img src="img_chiyu.jpg"></div>
+    <div class="char-btn sel" onclick="switchChar('longyuan')"><img src="img_longyuan.jpg"></div>
     <div id="talk-btn" ontouchstart="startTalk(event)" ontouchend="stopTalk(event)" onmousedown="startTalk(event)" onmouseup="stopTalk(event)">
       <div id="talk-ripple"></div>
       <span class="icon">🎤</span>
     </div>
     <div class="char-btn" onclick="switchChar('ling')"><img src="img_ling.jpg"></div>
     <div class="char-btn" onclick="switchChar('qingmo')"><img src="img_qingmo.jpg"></div>
+    <div class="char-btn" onclick="switchChar('yeying')"><img src="img_yeying.jpg"></div>
   </div>
 </div>
 
 <div id="settings">
-  <div style="color:var(--gold);font-size:16px;font-weight:bold">⚙️ 连接设置</div>
-  <input id="server-input" placeholder="例: 192.168.1.35:8765" value="">
-  <button onclick="saveSettings()">连接</button>
-  <div id="settings-hint" style="color:#888;font-size:11px;text-align:center;max-width:280px">
-    输入小龙人引擎地址<br>同一WiFi下填局域网IP<br>出门在外需要公网地址
+  <h3>⚙️ 连接设置</h3>
+  <label>引擎地址</label>
+  <input id="server-input" placeholder="例: 192.168.1.35:8765">
+  
+  <div class="sep"></div>
+  <h3>🎨 主题</h3>
+  <div class="theme-row">
+    <div class="theme-dot sel" onclick="setTheme('')">🐉 龙宫</div>
+    <div class="theme-dot" onclick="setTheme('theme-tech')">💠 科技</div>
+    <div class="theme-dot" onclick="setTheme('theme-loft')">🏠 Loft</div>
   </div>
+
+  <div class="sep"></div>
+  <button onclick="saveSettings()">保存连接</button>
+  <button onclick="location.href='config.html'" style="background:rgba(255,255,255,0.08);color:#fff">⚙ 配置大模型</button>
   <span class="close" onclick="hideSettings()">取消</span>
 </div>
 
@@ -119,6 +147,23 @@ const CHARS = {
 let ws = null, charId = 'longyuan', recognition = null;
 let isListening = false, currentUtterance = null;
 let serverAddr = localStorage.getItem('xlr_server') || '';
+
+// ====== 主题 ======
+function setTheme(cls) {
+  document.documentElement.className = cls;
+  localStorage.setItem('xlr_theme', cls);
+  document.querySelectorAll('.theme-dot').forEach(d => d.classList.toggle('sel', d.textContent === document.querySelector('.theme-dot.sel')?.textContent || false));
+  document.querySelectorAll('.theme-dot').forEach(d => {
+    const isMatch = (cls === '' && d.textContent.includes('龙宫')) ||
+                    (cls === 'theme-tech' && d.textContent.includes('科技')) ||
+                    (cls === 'theme-loft' && d.textContent.includes('Loft'));
+    d.classList.toggle('sel', isMatch);
+  });
+}
+(function(){
+  const t = localStorage.getItem('xlr_theme');
+  if(t) document.documentElement.className = t;
+})();
 
 // ====== WebSocket ======
 function connectWS() {
@@ -270,10 +315,17 @@ function hideBubble() { document.querySelector('#bubble .b').classList.remove('s
 function setStatus(t) { document.getElementById('status').textContent = t; }
 
 // ====== 启动 ======
+// 检查是否已配置模型
+fetch('/api/config-file').then(function(r){return r.json()}).then(function(d){
+  if(!d.exists){
+    // 未配置模型，弹窗提示
+    setStatus('⚠️ 请先配置大模型');
+    showSettings();
+  }
+}).catch(function(){});
+
 if (serverAddr) {
   connectWS();
-} else {
-  showSettings();
 }
 
 // 注册 Service Worker
