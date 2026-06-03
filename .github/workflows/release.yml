@@ -120,7 +120,11 @@ jobs:
       - name: Build installer (Windows)
         if: matrix.platform == 'windows'
         shell: cmd
-        run: python installer/make_installer.py
+        run: |
+          python installer/make_installer.py || python3 installer/make_installer.py
+          if %ERRORLEVEL% NEQ 0 exit /b 1
+          echo === dist contents ===
+          dir dist\
 
       - name: Build installer (macOS/Linux)
         if: matrix.platform != 'windows'
