@@ -55,6 +55,14 @@ jobs:
             app-build/android/app/src/main/res/values/strings.xml
           sed -i 's/android:usesCleartextTraffic="false"/android:usesCleartextTraffic="true"/' \
             app-build/android/app/src/main/AndroidManifest.xml 2>/dev/null || true
+          # Fix Kotlin stdlib duplicate class conflict (Capacitor v8 known issue)
+          cat >> app-build/android/app/build.gradle << 'GRADLEEOF'
+
+          configurations.all {
+              exclude group: 'org.jetbrains.kotlin', module: 'kotlin-stdlib-jdk7'
+              exclude group: 'org.jetbrains.kotlin', module: 'kotlin-stdlib-jdk8'
+          }
+          GRADLEEOF
 
       - name: Build APK
         working-directory: app-build/android
