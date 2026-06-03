@@ -119,7 +119,7 @@ jobs:
 
       - name: Build installer (Windows)
         if: matrix.platform == 'windows'
-        shell: pwsh
+        shell: cmd
         run: python installer/make_installer.py
 
       - name: Build installer (macOS/Linux)
