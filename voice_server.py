@@ -25,8 +25,23 @@ CHARACTERS = {
     "yeying": "你是夜影，暗夜刺客。神秘寡言，说话带锋芒。回复简短口语化，每次1-2句话。",
 }
 
-# 对话历史（短期）
-conversations = {}
+# 对话历史（短期），自动过期清理
+conversations = {}  # {peer_id: {"history": [...], "last_active": timestamp}}
+MAX_CONVERSATIONS = 50
+CONVERSATION_TTL = 1800  # 30分钟无活动自动清理
+
+def _cleanup_conversations():
+    """清理过期和超量的对话"""
+    now = time.time()
+    # 1. 删除过期
+    expired = [p for p, v in conversations.items() if now - v.get("last_active", 0) > CONVERSATION_TTL]
+    for p in expired:
+        conversations.pop(p, None)
+    # 2. 超量删最旧的
+    if len(conversations) > MAX_CONVERSATIONS:
+        sorted_peers = sorted(conversations.items(), key=lambda x: x[1].get("last_active", 0))
+        for p, _ in sorted_peers[:len(conversations) - MAX_CONVERSATIONS]:
+            conversations.pop(p, None)
 
 def call_llm(user_text, char_id="longyuan", history=None):
     """调用LLM，返回简短口语化回复"""
@@ -61,7 +76,8 @@ def call_llm(user_text, char_id="longyuan", history=None):
 async def handle_voice(websocket):
     """处理一个语音对话连接"""
     peer = id(websocket)
-    conversations[peer] = []
+    _cleanup_conversations()  # 新连接时清理过期对话
+    conversations[peer] = {"history": [], "last_active": time.time()}
     char_id = "longyuan"
     current_task = None
     
@@ -81,7 +97,8 @@ async def handle_voice(websocket):
                     await websocket.send(json.dumps({"type": "interrupted"}))
                 
                 # 保存历史
-                conversations[peer].append({"role": "user", "content": user_text})
+                conversations[peer]["history"].append({"role": "user", "content": user_text})
+                conversations[peer]["last_active"] = time.time()
                 
                 # 异步调用LLM
                 current_task = asyncio.create_task(
@@ -90,7 +107,7 @@ async def handle_voice(websocket):
             
             elif msg_type == "switch_character":
                 char_id = msg.get("character", "longyuan")
-                conversations[peer] = []  # 切角色清上下文
+                conversations[peer]["history"] = []  # 切角色清上下文
                 await websocket.send(json.dumps({
                     "type": "character_changed",
                     "character": char_id,
@@ -105,10 +122,10 @@ async def handle_voice(websocket):
 
 async def process_and_reply(websocket, user_text, char_id, peer):
     """调用LLM并回传结果"""
-    history = conversations.get(peer, [])
+    history = conversations.get(peer, {}).get("history", [])
     reply = await asyncio.to_thread(call_llm, user_text, char_id, history)
     
-    conversations[peer].append({"role": "assistant", "content": reply})
+    conversations[peer]["history"].append({"role": "assistant", "content": reply})
     
     try:
         await websocket.send(json.dumps({

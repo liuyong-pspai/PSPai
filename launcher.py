@@ -430,9 +430,18 @@ def main():
 
     restart_count = 0
     MAX_RESTARTS = 3
+    last_health_check = time.time()
     try:
         while True:
             time.sleep(1)
+            # 定期健康检查 (每15秒ping一次引擎)
+            if time.time() - last_health_check > 15 and engine_proc and engine_proc.poll() is None:
+                last_health_check = time.time()
+                try:
+                    import urllib.request
+                    urllib.request.urlopen(f"http://127.0.0.1:{ENGINE_PORT}/api/health", timeout=3)
+                except Exception:
+                    pass  # 仅用于监控，不影响运行
             if engine_proc and engine_proc.poll() is not None:
                 exit_code = engine_proc.returncode
                 print(f"⚠️ 引擎已退出 (exit={exit_code})")

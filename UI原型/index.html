@@ -131,13 +131,16 @@ html,body{width:100%;height:100%;overflow:hidden;font-family:'PingFang SC','Micr
 .spk-btn:hover{opacity:0.8}.spk-btn.speaking{opacity:1;animation:pulse 0.6s ease-in-out infinite}
 @keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.2)}}
 .token-tag{font-size:8px;color:#6a6a6a;background:rgba(255,255,255,0.03);padding:1px 5px;border-radius:3px;margin-left:4px}
+.conn-dot{display:inline-block;width:7px;height:7px;border-radius:50%;margin-left:8px;flex-shrink:0}
+.conn-online{background:#4ade80;box-shadow:0 0 6px rgba(74,222,128,0.5)}
+.conn-offline{background:#f44;box-shadow:0 0 6px rgba(255,68,68,0.5)}
 </style>
 </head>
 <body>
 
 <div id="main">
   <div id="bar">
-    <div class="bl"><span id="sm-avatar">🐉</span><span id="sm-name">龙渊</span></div>
+    <div class="bl"><span id="sm-avatar">🐉</span><span id="sm-name">龙渊</span><span id="conn-indicator" class="conn-dot conn-offline" title="引擎离线"></span></div>
     <div class="br">
       <button class="lang-btn" onclick="toggleLang()">🌐 <span data-i18n="lang_label">中</span></button>
       <span onclick="showPanel('memo')">📝</span>
@@ -681,6 +684,24 @@ function speak(el){
 
 // Init — 动态语言索引 → 自动检测可用语言
 initI18n();
+
+// ====== 引擎连接状态检测 (每30秒ping /api/health) ======
+function checkEngineHealth() {
+    fetch(API_BASE + '/api/health')
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+            if (d.ok) {
+                document.getElementById('conn-indicator').className = 'conn-dot conn-online';
+                document.getElementById('conn-indicator').title = '引擎在线';
+            }
+        })
+        .catch(function() {
+            document.getElementById('conn-indicator').className = 'conn-dot conn-offline';
+            document.getElementById('conn-indicator').title = '引擎离线';
+        });
+}
+setInterval(checkEngineHealth, 30000);
+checkEngineHealth();  // 立即检测一次
 </script>
 </body>
 </html>

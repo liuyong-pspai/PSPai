@@ -317,6 +317,10 @@ class PSPAIHandler(http.server.BaseHTTPRequestHandler):
             })
             return
 
+        if path == "/api/health":
+            self._send_json({"ok": True, "time": time.time()})
+            return
+
         if path == "/api/names":
             names = load_json("names", {})
             self._send_json(names)
