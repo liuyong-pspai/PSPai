@@ -298,7 +298,13 @@ async function callLLM(userText) {
 
   } catch(err) {
     loadEl.remove();
-    addMsg('ai', '❌ 网络错误：'+err.message+'\n\n请检查网络连接。');
+    const netErrors = ['Failed to fetch', 'NetworkError', 'TypeError'];
+    const isNet = netErrors.some(e => err.message && err.message.includes(e));
+    if (isNet) {
+      addMsg('ai', '❌ 网络不通：无法连接到 API 服务器。\n\n请检查手机网络或尝试切换 Wi-Fi/移动数据。');
+    } else {
+      addMsg('ai', '❌ 出错了：'+err.message+'\n\n请重试或检查配置。');
+    }
   } finally {
     isLoading = false;
     document.getElementById('send-btn').disabled = false;
@@ -340,6 +346,7 @@ document.getElementById('text-input').addEventListener('input', function(){
 
 // ====== TTS ======
 function speakText(text) {
+  if (typeof SpeechSynthesisUtterance === 'undefined' || typeof speechSynthesis === 'undefined') return;
   stopSpeaking();
   const u = new SpeechSynthesisUtterance(text);
   u.lang = 'zh-CN'; u.rate = 1.05; u.pitch = 1.0;
@@ -348,7 +355,7 @@ function speakText(text) {
 }
 
 function stopSpeaking() {
-  if (currentUtterance) {
+  if (currentUtterance && typeof speechSynthesis !== 'undefined') {
     speechSynthesis.cancel();
     currentUtterance = null;
   }
