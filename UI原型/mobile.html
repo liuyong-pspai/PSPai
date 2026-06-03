@@ -59,9 +59,13 @@ html,body{width:100%;height:100%;overflow:hidden;font-family:'PingFang SC','Micr
 #status{font-size:13px;color:#888;margin-top:8px;text-align:center;min-height:20px;transition:all 0.3s}
 
 /* 气泡 */
-#bubble{position:absolute;bottom:70px;left:16px;right:16px;text-align:center;pointer-events:none;z-index:5}
-#bubble .b{display:inline-block;padding:10px 18px;border-radius:16px;background:rgba(0,0,0,0.75);color:#fff;font-size:16px;max-width:90%;line-height:1.5;opacity:0;transform:translateY(10px);transition:all 0.25s}
+#bubble{position:absolute;bottom:80px;left:16px;right:16px;text-align:center;z-index:5}
+#bubble .b{display:inline-block;padding:12px 18px;border-radius:16px;background:rgba(0,0,0,0.8);color:#fff;font-size:16px;max-width:90%;line-height:1.5;opacity:0;transform:translateY(10px);transition:all 0.3s;position:relative}
 #bubble .b.show{opacity:1;transform:translateY(0)}
+#bubble .btns{display:flex;justify-content:center;gap:8px;margin-top:8px}
+#bubble .replay-btn{display:inline-block;width:32px;height:32px;border-radius:50%;background:var(--gold);border:none;color:#000;font-size:14px;cursor:pointer;line-height:32px;text-align:center;transition:all 0.15s}
+#bubble .replay-btn:active{transform:scale(1.2)}
+#bubble .replay-btn.playing{animation:tpulse 1s ease-in-out infinite}
 
 /* 底部 */
 #dock{flex-shrink:0;padding:8px 8px;padding-bottom:max(14px,env(safe-area-inset-bottom));display:flex;align-items:center;justify-content:center;gap:8px;z-index:10;flex-wrap:wrap}
@@ -97,7 +101,7 @@ html,body{width:100%;height:100%;overflow:hidden;font-family:'PingFang SC','Micr
     <div id="char-name">龙渊</div>
     <div id="char-tag">你的AI伙伴</div>
     <div id="status">轻触金色按钮开始说话</div>
-    <div id="bubble"><div class="b"></div></div>
+    <div id="bubble"><div class="b"><span class="btxt"></span><div class="btns"><button class="replay-btn" onclick="replayText(event)" title="重播">🔊</button></div></div></div>
   </div>
 
   <div id="dock">
@@ -203,9 +207,12 @@ function connectWS() {
   }
 }
 
+let lastReplyText = '';
+
 // ====== TTS ======
 function speakText(text) {
   stopSpeaking();
+  lastReplyText = text;
   document.getElementById('char-ring').classList.add('speaking');
   showBubble(text);
   
@@ -213,14 +220,35 @@ function speakText(text) {
   u.lang = 'zh-CN'; u.rate = 1.05; u.pitch = 1.0;
   u.onend = () => {
     document.getElementById('char-ring').classList.remove('speaking');
-    hideBubble();
+    document.querySelector('.replay-btn').classList.remove('playing');
     if (!isListening) setStatus('轻触金色按钮开始说话');
   };
   u.onerror = () => {
     document.getElementById('char-ring').classList.remove('speaking');
-    hideBubble();
+    document.querySelector('.replay-btn').classList.remove('playing');
   };
   currentUtterance = u;
+  document.querySelector('.replay-btn').classList.add('playing');
+  speechSynthesis.speak(u);
+}
+
+function replayText(e) {
+  e.stopPropagation();
+  if (!lastReplyText) return;
+  stopSpeaking();
+  document.getElementById('char-ring').classList.add('speaking');
+  const u = new SpeechSynthesisUtterance(lastReplyText);
+  u.lang = 'zh-CN'; u.rate = 1.05; u.pitch = 1.0;
+  u.onend = () => {
+    document.getElementById('char-ring').classList.remove('speaking');
+    document.querySelector('.replay-btn').classList.remove('playing');
+  };
+  u.onerror = () => {
+    document.getElementById('char-ring').classList.remove('speaking');
+    document.querySelector('.replay-btn').classList.remove('playing');
+  };
+  currentUtterance = u;
+  document.querySelector('.replay-btn').classList.add('playing');
   speechSynthesis.speak(u);
 }
 
@@ -228,7 +256,7 @@ function stopSpeaking() {
   if (currentUtterance) {
     speechSynthesis.cancel();
     document.getElementById('char-ring').classList.remove('speaking');
-    hideBubble();
+    document.querySelector('.replay-btn').classList.remove('playing');
     currentUtterance = null;
   }
 }
@@ -310,8 +338,14 @@ function saveSettings() {
 }
 
 // ====== UI ======
-function showBubble(t) { const b=document.querySelector('#bubble .b'); b.textContent=t; b.classList.add('show'); }
-function hideBubble() { document.querySelector('#bubble .b').classList.remove('show'); }
+function showBubble(t) {
+  const bb = document.querySelector('#bubble .b');
+  bb.querySelector('.btxt').textContent = t;
+  bb.classList.add('show');
+}
+function hideBubble() {
+  document.querySelector('#bubble .b').classList.remove('show');
+}
 function setStatus(t) { document.getElementById('status').textContent = t; }
 
 // ====== 启动 ======
