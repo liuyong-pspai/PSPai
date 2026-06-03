@@ -358,26 +358,42 @@ class PSPAIHandler(http.server.BaseHTTPRequestHandler):
             system_prompt = PSPAI_PROMPTS.get(lang, DEFAULT_PROMPT)
             context_msg = f"[当前角色名: {current_name}] {msg}"
 
-            # === chat handler with retry + memory (v3.0) ===
+            # === Agent Harness 修正闭环 (v1.3.2) ===
+            # 四大循环: 决策→执行→观察→修正, 最多3策略递进
             t_start = time.time()
             try:
                 agent = get_agent(char_index, current_name)
                 history = get_history(char_index)
 
                 # 改名意图检测
-                rename_match = re.search(r"(?:叫你|叫你叫|把你叫|改名为|改名[为]?|叫)(.+)", msg)
+                rename_match = re.search(r"(?:叫你|叫你叫|把你叫|改名为|改名[为]?|叫)(.+?)", msg)
                 if rename_match:
                     new_name = rename_match.group(1).strip()[:10]
                     names[str(char_index)] = new_name
                     save_json("names", names)
-                    context_msg = f"[当前角色名: {current_name}] 用户给你改名为「{new_name}」。请用新名字回应。用户说: {msg}"
+                    context_msg += f"\n[系统: 用户叫你「{new_name}」]"
 
-                # L1+L2 retry
                 result = None
                 retries = 0
-                prompt = system_prompt
-                for attempt in range(2):
+                strategy = "normal"
+                error_type = ""
+
+                # 多策略修正: 最多3次尝试
+                for attempt in range(3):
                     try:
+                        # 策略选择
+                        if attempt == 0:
+                            prompt = system_prompt
+                            strategy = "normal"
+                        elif attempt == 1:
+                            prompt = system_prompt + "\n(请简短直接回复，不超过3句话)"
+                            strategy = "short_prompt"
+                        else:
+                            # 策略3: 清除历史减少上下文噪音
+                            conversation_history[str(char_index)] = []
+                            prompt = system_prompt + "\n(简洁回复即可)"
+                            strategy = "clear_history"
+
                         result = agent.run_conversation(
                             user_message=context_msg,
                             system_message=prompt,
@@ -386,11 +402,10 @@ class PSPAIHandler(http.server.BaseHTTPRequestHandler):
                             break
                     except Exception as inner_e:
                         retries += 1
-                        if attempt == 0:
-                            print(f"[PSPAI] L1 retry: {inner_e}")
-                            prompt = system_prompt + "\n(请简短回复)"
-                            time.sleep(1)
-                        else:
+                        error_type = type(inner_e).__name__
+                        print(f"[PSPAI] L{attempt+1} retry (strategy={strategy}): {error_type}: {inner_e}")
+                        time.sleep(1)
+                        if attempt == 2:
                             raise inner_e
 
                 reply = result.get('final_response', '') if result else ''
@@ -399,7 +414,7 @@ class PSPAIHandler(http.server.BaseHTTPRequestHandler):
 
                 latency_ms = int((time.time() - t_start) * 1000)
 
-                # 记忆回路: record successful operation
+                # 记忆回路: record with strategy info
                 op_logger.record(
                     tool="chat",
                     params={
@@ -409,6 +424,8 @@ class PSPAIHandler(http.server.BaseHTTPRequestHandler):
                         "msg_len": len(msg),
                         "reply_len": len(reply),
                         "retries": retries,
+                        "strategy": strategy,
+                        "error_type": error_type,
                     },
                     success=True,
                     summary=reply[:100],
