@@ -1,0 +1,65 @@
+name: Build APK
+
+on:
+  push:
+    paths:
+      - 'pwa/**'
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: 'platforms;android-34 build-tools;34.0.0 platform-tools'
+
+      - name: Create Capacitor project
+        run: |
+          mkdir -p app-build && cd app-build
+          npm init -y
+          npm install @capacitor/core @capacitor/cli @capacitor/android
+          npx cap init 小龙人 com.pspai.xiaolongren --web-dir=www
+
+      - name: Copy PWA files
+        run: |
+          cp -r pwa/* app-build/www/
+          rm -f app-build/www/sw.js
+
+      - name: Add Android platform
+        working-directory: app-build
+        run: npx cap add android
+
+      - name: Configure Android
+        run: |
+          sed -i 's/<string name="app_name">.*<\/string>/<string name="app_name">小龙人<\/string>/' \
+            app-build/android/app/src/main/res/values/strings.xml
+          sed -i 's/android:usesCleartextTraffic="false"/android:usesCleartextTraffic="true"/' \
+            app-build/android/app/src/main/AndroidManifest.xml 2>/dev/null || true
+
+      - name: Build APK
+        working-directory: app-build/android
+        run: ./gradlew assembleDebug
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: xiaolongren-apk
+          path: app-build/android/app/build/outputs/apk/debug/app-debug.apk
