@@ -55,6 +55,15 @@ jobs:
             app-build/android/app/src/main/res/values/strings.xml
           sed -i 's/android:usesCleartextTraffic="false"/android:usesCleartextTraffic="true"/' \
             app-build/android/app/src/main/AndroidManifest.xml 2>/dev/null || true
+          # Replace default Capacitor icons with 小龙人 icons
+          for density in mdpi hdpi xhdpi xxhdpi xxxhdpi; do
+            cp android-app/res/mipmap-${density}/ic_launcher.png app-build/android/app/src/main/res/mipmap-${density}/ic_launcher.png
+            cp android-app/res/mipmap-${density}/ic_launcher_round.png app-build/android/app/src/main/res/mipmap-${density}/ic_launcher_round.png 2>/dev/null || true
+          done
+          # Network security config for API access
+          cp android-app/res/xml/network_security_config.xml app-build/android/app/src/main/res/xml/
+          sed -i 's|<application|<application android:networkSecurityConfig="@xml/network_security_config"|' \
+            app-build/android/app/src/main/AndroidManifest.xml
           # Fix Kotlin stdlib duplicate class conflict (Capacitor v8 known issue)
           cat >> app-build/android/app/build.gradle << 'GRADLEEOF'
 
