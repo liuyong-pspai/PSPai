@@ -34,6 +34,11 @@ html,body{width:100%;height:100%;overflow:hidden;font-family:'PingFang SC','Micr
 .sbar:nth-child(4){height:12px;animation:sb 0.4s ease-in-out .24s infinite}
 .sbar:nth-child(5){height:6px;animation:sb 0.4s ease-in-out .32s infinite}
 @keyframes sb{0%,100%{transform:scaleY(0.5)}50%{transform:scaleY(1.5)}}
+#engine-status{font-size:11px;cursor:default;opacity:0.8;transition:all 0.3s}
+#engine-status:hover{opacity:1}
+.msg-bbl.loading{animation:pulse 1s ease-in-out infinite;color:var(--accent);min-width:24px;text-align:center}
+@keyframes pulse{0%,100%{opacity:0.3}50%{opacity:1}}
+.msg-bbl.err{background:rgba(255,60,60,0.12)!important;border-color:rgba(255,60,60,0.3)!important}
 #ntag{text-align:center;margin-top:28px}
 #ntag .cn{font-size:14px;font-weight:bold;color:var(--gold)}
 #ntag .cd{font-size:8px;color:var(--accent2);opacity:0.5}
@@ -139,6 +144,7 @@ html,body{width:100%;height:100%;overflow:hidden;font-family:'PingFang SC','Micr
   <div id="bar">
     <div class="bl"><span id="sm-avatar">🐉</span><span id="sm-name">龙渊</span></div>
     <div class="br">
+      <span id="engine-status" title="检测中...">⏳</span>
       <button class="lang-btn" onclick="toggleLang()">🌐 <span data-i18n="lang_label">中</span></button>
       <span onclick="showPanel('memo')">📝</span>
       <span onclick="showPanel('model')">⚙️</span>
@@ -598,9 +604,19 @@ function sendChat(){
   saveMessage('user',msg);
   inp.value='';stream.scrollTop=stream.scrollHeight;
   document.getElementById('speak-indicator').classList.add('active');
+  // 加载占位
+  var loadEl=document.createElement('div');
+  loadEl.className='msg-row';loadEl.innerHTML='<div class="msg-bbl loading">...</div>';
+  stream.appendChild(loadEl);stream.scrollTop=stream.scrollHeight;
+  // 带重试的fetch（最多3次，指数退避）
+  doChat(msg,cname,0,loadEl);
+}
+function doChat(msg,cname,attempt,loadEl){
   fetch(API_BASE+'/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:msg,charIndex:cur,charName:cname,lang:lang})})
   .then(function(r){return r.json()})
   .then(function(data){
+    loadEl.remove();
+    var stream=document.getElementById('stream');
     stream.innerHTML+='<div class="msg-row"><div class="msg-bbl">'+data.reply+'<span class="spk-btn" onclick="speak(this)">🔊</span></div></div>';
     saveMessage('bot',data.reply);
     stream.scrollTop=stream.scrollHeight;
@@ -611,11 +627,31 @@ function sendChat(){
       ac(cur);
     }
   })
-  .catch(function(){
-    stream.innerHTML+='<div class="msg-row"><div class="msg-bbl">'+t('backend_down')+'</div></div>';
+  .catch(function(e){
+    if(attempt<2){
+      // 重试：指数退避 1s/2s/4s
+      setTimeout(function(){doChat(msg,cname,attempt+1,loadEl)},Math.pow(2,attempt)*1000);
+      return;
+    }
+    // 3次失败后显示错误
+    loadEl.remove();
+    var stream=document.getElementById('stream');
+    stream.innerHTML+='<div class="msg-row"><div class="msg-bbl err">'+t('backend_down')+'</div></div>';
     document.getElementById('speak-indicator').classList.remove('active');
+    stream.scrollTop=stream.scrollHeight;
   });
 }
+// 引擎连接检测（每30秒ping一次）
+function checkEngine(){
+  fetch(API_BASE+'/api/status').then(function(r){return r.json()}).then(function(d){
+    var el=document.getElementById('engine-status');
+    if(el){el.textContent='🟢';el.title=d.version||'connected'}
+  }).catch(function(){
+    var el=document.getElementById('engine-status');
+    if(el){el.textContent='🔴';el.title='引擎未连接'}
+  });
+}
+setInterval(checkEngine,30000);checkEngine();
 
 function openVideo(){document.getElementById('video-page').classList.add('show')}
 function closeVideo(){document.getElementById('video-page').classList.remove('show')}

@@ -404,11 +404,20 @@ def main():
     print()
 
     try:
+        restart_count = 0
         while True:
             time.sleep(1)
             if engine_proc and engine_proc.poll() is not None:
-                print("⚠️ 引擎已退出")
-                break
+                restart_count += 1
+                if restart_count <= 3:
+                    print(f"⚠️ 引擎异常退出，第{restart_count}次重启...")
+                    time.sleep(2)
+                    engine_proc = start_engine()
+                    if engine_proc:
+                        wait_for_port(ENGINE_PORT, timeout=30)
+                else:
+                    print("❌ 引擎连续3次退出，请检查日志")
+                    break
     except KeyboardInterrupt:
         print("\n🛑 正在停止...")
 
