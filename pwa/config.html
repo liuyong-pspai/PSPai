@@ -153,7 +153,15 @@ h1 { font-size: 28px; text-align: center; margin-bottom: 8px; }
         <input type="password" id="apiKey" placeholder="sk-..." autocomplete="off">
         <button onclick="toggleKey()" id="btn-toggle">👁</button>
       </div>
-      <p class="note" id="note-key">密钥仅存储在您的电脑上，不会上传</p>
+      <p class="note" id="note-key">密钥仅存储在您的手机上，不会上传</p>
+      <p class="note" id="note-key-help" style="margin-top:4px;color:#667eea;cursor:pointer" onclick="showKeyHelp()">💡 不知道去哪拿 Key？点这里</p>
+      <div id="key-help" style="display:none;margin-top:8px;padding:12px;background:rgba(102,126,234,0.08);border-radius:8px;font-size:12px;color:#aaa;line-height:1.6">
+        <div><b>DeepSeek</b>（推荐★免费）：<a href="https://platform.deepseek.com/api_keys" target="_blank" style="color:#667eea;">platform.deepseek.com</a> → 注册 → API Keys</div>
+        <div style="margin-top:4px"><b>OpenAI</b>：<a href="https://platform.openai.com/api-keys" target="_blank" style="color:#667eea;">platform.openai.com</a> → API Keys</div>
+        <div style="margin-top:4px"><b>Moonshot</b>：<a href="https://platform.moonshot.cn/console/api-keys" target="_blank" style="color:#667eea;">platform.moonshot.cn</a></div>
+        <div style="margin-top:4px"><b>智谱GLM</b>：<a href="https://open.bigmodel.cn/usercenter/apikeys" target="_blank" style="color:#667eea;">open.bigmodel.cn</a></div>
+        <div style="margin-top:4px"><b>通义千问</b>：<a href="https://bailian.console.aliyun.com/#/api-key" target="_blank" style="color:#667eea;">bailian.console.aliyun.com</a></div>
+      </div>
     </div>
     <div class="form-group" id="group-model">
       <label for="modelSelect" id="label-model">🤖 模型</label>
@@ -400,6 +408,11 @@ function toggleKey() {
   inp.type = inp.type === 'password' ? 'text' : 'password';
 }
 
+function showKeyHelp() {
+  const el = document.getElementById('key-help');
+  el.style.display = el.style.display === 'none' ? 'block' : 'none';
+}
+
 function nextStep() {
   // 验证第一步
   if (currentStep === 0) {
@@ -435,7 +448,7 @@ function showStatus(msg, type) {
   setTimeout(() => el.classList.add('hidden'), 5000);
 }
 
-async function saveAndLaunch() {
+function saveAndLaunch() {
   const btn = document.getElementById('btn-launch');
   btn.disabled = true;
   btn.textContent = i18n[lang].saving;
@@ -453,54 +466,18 @@ async function saveAndLaunch() {
   };
   
   try {
-    // 保存到本地存储（备用）
+    // PWA模式：存在浏览器本地，直接跳转
     localStorage.setItem('xiaolongren_config', JSON.stringify(config));
-    
-    // 通过API写文件（由launcher.py提供）
-    const resp = await fetch('/api/config', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(config),
-    });
-    
-    if (resp.ok) {
-      showStatus(i18n[lang].saveOk, '');
-      // 延迟跳转，让用户看到成功提示
-      setTimeout(() => {
-        window.location.href = '/';
-      }, 2000);
-    } else {
-      throw new Error('API返回 ' + resp.status);
-    }
+    showStatus(i18n[lang].saveOk, '');
+    setTimeout(() => {
+      window.location.href = 'mobile.html';
+    }, 800);
   } catch (err) {
     console.error('保存失败:', err);
     showStatus(i18n[lang].saveErr, 'error');
     btn.disabled = false;
     btn.textContent = i18n[lang].launch;
-    
-    // 降级方案：如果API不可用，显示手动保存提示
-    document.getElementById('config-summary').insertAdjacentHTML('beforeend', 
-      '<div style="margin-top:12px;padding:12px;background:rgba(239,68,68,0.1);border-radius:8px;font-size:12px;color:#ef4444;">' +
-      '⚠️ API不可用，请<a href="#" onclick="downloadConfig()" style="color:#667eea;">下载配置文件</a>放到小龙人目录下' +
-      '</div>');
   }
-}
-
-function downloadConfig() {
-  const config = {
-    provider: selectedProvider,
-    model: selectedModel,
-    api_key: apiKey,
-    character: selectedCharacter,
-    language: lang,
-  };
-  const blob = new Blob([JSON.stringify(config, null, 2)], {type: 'application/json'});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = 'config.json';
-  a.click();
-  URL.revokeObjectURL(url);
 }
 
 // 恢复之前的选择
