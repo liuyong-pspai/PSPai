@@ -11,10 +11,8 @@
 <link rel="manifest" href="manifest.json">
 <style>
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-html,body{width:100%;height:100%;overflow:hidden;font-family:'PingFang SC','Microsoft YaHei',sans-serif;background:#0a0a14;color:#e0d8c8;touch-action:manipulation;user-select:none;-webkit-user-select:none}
+html,body{width:100%;height:100%;overflow:hidden;font-family:'PingFang SC','Microsoft YaHei',sans-serif;background:#0a0a14;color:#e0d8c8;touch-action:manipulation}
 :root{--gold:#c8a84e;--gold-dim:rgba(200,168,78,0.3);--bg:#0a0a14;--card:rgba(20,20,32,0.5);--text:#e0d8c8}
-
-/* === 主题 === */
 .theme-tech{--gold:#00d4ff;--gold-dim:rgba(0,212,255,0.3);--bg:#0a0a1a;--card:rgba(0,20,40,0.5);--text:#c0e0f0}
 .theme-loft{--gold:#e8904a;--gold-dim:rgba(232,144,74,0.3);--bg:#1a1a14;--card:rgba(32,28,20,0.5);--text:#d8d0c0}
 
@@ -26,6 +24,53 @@ html,body{width:100%;height:100%;overflow:hidden;font-family:'PingFang SC','Micr
 #top .r{display:flex;align-items:center;gap:10px}
 #top .st{font-size:11px;cursor:pointer}
 #top .cfg-btn{width:28px;height:28px;border-radius:6px;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.04);color:var(--gold);font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+
+/* 角色小头像 */
+#char-bar{flex-shrink:0;display:flex;align-items:center;justify-content:center;gap:8px;padding:6px 14px}
+#char-bar .cmini{width:36px;height:36px;border-radius:50%;overflow:hidden;border:2px solid rgba(255,255,255,0.08);cursor:pointer;opacity:0.3;transition:all 0.2s;flex-shrink:0}
+#char-bar .cmini:active,#char-bar .cmini.sel{opacity:1;border-color:var(--gold);transform:scale(1.15)}
+#char-bar .cmini img{width:100%;height:100%;object-fit:cover}
+#char-bar .name-tag{font-size:11px;color:var(--gold);font-weight:bold;margin-right:4px}
+
+/* 消息区 */
+#msgs{flex:1;overflow-y:auto;padding:8px 14px;scrollbar-width:none;display:flex;flex-direction:column;gap:8px}
+#msgs::-webkit-scrollbar{display:none}
+#msgs .empty{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#333}
+#msgs .empty .er{width:56px;height:56px;border-radius:50%;overflow:hidden;margin-bottom:8px;border:2px solid rgba(255,255,255,0.06)}
+#msgs .empty .er img{width:100%;height:100%;object-fit:cover}
+#msgs .empty .et{font-size:13px;color:#444;margin-bottom:2px}
+#msgs .empty .es{font-size:11px;color:#2a2a2a}
+
+.msg{display:flex;flex-direction:column;max-width:85%;animation:mi .25s ease}
+@keyframes mi{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+.msg.user{align-self:flex-end}
+.msg.ai{align-self:flex-start}
+.msg .mb{padding:10px 14px;border-radius:14px;font-size:14px;line-height:1.55;word-break:break-word}
+.msg.user .mb{background:var(--gold);color:#000;border-bottom-right-radius:4px}
+.msg.ai .mb{background:rgba(30,30,48,0.85);color:#d0c8b8;border-bottom-left-radius:4px}
+.msg .mtime{font-size:9px;color:#3a3a4a;margin-top:2px;padding:0 4px}
+.msg.user .mtime{text-align:right}
+.msg .mbtns{margin-top:4px;display:flex;gap:6px}
+.msg.ai .mbtns{padding-left:4px}
+.msg.user .mbtns{justify-content:flex-end;padding-right:4px}
+.mbtn{width:26px;height:26px;border-radius:50%;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.05);color:var(--gold);font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all 0.15s}
+.mbtn:active{transform:scale(1.2);background:var(--gold);color:#000}
+.mbtn.playing{animation:tpulse 0.8s ease-in-out infinite}
+
+/* 输入栏 */
+#input-bar{flex-shrink:0;display:flex;align-items:center;gap:8px;padding:8px 12px;padding-bottom:max(10px,env(safe-area-inset-bottom));background:rgba(0,0,0,0.4);border-top:1px solid rgba(255,255,255,0.04)}
+#text-input{flex:1;padding:10px 14px;border-radius:20px;border:1px solid rgba(255,255,255,0.08);background:rgba(255,255,255,0.04);color:#e0d8c8;font-size:15px;outline:none;resize:none;max-height:80px;font-family:inherit}
+#text-input:focus{border-color:var(--gold-dim)}
+#text-input::placeholder{color:#444}
+#send-btn{width:40px;height:40px;border-radius:50%;border:none;background:var(--gold);color:#000;font-size:16px;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;transition:all 0.15s}
+#send-btn:active{transform:scale(1.15)}
+#mic-btn{width:40px;height:40px;border-radius:50%;border:2px solid var(--gold-dim);background:rgba(200,168,78,0.08);cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;transition:all 0.15s}
+#mic-btn:active,#mic-btn.active{background:var(--gold);border-color:var(--gold);transform:scale(1.1)}
+#mic-btn .icon{width:18px;height:18px;pointer-events:none}
+#mic-btn .icon svg{width:100%;height:100%}
+#mic-btn.active{animation:tpulse 1s ease-in-out infinite}
+
+@keyframes tpulse{0%,100%{box-shadow:0 0 15px var(--gold-dim)}50%{box-shadow:0 0 40px var(--gold),0 0 70px var(--gold-dim)}}
 
 /* 设置面板 */
 #settings{position:fixed;top:0;left:0;right:0;bottom:0;z-index:200;background:rgba(0,0,0,0.95);display:none;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:40px;overflow-y:auto}
@@ -42,47 +87,6 @@ html,body{width:100%;height:100%;overflow:hidden;font-family:'PingFang SC','Micr
 .theme-dot{flex:1;padding:8px;border-radius:8px;border:2px solid rgba(255,255,255,0.06);text-align:center;cursor:pointer;font-size:12px;color:#888;transition:all 0.2s}
 .theme-dot.sel{border-color:var(--gold);color:var(--gold)}
 
-/* 角色区 */
-#char-area{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center}
-#char-ring{width:130px;height:130px;border-radius:50%;padding:3px;transition:all 0.3s}
-#char-ring.listening{animation:ring 1.5s ease-in-out infinite}
-#char-ring.speaking{animation:speakring 0.6s ease-in-out infinite}
-@keyframes ring{0%,100%{box-shadow:0 0 12px var(--gold-dim)}50%{box-shadow:0 0 40px var(--gold),0 0 80px var(--gold-dim)}}
-@keyframes speakring{0%,100%{box-shadow:0 0 18px var(--gold-dim)}50%{box-shadow:0 0 50px var(--gold),0 0 90px var(--gold-dim)}}
-#char-ring img{width:100%;height:100%;border-radius:50%;object-fit:cover}
-#char-ring.listening img{animation:pulse 1s ease-in-out infinite}
-@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.05)}}
-#char-name{font-size:16px;font-weight:bold;color:var(--gold);margin-top:10px}
-#char-tag{font-size:10px;color:#555;margin-top:2px}
-
-/* 状态 */
-#status{font-size:13px;color:#888;margin-top:8px;text-align:center;min-height:20px;transition:all 0.3s}
-
-/* 气泡 */
-#bubble{position:absolute;bottom:80px;left:16px;right:16px;text-align:center;z-index:5}
-#bubble .b{display:inline-block;padding:12px 18px;border-radius:16px;background:rgba(0,0,0,0.8);color:#fff;font-size:16px;max-width:90%;line-height:1.5;opacity:0;transform:translateY(10px);transition:all 0.3s;position:relative}
-#bubble .b.show{opacity:1;transform:translateY(0)}
-#bubble .btns{display:flex;justify-content:center;gap:8px;margin-top:8px}
-#bubble .replay-btn{display:inline-block;width:32px;height:32px;border-radius:50%;background:var(--gold);border:none;color:#000;font-size:14px;cursor:pointer;line-height:32px;text-align:center;transition:all 0.15s}
-#bubble .replay-btn:active{transform:scale(1.2)}
-#bubble .replay-btn.playing{animation:tpulse 1s ease-in-out infinite}
-
-/* 底部 */
-#dock{flex-shrink:0;padding:8px 8px;padding-bottom:max(14px,env(safe-area-inset-bottom));display:flex;align-items:center;justify-content:center;gap:8px;z-index:10;flex-wrap:wrap}
-#talk-btn{width:64px;height:64px;border-radius:50%;background:linear-gradient(135deg,var(--gold),#a08020);border:3px solid var(--gold-dim);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all 0.2s;position:relative;flex-shrink:0;box-shadow:0 4px 20px rgba(200,168,78,0.15)}
-#talk-btn:active,#talk-btn.active{transform:scale(1.12);box-shadow:0 6px 30px var(--gold-dim)}
-#talk-btn.active{animation:tpulse 1.2s ease-in-out infinite}
-@keyframes tpulse{0%,100%{box-shadow:0 0 25px var(--gold-dim)}50%{box-shadow:0 0 60px var(--gold),0 0 100px var(--gold-dim)}}
-#talk-btn .icon{width:26px;height:26px;pointer-events:none}
-#talk-btn .icon svg{width:100%;height:100%}
-#talk-ripple{position:absolute;inset:-6px;border-radius:50%;border:2px solid var(--gold);opacity:0}
-#talk-btn.active #talk-ripple{opacity:1;animation:ripple 1.5s ease-out infinite}
-@keyframes ripple{0%{inset:-6px;opacity:0.8}100%{inset:-30px;opacity:0}}
-
-.char-btn{width:34px;height:34px;border-radius:50%;overflow:hidden;border:2px solid rgba(255,255,255,0.08);cursor:pointer;opacity:0.35;transition:all 0.2s;flex-shrink:0}
-.char-btn:active,.char-btn.sel{opacity:1;border-color:var(--gold);transform:scale(1.12)}
-.char-btn img{width:100%;height:100%;object-fit:cover}
-
 @media(min-width:500px){#app{max-width:430px;margin:0 auto;border:1px solid rgba(255,255,255,0.04)}}
 </style>
 </head>
@@ -97,25 +101,30 @@ html,body{width:100%;height:100%;overflow:hidden;font-family:'PingFang SC','Micr
     </div>
   </div>
 
-  <div id="char-area">
-    <div id="char-ring"><img id="char-img" src="img_longyuan.jpg" alt="龙渊"></div>
-    <div id="char-name">龙渊</div>
-    <div id="char-tag">你的AI伙伴</div>
-    <div id="status">轻触金色按钮开始说话</div>
-    <div id="bubble"><div class="b"><span class="btxt"></span><div class="btns"><button class="replay-btn" onclick="replayText(event)" title="重播">🔊</button></div></div></div>
+  <div id="char-bar">
+    <span class="name-tag" id="cur-name">龙渊</span>
+    <div class="cmini sel" onclick="switchChar('longyuan')"><img src="img_longyuan.jpg"></div>
+    <div class="cmini" onclick="switchChar('chiyu')"><img src="img_chiyu.jpg"></div>
+    <div class="cmini" onclick="switchChar('ling')"><img src="img_ling.jpg"></div>
+    <div class="cmini" onclick="switchChar('qingmo')"><img src="img_qingmo.jpg"></div>
+    <div class="cmini" onclick="switchChar('shuanghua')"><img src="img_shuanghua.jpg"></div>
+    <div class="cmini" onclick="switchChar('yeying')"><img src="img_yeying.jpg"></div>
   </div>
 
-  <div id="dock">
-    <div class="char-btn" onclick="switchChar('shuanghua')"><img src="img_shuanghua.jpg"></div>
-    <div class="char-btn" onclick="switchChar('chiyu')"><img src="img_chiyu.jpg"></div>
-    <div class="char-btn sel" onclick="switchChar('longyuan')"><img src="img_longyuan.jpg"></div>
-    <div id="talk-btn" ontouchstart="startTalk(event)" ontouchend="stopTalk(event)" onmousedown="startTalk(event)" onmouseup="stopTalk(event)">
-      <div id="talk-ripple"></div>
-      <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg></span>
+  <div id="msgs">
+    <div class="empty" id="empty-hint">
+      <div class="er"><img id="empty-avatar" src="img_longyuan.jpg"></div>
+      <div class="et">龙渊在等你</div>
+      <div class="es">说话或打字，我在这里</div>
     </div>
-    <div class="char-btn" onclick="switchChar('ling')"><img src="img_ling.jpg"></div>
-    <div class="char-btn" onclick="switchChar('qingmo')"><img src="img_qingmo.jpg"></div>
-    <div class="char-btn" onclick="switchChar('yeying')"><img src="img_yeying.jpg"></div>
+  </div>
+
+  <div id="input-bar">
+    <textarea id="text-input" placeholder="说点什么..." rows="1" onkeydown="onKeyDown(event)"></textarea>
+    <button id="mic-btn" ontouchstart="startTalk(event)" ontouchend="stopTalk(event)" onmousedown="startTalk(event)" onmouseup="stopTalk(event)">
+      <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg></span>
+    </button>
+    <button id="send-btn" onclick="sendText()">➤</button>
   </div>
 </div>
 
@@ -123,7 +132,6 @@ html,body{width:100%;height:100%;overflow:hidden;font-family:'PingFang SC','Micr
   <h3>⚙️ 连接设置</h3>
   <label>引擎地址</label>
   <input id="server-input" placeholder="例: 192.168.1.35:8765">
-  
   <div class="sep"></div>
   <h3>🎨 主题</h3>
   <div class="theme-row">
@@ -131,7 +139,6 @@ html,body{width:100%;height:100%;overflow:hidden;font-family:'PingFang SC','Micr
     <div class="theme-dot" onclick="setTheme('theme-tech')">💠 科技</div>
     <div class="theme-dot" onclick="setTheme('theme-loft')">🏠 Loft</div>
   </div>
-
   <div class="sep"></div>
   <button onclick="saveSettings()">保存连接</button>
   <button onclick="location.href='config.html'" style="background:rgba(255,255,255,0.08);color:#fff">⚙ 配置大模型</button>
@@ -157,18 +164,84 @@ let serverAddr = localStorage.getItem('xlr_server') || '';
 function setTheme(cls) {
   document.documentElement.className = cls;
   localStorage.setItem('xlr_theme', cls);
-  document.querySelectorAll('.theme-dot').forEach(d => d.classList.toggle('sel', d.textContent === document.querySelector('.theme-dot.sel')?.textContent || false));
   document.querySelectorAll('.theme-dot').forEach(d => {
-    const isMatch = (cls === '' && d.textContent.includes('龙宫')) ||
-                    (cls === 'theme-tech' && d.textContent.includes('科技')) ||
-                    (cls === 'theme-loft' && d.textContent.includes('Loft'));
-    d.classList.toggle('sel', isMatch);
+    const t = d.textContent;
+    d.classList.toggle('sel', (cls===''&&t.includes('龙宫'))||(cls==='theme-tech'&&t.includes('科技'))||(cls==='theme-loft'&&t.includes('Loft')));
   });
 }
-(function(){
-  const t = localStorage.getItem('xlr_theme');
-  if(t) document.documentElement.className = t;
-})();
+(function(){ const t=localStorage.getItem('xlr_theme');if(t)document.documentElement.className=t; })();
+
+// ====== 消息 ======
+function addMsg(type, text) {
+  const d = document.getElementById('msgs');
+  // Remove empty hint
+  const eh = document.getElementById('empty-hint');
+  if (eh) eh.remove();
+
+  const el = document.createElement('div');
+  el.className = 'msg ' + type;
+  const now = new Date();
+  const time = now.getHours().toString().padStart(2,'0')+':'+now.getMinutes().toString().padStart(2,'0');
+
+  if (type === 'ai') {
+    el.innerHTML = '<div class="mb">'+escHtml(text)+'</div>'+
+      '<div class="mbtns"><button class="mbtn" onclick="replayMsg(this,\''+escAttr(text)+'\')" title="重播">🔊</button></div>'+
+      '<div class="mtime">'+time+'</div>';
+  } else {
+    el.innerHTML = '<div class="mb">'+escHtml(text)+'</div><div class="mtime">'+time+'</div>';
+  }
+  d.appendChild(el);
+  d.scrollTop = d.scrollHeight;
+  return el;
+}
+
+function escHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function escAttr(s) { return s.replace(/'/g,"\\'").replace(/"/g,'&quot;'); }
+
+function replayMsg(btn, text) {
+  if (!text) return;
+  stopSpeaking();
+  const u = new SpeechSynthesisUtterance(text);
+  u.lang = 'zh-CN'; u.rate = 1.05; u.pitch = 1.0;
+  btn.classList.add('playing');
+  u.onend = () => btn.classList.remove('playing');
+  u.onerror = () => btn.classList.remove('playing');
+  currentUtterance = u;
+  speechSynthesis.speak(u);
+}
+
+// ====== 输入 ======
+function sendText() {
+  const inp = document.getElementById('text-input');
+  const text = inp.value.trim();
+  if (!text) return;
+  addMsg('user', text);
+  inp.value = '';
+  inp.style.height = 'auto';
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify({type:'text', text: text}));
+  } else {
+    // 模拟回复（后端没通时）
+    setTimeout(() => {
+      const reply = '收到你说的：「'+text+'」\n\n目前引擎未连接，这是前端模拟回复。连接后端后可获得AI真实回复。';
+      addMsg('ai', reply);
+      speakText(reply);
+    }, 600);
+  }
+}
+
+function onKeyDown(e) {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    sendText();
+  }
+}
+
+// Auto-resize textarea
+document.getElementById('text-input').addEventListener('input', function(){
+  this.style.height = 'auto';
+  this.style.height = Math.min(this.scrollHeight, 80) + 'px';
+});
 
 // ====== WebSocket ======
 function connectWS() {
@@ -176,88 +249,48 @@ function connectWS() {
   let addr = serverAddr || location.hostname + ':8765';
   if (!addr.includes(':')) addr += ':8765';
   if (!addr.startsWith('w')) addr = 'ws://' + addr;
-  
+
   document.getElementById('conn-dot').style.color = '#fa0';
   document.getElementById('conn-dot').textContent = '● 连接中';
-  setStatus('连接中...');
-  
+
   try {
     ws = new WebSocket(addr);
     ws.onopen = () => {
       document.getElementById('conn-dot').style.color = '#4f8';
       document.getElementById('conn-dot').textContent = '● 已连接';
-      setStatus('可以说话了');
     };
     ws.onclose = () => {
       document.getElementById('conn-dot').style.color = '#f44';
       document.getElementById('conn-dot').textContent = '● 离线';
-      setStatus('连接断开，点右上角设置');
     };
-    ws.onerror = () => {
-      setStatus('连不上引擎，请检查地址');
-    };
+    ws.onerror = () => {};
     ws.onmessage = (e) => {
       const msg = JSON.parse(e.data);
-      if (msg.type === 'reply') speakText(msg.text);
-      else if (msg.type === 'interrupted') stopSpeaking();
+      if (msg.type === 'reply') {
+        addMsg('ai', msg.text);
+        speakText(msg.text);
+      } else if (msg.type === 'interrupted') {
+        stopSpeaking();
+      }
     };
   } catch(e) {
     document.getElementById('conn-dot').style.color = '#f44';
     document.getElementById('conn-dot').textContent = '● 离线';
-    setStatus('连接失败，点右上角设置地址');
   }
 }
-
-let lastReplyText = '';
 
 // ====== TTS ======
 function speakText(text) {
   stopSpeaking();
-  lastReplyText = text;
-  document.getElementById('char-ring').classList.add('speaking');
-  showBubble(text);
-  
   const u = new SpeechSynthesisUtterance(text);
   u.lang = 'zh-CN'; u.rate = 1.05; u.pitch = 1.0;
-  u.onend = () => {
-    document.getElementById('char-ring').classList.remove('speaking');
-    document.querySelector('.replay-btn').classList.remove('playing');
-    if (!isListening) setStatus('轻触金色按钮开始说话');
-  };
-  u.onerror = () => {
-    document.getElementById('char-ring').classList.remove('speaking');
-    document.querySelector('.replay-btn').classList.remove('playing');
-  };
   currentUtterance = u;
-  document.querySelector('.replay-btn').classList.add('playing');
-  speechSynthesis.speak(u);
-}
-
-function replayText(e) {
-  e.stopPropagation();
-  if (!lastReplyText) return;
-  stopSpeaking();
-  document.getElementById('char-ring').classList.add('speaking');
-  const u = new SpeechSynthesisUtterance(lastReplyText);
-  u.lang = 'zh-CN'; u.rate = 1.05; u.pitch = 1.0;
-  u.onend = () => {
-    document.getElementById('char-ring').classList.remove('speaking');
-    document.querySelector('.replay-btn').classList.remove('playing');
-  };
-  u.onerror = () => {
-    document.getElementById('char-ring').classList.remove('speaking');
-    document.querySelector('.replay-btn').classList.remove('playing');
-  };
-  currentUtterance = u;
-  document.querySelector('.replay-btn').classList.add('playing');
   speechSynthesis.speak(u);
 }
 
 function stopSpeaking() {
   if (currentUtterance) {
     speechSynthesis.cancel();
-    document.getElementById('char-ring').classList.remove('speaking');
-    document.querySelector('.replay-btn').classList.remove('playing');
     currentUtterance = null;
   }
 }
@@ -265,7 +298,7 @@ function stopSpeaking() {
 // ====== STT ======
 function initRecognition() {
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!SR) { setStatus('浏览器不支持语音'); return null; }
+  if (!SR) return null;
   const r = new SR();
   r.lang = 'zh-CN'; r.continuous = true; r.interimResults = true;
   r.onresult = (e) => {
@@ -273,15 +306,12 @@ function initRecognition() {
     for (let i = e.resultIndex; i < e.results.length; i++)
       text += e.results[i][0].transcript;
     if (e.results[e.results.length-1].isFinal && text.trim()) {
-      if (ws && ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({type:'text', text: text.trim()}));
-        setStatus('听到了，正在想...');
-      }
+      document.getElementById('text-input').value = text.trim();
+      sendText();
     }
   };
   r.onerror = (e) => {
     if (e.error === 'no-speech'||e.error==='aborted') return;
-    if (e.error === 'not-allowed') setStatus('请允许麦克风权限');
     stopListening();
   };
   r.onend = () => { if (isListening) { try{r.start()}catch(ex){} } };
@@ -291,38 +321,32 @@ function initRecognition() {
 function startListening() {
   if (!recognition) recognition = initRecognition();
   if (!recognition) return;
-  stopSpeaking();
   try { recognition.start(); } catch(ex) {}
   isListening = true;
-  document.getElementById('talk-btn').classList.add('active');
-  document.getElementById('char-ring').classList.add('listening');
-  setStatus('听着呢，说吧...');
+  document.getElementById('mic-btn').classList.add('active');
 }
 
 function stopListening() {
   if (recognition) { try{recognition.stop()}catch(ex){} }
   isListening = false;
-  document.getElementById('talk-btn').classList.remove('active');
-  document.getElementById('char-ring').classList.remove('listening');
+  document.getElementById('mic-btn').classList.remove('active');
 }
 
-// ====== 按钮 ======
 function startTalk(e) { e.preventDefault(); if (!isListening) startListening(); }
-function stopTalk(e) { e.preventDefault(); setTimeout(()=>{if(isListening)stopListening()},300); }
+function stopTalk(e) { e.preventDefault(); setTimeout(()=>{if(isListening)stopListening()},400); }
 
 // ====== 角色 ======
 function switchChar(id) {
   charId = id;
   const c = CHARS[id];
-  document.getElementById('char-img').src = 'img_'+id+'.jpg';
-  document.getElementById('char-name').textContent = c.name;
-  document.getElementById('char-tag').textContent = c.tag;
-  document.querySelectorAll('.char-btn').forEach(b => {
+  document.getElementById('cur-name').textContent = c.name;
+  document.getElementById('empty-avatar').src = 'img_'+id+'.jpg';
+  document.querySelector('#msgs .empty .et').textContent = c.name + '在等你';
+  document.querySelectorAll('.cmini').forEach(b => {
     b.classList.toggle('sel', b.querySelector('img').src.includes('img_'+id));
   });
   if (ws && ws.readyState === WebSocket.OPEN)
     ws.send(JSON.stringify({type:'switch_character', character: id}));
-  setStatus('切换到了'+c.name);
 }
 
 // ====== 设置 ======
@@ -338,32 +362,13 @@ function saveSettings() {
   connectWS();
 }
 
-// ====== UI ======
-function showBubble(t) {
-  const bb = document.querySelector('#bubble .b');
-  bb.querySelector('.btxt').textContent = t;
-  bb.classList.add('show');
-}
-function hideBubble() {
-  document.querySelector('#bubble .b').classList.remove('show');
-}
-function setStatus(t) { document.getElementById('status').textContent = t; }
-
 // ====== 启动 ======
-// 检查是否已配置模型
 fetch('/api/config-file').then(function(r){return r.json()}).then(function(d){
-  if(!d.exists){
-    // 未配置模型，弹窗提示
-    setStatus('⚠️ 请先配置大模型');
-    showSettings();
-  }
+  if(!d.exists) showSettings();
 }).catch(function(){});
 
-if (serverAddr) {
-  connectWS();
-}
+if (serverAddr) connectWS();
 
-// 注册 Service Worker
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('sw.js').catch(()=>{});
 }
