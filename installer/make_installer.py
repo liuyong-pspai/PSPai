@@ -159,9 +159,16 @@ def build_macos():
         'mkdir -p "$HOME/.xiaolongren"\n'
         'cp -Rn "$DIR"/* "$HOME/.xiaolongren/" 2>/dev/null\n'
         'cd "$HOME/.xiaolongren"\n'
-        'PYTHON="python3"\n'
-        '[ -x /opt/homebrew/bin/python3 ] && PYTHON=/opt/homebrew/bin/python3\n'
-        '[ -x /usr/local/bin/python3 ] && PYTHON=/usr/local/bin/python3\n'
+        '# 查找Python3\n'
+        'PYTHON=""\n'
+        'for p in /opt/homebrew/bin/python3 /usr/local/bin/python3 /usr/bin/python3; do\n'
+        '  [ -x "$p" ] && PYTHON="$p" && break\n'
+        'done\n'
+        'if [ -z "$PYTHON" ]; then\n'
+        '  echo "❌ 需要Python3才能运行小龙人"\n'
+        '  echo "  下载: https://www.python.org/downloads/"\n'
+        '  exit 1\n'
+        'fi\n'
         'exec "$PYTHON" launcher.py\n')
     os.chmod(launch, 0o755)
 
@@ -226,6 +233,13 @@ def build_linux():
         f.write('tar xzf "$ARCHIVE" -C "$APP"\n')
         f.write('rm "$ARCHIVE"\n')
         f.write('cd "$APP"\n')
+        f.write('# 检查Python3\n')
+        f.write('if ! command -v python3 &>/dev/null; then\n')
+        f.write('  echo "❌ 需要Python3才能运行小龙人"\n')
+        f.write('  echo "  Ubuntu/Debian: sudo apt install python3 python3-pip"\n')
+        f.write('  echo "  CentOS/RHEL: sudo yum install python3 python3-pip"\n')
+        f.write('  exit 1\n')
+        f.write('fi\n')
         f.write('python3 -m pip install -q PyYAML Pillow requests 2>/dev/null || true\n')
         f.write('mkdir -p "$HOME/.local/share/applications"\n')
         f.write('cat > "$HOME/.local/share/applications/xiaolongren.desktop" << DESKTOPEOF\n')
