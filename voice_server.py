@@ -11,7 +11,9 @@ import time
 
 PORT = 8765
 LLM_URL = "https://api.deepseek.com/v1/chat/completions"
-API_KEY = os.environ.get("PSPAI_API_KEY", os.environ.get("DEEPSEEK_API_KEY", ""))
+API_KEY = os.environ.get("PSPAI_API_KEY") or os.environ.get("DEEPSEEK_API_KEY", "")
+if not API_KEY:
+    print("⚠️ 未配置API Key，语音回复将使用降级模式")
 
 # 角色人格提示词
 CHARACTERS = {

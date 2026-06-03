@@ -7,6 +7,7 @@
 """
 import json
 import os
+import re
 import sys
 import time
 import socket
@@ -145,6 +146,47 @@ def config_to_env(cfg):
 
     with open(ENV_FILE, "w") as f:
         f.write("\n".join(lines) + "\n")
+
+    # === 同步写入 config.yaml（双写） ===
+    _sync_config_yaml(cfg)
+
+
+def _sync_config_yaml(cfg):
+    """将config.json的模型配置同步到engine/config.yaml"""
+    config_yaml_path = APP_DIR / "engine" / "config.yaml"
+    if not config_yaml_path.exists():
+        return
+    try:
+        with open(config_yaml_path) as f:
+            content = f.read()
+
+        provider = cfg.get("provider", "deepseek")
+        model = cfg.get("model", "deepseek-chat")
+
+        # 更新provider
+        content = re.sub(
+            r'^(\s*provider:\s*).*$',
+            f'\\1{provider}',
+            content, flags=re.MULTILINE
+        )
+        # 更新model（如果存在）
+        if model:
+            if 'model:' not in content:
+                content = content.replace(
+                    f'provider: {provider}',
+                    f'provider: {provider}\n  model: {model}'
+                )
+            else:
+                content = re.sub(
+                    r'^(\s*model:\s*).*$',
+                    f'\\1{model}',
+                    content, flags=re.MULTILINE
+                )
+
+        with open(config_yaml_path, 'w') as f:
+            f.write(content)
+    except Exception as e:
+        print(f"⚠️ config.yaml同步失败: {e}")
 
 
 # ============================================================
@@ -380,20 +422,36 @@ def main():
     # 创建桌面快捷方式
     create_desktop_shortcut()
 
-    print("\n" + "=" * 50)
+    print("\\n" + "=" * 50)
     print("  🐉  小龙人 运行中！")
     print("  关闭此窗口可停止程序")
     print("=" * 50)
     print()
 
+    restart_count = 0
+    MAX_RESTARTS = 3
     try:
         while True:
             time.sleep(1)
             if engine_proc and engine_proc.poll() is not None:
-                print("⚠️ 引擎已退出")
-                break
+                exit_code = engine_proc.returncode
+                print(f"⚠️ 引擎已退出 (exit={exit_code})")
+                if restart_count < MAX_RESTARTS:
+                    restart_count += 1
+                    print(f"🔄 第{restart_count}次自动重启引擎...")
+                    # 等待端口释放
+                    time.sleep(1)
+                    engine_proc = start_engine()
+                    if engine_proc:
+                        wait_for_port(ENGINE_PORT, timeout=25)
+                    else:
+                        print("❌ 引擎重启失败")
+                        break
+                else:
+                    print(f"❌ 引擎已崩溃{MAX_RESTARTS}次，停止重试")
+                    break
     except KeyboardInterrupt:
-        print("\n🛑 正在停止...")
+        print("\\n🛑 正在停止...")
 
     # 清理
     if httpd:

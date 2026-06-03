@@ -68,8 +68,15 @@ PSPAI_MSGS = {
 def t_msg(lang, key):
     return PSPAI_MSGS.get(lang, PSPAI_MSGS['zh']).get(key, PSPAI_MSGS['zh'][key])
 
-API_KEY = os.environ.get('DEEPSEEK_API_KEY', '')
-BASE_URL = 'https://api.deepseek.com/v1'
+# 统一API Key读取：优先PSPAI_API_KEY（launcher写入），回退DEEPSEEK_API_KEY
+API_KEY = os.environ.get('PSPAI_API_KEY') or os.environ.get('DEEPSEEK_API_KEY', '')
+# Base URL: 根据provider从config读取，默认DeepSeek
+_BASE_URL_MAP = {
+    'deepseek': 'https://api.deepseek.com/v1',
+    'openai': 'https://api.openai.com/v1',
+    'anthropic': 'https://api.anthropic.com/v1',
+}
+BASE_URL = _BASE_URL_MAP.get(PROVIDER, 'https://api.deepseek.com/v1')
 
 from run_agent import AIAgent
 import pspai_search
@@ -84,15 +91,20 @@ def get_agent(char_index, char_name):
     key = str(char_index)
     with agent_lock:
         if key not in agents:
+            # 从config.yaml读取provider/model/max_turns，不再硬编码
+            _provider = AGENT_CFG.get('provider', PROVIDER)
+            _model = AGENT_CFG.get('model', 'deepseek-chat')
+            _max_iters = int(AGENT_CFG.get('max_turns', 8))
+            _base_url = _BASE_URL_MAP.get(_provider, BASE_URL)
             agent = AIAgent(
-                model='deepseek-chat',
-                provider='deepseek',
+                model=_model,
+                provider=_provider,
                 api_key=API_KEY,
-                base_url=BASE_URL,
+                base_url=_base_url,
                 ephemeral_system_prompt=DEFAULT_PROMPT,
                 skip_context_files=True,
-                skip_memory=True,
-                max_iterations=5,
+                skip_memory=False,
+                max_iterations=_max_iters,
                 quiet_mode=True,
             )
             agents[key] = agent
@@ -104,13 +116,20 @@ def get_agent(char_index, char_name):
 def load_json(name, default=None):
     path = DATA_DIR / f"{name}.json"
     if path.exists():
-        with open(path) as f:
+        with open(path, encoding='utf-8') as f:
             return json.load(f)
     return default if default is not None else {}
 
 def save_json(name, data):
-    with open(DATA_DIR / f"{name}.json", 'w') as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
+    path = DATA_DIR / f"{name}.json"
+    content = json.dumps(data, ensure_ascii=False, indent=2)
+    with open(path, 'w', encoding='utf-8') as f:
+        f.write(content)
+    # 写入验证：读回确认完整性
+    with open(path, encoding='utf-8') as f:
+        written = f.read()
+    if len(written) < len(content) * 0.99:
+        print(f"[PSPAI] WARN: save_json({name}) write verification size mismatch")
 
 # ============================================================
 # 头像存储
@@ -176,10 +195,10 @@ class OperationLogger:
         p = self._path()
         if p.exists():
             try:
-                with open(p) as f:
+                with open(p, encoding='utf-8') as f:
                     raw = json.load(f)
                 self._ops = raw[-500:] if isinstance(raw, list) else []
-            except Exception:
+            except (json.JSONDecodeError, OSError):
                 self._ops = []
     
     def _save(self):
@@ -289,7 +308,7 @@ class PSPAIHandler(http.server.BaseHTTPRequestHandler):
             stats = op_logger.get_stats()
             self._send_json({
                 "name": "PSPAI",
-                "version": "v3.0",
+                "version": "v1.3.0",
                 "engine": "Hermes",
                 "tools": 31,
                 "status": "running",

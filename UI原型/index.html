@@ -439,7 +439,7 @@ function nc(){if(!hasCustom()){ac((cur+1)%chars.length);return}if(cur===chars.le
 // === 首次运行检测 === 无配置 → 跳转配置向导
 fetch('/api/config-file').then(function(r){return r.json()}).then(function(d){if(!d.exists){location.href='/config.html'}}).catch(function(){});
 // =====================
-var API_BASE='http://localhost:8089';
+var API_BASE=(function(){var h=location.hostname;var p=location.port;return p&&p!=='8088'?location.protocol+'//'+h+':8089':location.protocol+'//'+h+':8089'})();
 
 function getMsgKey(){return 'xiaolongren_msgs_'+cur}
 function loadMessages(){
@@ -589,6 +589,24 @@ function tg(n){perms[n]=!perms[n];document.getElementById('sw-'+n).classList.tog
 function openChat(){
   document.getElementById('chat-input-main').focus();
 }
+// ====== fetch 重试 + 指数退避 ======
+function fetchWithRetry(url,options,maxRetries){
+  return new Promise(function(resolve,reject){
+    var attempt=0;
+    function doFetch(){
+      fetch(url,options).then(resolve).catch(function(err){
+        attempt++;
+        if(attempt<maxRetries){
+          var delay=Math.pow(2,attempt)*300;
+          setTimeout(doFetch,delay);
+        }else{
+          reject(err);
+        }
+      });
+    }
+    doFetch();
+  });
+}
 function sendChat(){
   var inp=document.getElementById('chat-input-main'),msg=inp.value.trim();
   if(!msg)return;
@@ -598,8 +616,11 @@ function sendChat(){
   saveMessage('user',msg);
   inp.value='';stream.scrollTop=stream.scrollHeight;
   document.getElementById('speak-indicator').classList.add('active');
-  fetch(API_BASE+'/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:msg,charIndex:cur,charName:cname,lang:lang})})
-  .then(function(r){return r.json()})
+  fetchWithRetry(API_BASE+'/api/chat',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({message:msg,charIndex:cur,charName:cname,lang:lang})
+  }, 3).then(function(r){return r.json()})
   .then(function(data){
     stream.innerHTML+='<div class="msg-row"><div class="msg-bbl">'+data.reply+'<span class="spk-btn" onclick="speak(this)">🔊</span></div></div>';
     saveMessage('bot',data.reply);

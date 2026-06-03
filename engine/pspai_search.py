@@ -63,8 +63,8 @@ def web_search(query: str, limit: int = 5) -> str:
                     if len(results) >= limit:
                         break
 
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"[PSPAI Search] 百度搜索失败: {e}")
 
     # 2. Hacker News API（英文/技术类，备用）
     if len(results) < limit:
@@ -81,8 +81,8 @@ def web_search(query: str, limit: int = 5) -> str:
                 })
                 if len(results) >= limit:
                     break
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"[PSPAI Search] HN搜索失败: {e}")
 
     return json.dumps({"success": len(results) > 0, "data": {"web": results[:limit]}}, ensure_ascii=False)
 

@@ -21,7 +21,17 @@ import os
 from pathlib import Path
 from datetime import datetime
 
-BASE = Path("~/.hermes-agent")
+# 基路径：优先环境变量，回退自动检测
+import os as _os
+_BASE_DIR = _os.environ.get('PSPAI_HOME') or _os.environ.get('HERMES_HOME')
+if _BASE_DIR:
+    BASE = Path(_BASE_DIR)
+elif Path("~/.hermes-agent").expanduser().exists():
+    BASE = Path("~/.hermes-agent")
+elif Path(__file__).parent.parent.name == 'engine':
+    BASE = Path(__file__).parent.parent
+else:
+    BASE = Path("~/.hermes-agent")
 MEMORY_FILE = BASE / "MEMORY.md"
 GUARD_LOG = BASE / "logs" / "l1_memory_guard.log"
 ALERT_SENTINEL = BASE / ".l1_alert_active"
