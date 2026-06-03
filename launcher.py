@@ -422,7 +422,7 @@ def main():
     # 创建桌面快捷方式
     create_desktop_shortcut()
 
-    print("\\n" + "=" * 50)
+    print("\n" + "=" * 50)
     print("  🐉  小龙人 运行中！")
     print("  关闭此窗口可停止程序")
     print("=" * 50)
@@ -451,7 +451,7 @@ def main():
                     print(f"❌ 引擎已崩溃{MAX_RESTARTS}次，停止重试")
                     break
     except KeyboardInterrupt:
-        print("\\n🛑 正在停止...")
+        print("\n🛑 正在停止...")
 
     # 清理
     if httpd:

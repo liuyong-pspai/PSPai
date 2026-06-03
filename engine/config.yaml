@@ -138,6 +138,7 @@ agent:
     ## Six-Step Closed-Loop Law
     Receive order → acknowledge → analyze → execute → verify & correct → report.
   provider: deepseek
+  model: deepseek-chat
   max_turns: 40
   skip_context_files: true
 toolsets:
