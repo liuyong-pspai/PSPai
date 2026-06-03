@@ -33,16 +33,18 @@ jobs:
 
       - name: Create Capacitor project
         run: |
-          mkdir -p app-build && cd app-build
+          mkdir -p app-build
+          cd app-build
           npm init -y
           npm install @capacitor/core @capacitor/cli @capacitor/android
           npx cap init 小龙人 com.pspai.xiaolongren --web-dir=www
+          mkdir -p www
 
       - name: Copy PWA files
         run: |
+          ls -la pwa/
           cp -r pwa/* app-build/www/
-          rm -f app-build/www/sw.js
-
+          ls -la app-build/www/
       - name: Add Android platform
         working-directory: app-build
         run: npx cap add android
