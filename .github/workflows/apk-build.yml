@@ -44,6 +44,8 @@ jobs:
         run: |
           ls -la pwa/
           cp -r pwa/* app-build/www/
+          # APK entry point: use mobile.html as index.html
+          cp app-build/www/mobile.html app-build/www/index.html
           ls -la app-build/www/
       - name: Add Android platform
         working-directory: app-build
