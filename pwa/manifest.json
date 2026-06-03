@@ -1,7 +1,7 @@
 {
-  "name": "🐉 小龙人 XiaoLongRen",
+  "name": "数字生命体小龙人",
   "short_name": "小龙人",
-  "description": "AI智能语音助手 — 说话就能干活",
+  "description": "数字生命体小龙人 — AI智能助手，说话就能干活",
   "start_url": "./mobile.html",
   "scope": "./",
   "display": "standalone",
