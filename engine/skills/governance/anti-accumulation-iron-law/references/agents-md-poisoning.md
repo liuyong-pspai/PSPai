@@ -12,7 +12,7 @@ Hermes Agent 自动扫描工作目录及子目录下的以下文件并注入 sys
 - `.cursorrules`
 - `.hermes.md`
 
-由于我的工作目录是 `~`，`hermes-agent/` 是子目录，20KB 的 `AGENTS.md` 被自动发现。
+由于我的工作目录是 `/home/yongliu`，`hermes-agent/` 是子目录，20KB 的 `AGENTS.md` 被自动发现。
 
 ## 伤害计算
 

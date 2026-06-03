@@ -1,6 +1,6 @@
 # 看门狗脚本模式（硬化手段参考）
 
-> 2026-05-30 Agent 首次硬化执行产物
+> 2026-05-30 刘玉龙 P07 首次硬化执行产物
 
 ## 模式1：计数器看门狗（turn_count_guard）
 
@@ -51,7 +51,7 @@
 
 ## M4-1 连接信息（2026-05-30 实战发现）
 
-SSH 访问 M4-1 (localhost)：
+SSH 访问 M4-1 (192.168.1.36)：
 - 用户：`liuyong`（不是 `yongliu`）
 - 密钥：`~/.ssh/id_ed25519` + `IdentitiesOnly yes`
 - SSH Config 中已有别名配置

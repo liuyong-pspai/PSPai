@@ -76,5 +76,5 @@ extract_lines = [l for i,l in enumerate(lines) if i not in keep_set]
 
 ## 备份节点
 
-- PV9: `/集团公司/Agent/PV9_20260530/` — 拆分前快照
-- PV10: `/集团公司/Agent/PV10_20260530/` — 拆分完成后快照
+- PV9: `/集团公司/刘玉龙/PV9_20260530/` — 拆分前快照
+- PV10: `/集团公司/刘玉龙/PV10_20260530/` — 拆分完成后快照

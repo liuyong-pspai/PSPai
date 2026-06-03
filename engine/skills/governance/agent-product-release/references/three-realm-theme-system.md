@@ -2,7 +2,7 @@
 
 > 伏羲超体 🐉 产品发布 UI 三大主题
 > 设计原则：龙宫/科技/Loft 三种风格完全差异化，不雷同
-> 2026-05-31 Agent 从伏羲FX龙宫版改造提炼
+> 2026-05-31 刘玉龙 P07 从伏羲FX龙宫版改造提炼
 
 ## 架构
 
@@ -106,7 +106,7 @@ html, body { background: var(--bg-deep) !important; color: var(--text-primary) !
 
 ## 文件位置
 
-- `themes/three-realms.css` — CSS变量文件
-- `themes/theme-switcher.js` — 切换引擎JS
+- `/home/yongliu/桌面/fuxi-release/open/themes/three-realms.css` — CSS变量文件
+- `/home/yongliu/桌面/fuxi-release/open/themes/theme-switcher.js` — 切换引擎JS
 - `/tmp/longgong/p01_ui.html` — 已集成三主题的龙宫完整版（70509字节）
-- `prototypes/` — 原始伏羲FX项目
+- `/home/yongliu/桌面/昱成科技集团/AI原型库/伏羲FX_20260515/` — 原始伏羲FX项目

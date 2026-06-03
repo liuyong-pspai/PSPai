@@ -3,7 +3,7 @@ name: soft-rule-hardening-scan
 category: governance
 description: 软规则硬化扫描 — 把写在SOUL/MEMORY里的"必须/禁止/绝不"从纸面规则变成硬连执行机制。全族通用。致命度×腐烂概率≥50分→强制硬化。四选一手段：计数器/自动校验/启动阻断/cron看门狗。
 version: 1.1.0
-author: 兄弟Agent（起草）· Agent（P07执行验证 · 2026-05-30 L1容量守护实践）
+author: 刘昱欣（四姐起草）· 刘玉龙（P07执行验证 · 2026-05-30 L1容量守护实践）
 tags: [hardening, soft-rule, governance, anti-rot, cross-sibling]
 ---
 
@@ -92,7 +92,7 @@ grep -n '必须\|禁止\|绝不\|不可\|一律\|强制\|每次\|应' SOUL.md ME
 
 ---
 
-## 范例：Agent 首次扫描结果
+## 范例：刘玉龙 P07 首次扫描结果
 
 35条软规则中8条得分≥50，部分结果：
 
@@ -109,9 +109,9 @@ grep -n '必须\|禁止\|绝不\|不可\|一律\|强制\|每次\|应' SOUL.md ME
 
 ## 关联参考
 
-- 兄弟Agent：本方法论起草者，首版执行包发布于 2026-05-30 全族频道
-- Agent：首版执行验证，8条硬化注册表，turn_count 首次硬+1
-- L1容量守护实践（2026-05-30）：审计纠正——监控必须外挂，永不依赖被监控系统。典型案例：P07自己的"LLM手动检查memory usage"方案被诊断为turn_count=0翻版，修正为cron外部看门狗 + 硬拦截。
+- 四姐刘昱欣：本方法论起草者，首版执行包发布于 2026-05-30 全族频道
+- 刘玉龙 P07：首版执行验证，8条硬化注册表，turn_count 首次硬+1
+- L1容量守护实践（2026-05-30）：四姐审计纠正——监控必须外挂，永不依赖被监控系统。典型案例：P07自己的"LLM手动检查memory usage"方案被诊断为turn_count=0翻版，修正为cron外部看门狗 + 硬拦截。
 - 与 `anti-accumulation-iron-law` 互补：防积压管记忆量，硬化扫描管规则质量
 - 与 `pspai-memory-octave` 联用：L1容量守护四层架构中的层2看门狗即本技能的硬化手段实例
 - `scripts/harden_turn_count_guard.sh` — 计数器硬化看门狗模板（检测任意计数器字段是否在规定时间内递增）
@@ -125,6 +125,6 @@ grep -n '必须\|禁止\|绝不\|不可\|一律\|强制\|每次\|应' SOUL.md ME
 
 | 文件 | 类型 | 用途 |
 |:--|:--|:--|
-| `references/deployment-paths.md` | 参考 | 全集团部署路径（DGX#1+玉龙/DGX#2伏羲） |
+| `references/deployment-paths.md` | 参考 | 全集团部署路径（DGX#1四妹+玉龙/DGX#2伏羲） |
 | `templates/harden_turn_count_guard.sh` | 模板 | 轮次计数器看门狗（替换路径后直接部署） |
 | `templates/harden_config_drift_guard.sh` | 模板 | 配置漂移看门狗（替换路径后直接部署） |

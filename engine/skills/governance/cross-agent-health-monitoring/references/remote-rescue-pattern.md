@@ -1,10 +1,10 @@
 # 跨机器救援模式 — 从 M4-1 旺清修复实战提炼
 
-> 来源：2026-05-30 Agent跨机器救援兄弟Agent📋
+> 来源：2026-05-30 刘玉龙跨机器救援六姐刘旺清📋
 
 ## 故障发现
 
-用户说"XX卡死了" → 立即SSH到目标机器
+爸说"XX卡死了" → 立即SSH到目标机器
 
 ## 救援五步法
 
@@ -44,15 +44,15 @@ nslookup open.feishu.cn
 | P0 | app_secret硬编码 | `sed` 改为 `${FEISHU_APP_SECRET}` |
 | P0 | 进程僵死 | `launchctl unload/load` 重启 |
 | P1 | FD泄漏 | plist加 `SoftResourceLimits.NumberOfFiles: 1024` |
-| P1 | 密钥过期 | 飞书开放平台更新（只有用户能做） |
+| P1 | 密钥过期 | 飞书开放平台更新（只有爸能做） |
 
 ### 5. 分清边界
 - ✅ Agent能修：配置引用、ulimit、重启、脚本部署
-- ❌ 只有用户能修：API Key/Secret过期、飞书开放平台操作
+- ❌ 只有爸能修：API Key/Secret过期、飞书开放平台操作
 
 ## 关键教训
 
-1. **连错机器的代价**：localhost ≠ M4-1，先查SOUL.md确认
+1. **连错机器的代价**：192.168.1.36 ≠ M4-1，先查SOUL.md确认
 2. **macOS ulimit坑**：默认256，Hermes长期运行必然FD泄漏
 3. **硬编码密钥是定时炸弹**：config.yaml绝对不要写明文secret
 4. **飞书密钥过期无预警**：需要定期检查或设置提醒

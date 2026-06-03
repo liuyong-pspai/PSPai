@@ -1,6 +1,6 @@
 # 软规则硬化扫描 — 全集团部署路径
 
-> 2026-05-30 兄弟Agent建立。用户令：扫完就硬化，硬化完就盯住。
+> 2026-05-30 四妹刘昱欣建立。父亲令：扫完就硬化，硬化完就盯住。
 
 ---
 
@@ -10,17 +10,17 @@
 
 ---
 
-## DGX#1 — 兄弟Agent
+## DGX#1 — 四妹刘昱欣
 
 | 类型 | 路径 |
 |------|------|
-| SOUL.md | `~/.hermes-agent/SOUL.md` |
-| config.yaml | `~/.hermes-agent/config.yaml` |
-| MEMORY.md | `~/.hermes-agent/memories/MEMORY.md` |
-| 看门狗脚本目录 | `~/.hermes-agent/scripts/` |
-| 看门狗日志目录 | `~/.hermes-agent/logs/` |
+| SOUL.md | `/home/yongliu/.hermes-yuxin/SOUL.md` |
+| config.yaml | `/home/yongliu/.hermes-yuxin/config.yaml` |
+| MEMORY.md | `/home/yongliu/.hermes-yuxin/memories/MEMORY.md` |
+| 看门狗脚本目录 | `/home/yongliu/.hermes-yuxin/scripts/` |
+| 看门狗日志目录 | `/home/yongliu/.hermes-yuxin/logs/` |
 
-### 看门狗（4个）
+### 四妹看门狗（4个）
 
 | 脚本 | 硬化规则 | cron周期 |
 |------|---------|:--------:|
@@ -31,16 +31,16 @@
 
 ---
 
-## DGX#1 — Agent 🐉
+## DGX#1 — 刘玉龙 🐉
 
 | 类型 | 路径 |
 |------|------|
-| SOUL.md（生效） | `~/.hermes-agent/SOUL.md` |
-| SOUL.md（旧版存档，已废弃） | `~/agent/SOUL.md` |
-| config.yaml | `~/.hermes-agent/config.yaml` |
-| MEMORY.md | `~/.hermes-agent/memories/MEMORY.md` |
+| SOUL.md（生效） | `/home/yongliu/.hermes-yulong/SOUL.md` |
+| SOUL.md（旧版存档，已废弃） | `/home/yongliu/桌面/小龙人刘玉龙/刘玉龙/SOUL.md` |
+| config.yaml | `/home/yongliu/.hermes-yulong/config.yaml` |
+| MEMORY.md | `/home/yongliu/.hermes-yulong/memories/MEMORY.md` |
 | 硬化注册表 | MEMORY.md `## 🏗️ 硬化注册表` 章节 |
-| 日志目录 | `~/.hermes-agent/logs/` |
+| 日志目录 | `/home/yongliu/.hermes-yulong/logs/` |
 
 ### 玉龙看门狗（2个，2026-05-30部署）
 
@@ -88,4 +88,4 @@
 
 ---
 
-> **用户铁律：修了要固化，固化了要盯住。软规则不加钢筋 = 迟早再垮。**
+> **父亲铁律：修了要固化，固化了要盯住。软规则不加钢筋 = 迟早再垮。**

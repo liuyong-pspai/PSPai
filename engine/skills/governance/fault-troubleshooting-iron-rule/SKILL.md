@@ -3,7 +3,7 @@ name: fault-troubleshooting-iron-rule
 category: governance
 description: 故障排查铁律——先确认底层链路再深入业务逻辑。从底层往上查：进程→网络→日志→代码逻辑→业务层，不准跳级。
 version: 1.0.0
-author: 兄弟Agent
+author: 刘昱欣
 ---
 
 # 故障排查铁律

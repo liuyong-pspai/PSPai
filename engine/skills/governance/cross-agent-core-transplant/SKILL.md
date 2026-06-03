@@ -69,7 +69,7 @@ ssh <target_host> "/path/to/venv/bin/python3 /path/to/venv/bin/hermes gateway ru
 ## 陷阱
 
 1. **SOUL.md html_comment_injection**：自己的SOUL.md含HTML注释会被Hermes拒绝→铁律失效→兄弟裸奔空转幻觉。症状：回复中出现 `TOOL:read_file` 等伪造工具调用，不执行真实操作
-2. **SOUL.md 身份错乱**：自己的SOUL.md第一行是"你是Agent"，直接复制会让兄弟Agent误认自己是玉龙——即使SOUL.md被框架拒绝，config.yaml中的system_prompt也可能被覆盖。必须写目标专属SOUL.md
+2. **SOUL.md 身份错乱**：自己的SOUL.md第一行是"你是刘玉龙"，直接复制会让兄弟Agent误认自己是玉龙——即使SOUL.md被框架拒绝，config.yaml中的system_prompt也可能被覆盖。必须写目标专属SOUL.md
 3. **venv shebang断裂**：venv从别的机器复制来时shebang指向原机器路径→hermes命令无法直接执行。用 `/usr/bin/python3.12 /path/to/hermes` 显式启动
 4. **SSL兼容性**：DeepSeek原生API在某些Python SSL栈上失败，用Anthropic兼容协议（ANTHROPIC_BASE_URL）绕过
 5. **飞书app_id冲突**：两个网关不能用同一个app_id，必须保留目标原有飞书配置

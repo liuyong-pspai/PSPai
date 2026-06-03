@@ -93,7 +93,7 @@ L7悟道#NNN（日期）：发现摘要
 | 可以做的 | 不可以做的 |
 |:-----|:-----|
 | 读取所有层（L0-L6） | 修改 SOUL.md（L0） |
-| 写入悟道笔记到 archive（L3） | 直接修改 skill SKILL.md（L5）— 需用户批准 |
+| 写入悟道笔记到 archive（L3） | 直接修改 skill SKILL.md（L5）— 需爸批准 |
 | 追加发现到 MEMORY.md（L1） | 删除任何归档文件 |
 | 更新 MEMORY_INDEX.md（L2） | 跳过五步直接输出 |
 

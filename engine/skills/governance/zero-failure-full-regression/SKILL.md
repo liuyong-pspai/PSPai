@@ -3,9 +3,9 @@ name: zero-failure-full-regression
 category: governance
 description: 全量回归清零方法论 — 从 N 个失败到 0 个失败的六步闭环。覆盖：污染三阶段隔离、架构迁移后测试重写、模块级 NameError 发现、缺失工具透明追踪。PSPAI P07 实战验证（377→437 passed, 0 failed）。
 version: 1.0.1
-author: Agent
+author: 刘玉龙 P07
 tags: [testing, regression, cleanup, conftest, isolation, audit]
-related_skills: [unified-audit-8fold, code-quality-closed-loop, six-step-closed-loop]
+related_skills: [unified-audit-8fold, code-quality-closed-loop, liuyulong-six-step-closed-loop]
 last_updated: 2026-05-30
 changelog: |
   v1.0.1 — 修复章节编号顺序（步骤4/5互换对齐六步图）；新增步骤2分类子节。

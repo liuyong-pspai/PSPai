@@ -20,7 +20,7 @@ hermes gateway restart: BLOCKED: Command timed out
 # 1. 创建重启脚本
 cat > ~/.hermes-yulong/scripts/restart_gateway.sh << 'SCRIPT'
 #!/bin/bash
-HERMES_HOME=~/.hermes-agent
+HERMES_HOME=/home/yongliu/.hermes-yulong
 PID_FILE="$HERMES_HOME/gateway.pid"
 
 if [ -f "$PID_FILE" ]; then

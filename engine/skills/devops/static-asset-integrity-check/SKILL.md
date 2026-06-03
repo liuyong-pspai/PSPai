@@ -178,6 +178,7 @@ i18n.setLang(code).then(function() {
 });
 ```
 
+详见 `liuyulong-engineering-discipline` 的 `references/theme-i18n-dual-track.md`。
 
 ## 资产引用完整性自动检测脚本
 

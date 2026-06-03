@@ -69,4 +69,4 @@ done
 - 修复代码片段（可直接 patch）
 - 所属批次建议（P0安全优先于P0逻辑优先于P1）
 
-参见 `../../unified-audit-8fold/references/2026-05-30-full-fix-log.md`（在 unified-audit-8fold 下）。
+参见 `references/2026-05-30-full-fix-log.md`（在 unified-audit-8fold 下）。

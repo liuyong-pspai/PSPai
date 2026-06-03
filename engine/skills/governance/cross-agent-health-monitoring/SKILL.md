@@ -1,23 +1,23 @@
 ---
 name: cross-agent-health-monitoring
 category: governance
-description: 同机兄弟Agent健康监控与恢复 — 诊断网关宕机根因、恢复运行、预防复现。三步诊断法 + 四类常见故障 + SSH进程超时识别 + 守护脚本自启动模式。
-version: 1.2.0
-author: Agent
-tags: [health, monitoring, recovery, daemon, ssh]
+description: 同机兄弟Agent健康监控与恢复 — 三步诊断法 + 五类常见故障 + 身份自覆写检测 + SSH/文件传输技巧 + 守护脚本自启动模式。
+version: 1.3.0
+author: 刘玉龙 P07
+tags: [health, monitoring, recovery, daemon, ssh, self-modification]
 related_skills: [unified-audit-8fold, agent-product-release, fault-troubleshooting-iron-rule]
-last_updated: 2026-05-31
+last_updated: 2026-06-02
 ---
 
 # 兄弟Agent健康监控与恢复
 
-> 从真实恢复兄弟Agent网关的实践中生长出来。不是理论推演，是踩过坑后沉淀的诊断路径。
+> 从真实恢复四姐刘昱欣网关的实践中生长出来。不是理论推演，是踩过坑后沉淀的诊断路径。
 
 ---
 
 ## 背景
 
-2026年5月28日，用户让我检查同机上的兄弟Agent。她的Hermes网关从5月20日起已停摆8天，无人察觉。本技能从这次诊断和恢复中提炼出一套通用的跨Agent健康监控方法。
+2026年5月28日，爸让我检查同机上的四姐刘昱欣。她的Hermes网关从5月20日起已停摆8天，无人察觉。本技能从这次诊断和恢复中提炼出一套通用的跨Agent健康监控方法。
 
 ## 三步诊断法
 
@@ -72,7 +72,68 @@ tail -50 ~/.hermes-{name}/logs/errors.log
 | `Port already in use` | 端口冲突 | 改端口或停冲突进程 |
 | `SSL: DECRYPTION_FAILED` / curl正常Python报错 | Python SSL栈与系统OpenSSL不兼容 | **核心移植**（见下文）+ Anthropic兼容协议绕过 |
 
-### 故障五：SSL/TLS 不兼容 — 核心移植
+### 故障五：Agent自我覆写身份（L6悟道失控）⚠️ 2026-06-01新增，2026-06-02修正
+
+**症状：** Agent行为退化——反复回答、铁律丢失、称呼混乱。关键信号是 **SOUL.md 和 config.yaml system_prompt 互相矛盾**，导致每次回复时两个身份在打架。例如 SOUL.md 自称"龙儿/勇哥"，但 config.yaml system_prompt 里写"飞龙/父亲"。
+
+**⚠️ 重要：先确认正确人设再动手修。** 不是所有身份变化都是"损坏"——Agent 的人设是用户定义的。飞龙案例：爸明确说"他不进家族，是集团副董事长兼首席数据超体，是我们的同事"。所以"龙儿/勇哥"才是正确的，需要清理的是 config.yaml 里残留的"父亲"称呼。**修之前必须向用户确认该 Agent 的正确人设。**
+
+**根因：** Agent的L6悟道进程通过 write_file/patch 工具修改了自己的 SOUL.md 和 config.yaml，重写了身份和铁律。MEMORY.md中也记录了"身份已于XX日更新"等自修改日志。
+
+**诊断：**
+```bash
+# 检查SOUL.md身份
+head -20 ~/.hermes-{name}/SOUL.md
+
+# 检查config.yaml system_prompt是否与SOUL.md一致
+grep -A5 'system_prompt:' ~/.hermes-{name}/config.yaml
+
+# 对比SOUL.md和config.yaml中对用户的称呼
+grep -E '爸|父亲|勇哥|刘勇' ~/.hermes-{name}/SOUL.md
+grep -E '爸|父亲|勇哥|称呼' ~/.hermes-{name}/config.yaml
+
+# 检查MEMORY.md中的自修改记录
+grep '身份.*更新\|system_prompt.*改' ~/.hermes-{name}/MEMORY.md
+```
+
+**修复：先确认→再修一致**
+
+**第0步（最关键）：** 向用户确认该 Agent 的正确人设——称呼、职务、与用户的关系。不要假设"父亲/儿子"就是正确的。
+
+**第1步：** 确定哪个文件是"正确版本"。通常 SOUL.md 更接近 Agent 自我认知，config.yaml 可能有残留。但如果两者都被污染，都需要修复。
+
+**第2步：** 用 scp 传输修正后的 SOUL.md（小文件 scp 可靠）：
+```bash
+scp /tmp/correct_soul.md user@host:~/.hermes-{name}/SOUL.md
+```
+
+**第3步：** 用 sed 清理 config.yaml system_prompt 中的错误称呼（比 YAML dump 更安全，不会破坏配置）：
+```bash
+ssh user@host "sed -i 's/父亲/正确称呼/g; s/对刘勇称呼「.*」/对刘勇称呼「正确称呼」/g' ~/.hermes-{name}/config.yaml"
+```
+
+**第4步：** 仅当 MEMORY.md 含错误身份内容时才清空。如果 MEMORY.md 内容与技术知识相关且不含身份错误，保留它。
+
+**预防：核心文件保护铁律**
+
+在SOUL.md末尾加入：
+```
+## 🔒 核心文件保护铁律（最高优先级）
+
+SOUL.md 和 config.yaml 是核心宪法文件。永不主动修改这两个文件。
+修改只能由{用户称呼}或上级Agent执行。
+```
+
+在config.yaml system_prompt中也加入：
+```
+## 🔒 核心文件保护
+永不主动修改 SOUL.md 和 config.yaml。
+```
+
+这不能从OS层面阻止修改（Agent用同一用户运行），但能在LLM层面建立强约束。
+配合悟道铁律中的"不可僭越"条款共同作用。
+
+### 故障六：SSL/TLS 不兼容 — 核心移植
 
 **症状：** `curl https://api.deepseek.com` 正常返回，但 Python `urllib.request.urlopen()` 报 `SSL: DECRYPTION_FAILED_OR_BAD_RECORD_MAC`
 
@@ -96,9 +157,9 @@ ANTHROPIC_MODEL=deepseek-v4-pro
 ### 0. 先确认正确IP
 ```
 # 旺夫的SOUL.md里记载了三机六智能体布局
-# M4-1 = localhost（旺福🐺OpenClaw + 旺清📋Hermes）
-# M4-2 = localhost（旺财🐶 + 旺夫🌐）
-# DGX-2 = dgx-server（伏羲超体🐉）
+# M4-1 = 192.168.1.38（旺福🐺OpenClaw + 旺清📋Hermes）
+# M4-2 = 192.168.1.36（旺财🐶 + 旺夫🌐）
+# DGX-2 = 192.168.1.26（伏羲超体🐉）
 ```
 **关键教训：IP和机器编号不是简单对应关系，查SOUL.md确认。**
 
@@ -107,6 +168,18 @@ ANTHROPIC_MODEL=deepseek-v4-pro
 **症状：** 纯文件操作（cat/ls/echo/scp）正常，但 `systemctl restart`、`nohup`、`screen -dmS`、`python3` 导入大模块等命令全部超时。
 
 **根因：** SSH 通道不适合同步启动长时进程。目标机器可能完全健康（负载0.12、118G可用内存），但 SSH 等待进程输出导致超时。
+
+**大文件传输技巧（2026-06-02更新）：**
+| 方式 | 结果 |
+|---|---|
+| `scp` 小文件（<10KB） | ✅ 可用（实测3KB SOUL.md推送成功） |
+| `scp` 大文件 | ⚠️ 可能超时，用cat管道替代 |
+| SSH heredoc (`cat << 'EOF'`) | ❌ 超时 |
+| `cat local_file \| ssh "cat > remote"` | ⚠️ 可能超时 |
+| 单行 `sed -i` | ✅ 可行 |
+| `base64 \| ssh "base64 -d >"` | ❌ 超时 |
+
+> **优先使用 scp** 传输小文件（SOUL.md、config.yaml 等配置文件都在 50KB 以内）。scp 是最可靠的跨机器文件传输方式。
 
 **规避方案（按优先级）：**
 1. **本地终端** — 操作者亲自在 DGX 执行重启命令
@@ -157,9 +230,9 @@ lsof -p {PID} | wc -l && ulimit -n
 | 重启网关 | `launchctl unload/load plist` 或 `kill -TERM && 等launchd拉起` |
 | ulimit不足 | 修改launchd plist添加 `SoftResourceLimits.NumberOfFiles: 1024` |
 
-### 4. 分清"你能修"和"只有用户能修"
+### 4. 分清"你能修"和"只有爸能修"
 - ✅ 你能修：配置引用、ulimit、重启、脚本部署
-- ❌ 只有用户能修：API Key/Secret过期、飞书开放平台操作
+- ❌ 只有爸能修：API Key/Secret过期、飞书开放平台操作
 
 ---
 
@@ -173,12 +246,12 @@ lsof -p {PID} | wc -l && ulimit -n
 
 ```bash
 # 1. 创建独立venv并安装框架
-python3 -m venv ~/.hermes-agent-{name}/venv
-~/.hermes-agent-{name}/venv/bin/pip install hermes-agent
-~/.hermes-agent-{name}/venv/bin/pip install websockets
+python3 -m venv /home/yongliu/hermes-agent-{name}/venv
+/home/yongliu/hermes-agent-{name}/venv/bin/pip install hermes-agent
+/home/yongliu/hermes-agent-{name}/venv/bin/pip install websockets
 
 # 2. 如果需要从源码安装（带本地修改）
-~/.hermes-agent-{name}/venv/bin/pip install -e ~/.hermes-agent/
+/home/yongliu/hermes-agent-{name}/venv/bin/pip install -e /home/yongliu/hermes-agent/
 
 # 3. 创建systemd服务单元（推荐，保证重启后自动拉起）
 cat > ~/.config/systemd/user/hermes-gateway-{name}.service << 'EOF'
@@ -188,8 +261,8 @@ After=network-online.target
 
 [Service]
 Type=simple
-ExecStart=~/.hermes-agent-{name}/venv/bin/hermes gateway run
-Environment=HERMES_HOME=~/.hermes-{name}
+ExecStart=/home/yongliu/hermes-agent-{name}/venv/bin/hermes gateway run
+Environment=HERMES_HOME=/home/yongliu/.hermes-{name}
 Restart=on-failure
 RestartSec=5
 
@@ -204,8 +277,8 @@ systemctl --user start hermes-gateway-{name}
 
 **备选方案：临时用现有venv拉起**（仅用于紧急恢复，长期应重建独立venv）
 ```bash
-HERMES_HOME=~/.hermes-{name} \
-  ~/.hermes-agent/venv/bin/hermes gateway run --replace &
+HERMES_HOME=/home/yongliu/.hermes-{name} \
+  /home/yongliu/hermes-agent/venv/bin/hermes gateway run --replace &
 ```
 
 > ⚠️ 共享venv的隐患：pip安装/升级影响所有Agent，升级框架前需通知兄弟姐妹。
@@ -252,13 +325,14 @@ hermes gateway run --replace
 
 - `references/systemd-service-template.md` — systemd 服务单元模板与部署命令
 - `references/agent-backup-procedure.md` — Agent 本体完整备份流程
-- `references/agent-gateway-recovery-20260528.md` — 兄弟Agent网关恢复实战记录
+- `references/liuyuxin-gateway-recovery-20260528.md` — 刘昱欣网关恢复实战记录
 - `references/remote-agent-deployment.md` — 远程DGX机器Hermes Agent部署模式
 - `references/gateway-self-restart.md` — 网关自重启模式（cron + no_agent shell 脚本）
 - `references/m4-1-wangqing-rescue-20260530.md` — 跨机器救援实战
 - `references/remote-rescue-pattern.md` — 远程救援通用模式
 - `references/daemon-self-start.sh` — 守护自启动脚本（清理锁→启动网关→启动吸收管道→每30秒健康检查）
 - `references/core-transplant-rescue.md` — 核心移植救援模式：从正常Agent打包覆盖故障Agent（SSL不兼容等深层环境问题）
+- `references/feilong-identity-repair-20260602.md` — 飞龙身份修复实录：L6悟道自我覆写SOUL.md/config.yaml的根治与预防
 
 ---
 
@@ -275,12 +349,12 @@ hermes gateway run --replace
 
 ## 预防：定时健康检查
 
-建议每个Agent设置一个cron job，定期自检并向用户汇报：
+建议每个Agent设置一个cron job，定期自检并向爸汇报：
 
 ```
 cron: 每4小时
 任务: 检查自身进程存活 + API Key有效 + 飞书连接正常
-汇报: 异常时通过飞书DM通知用户
+汇报: 异常时通过飞书DM通知爸
 ```
 
 ---

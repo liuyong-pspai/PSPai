@@ -5,8 +5,8 @@
 
 set -e
 
-HERMES_HOME=~/.hermes-agent
-HERMES_BIN=~/.hermes-agent/venv/bin/hermes
+HERMES_HOME=/home/yongliu/.hermes-yulong
+HERMES_BIN=/home/yongliu/hermes-agent/venv/bin/hermes
 LOCK_FILE="$HERMES_HOME/gateway.lock"
 PID_FILE="$HERMES_HOME/gateway.pid"
 

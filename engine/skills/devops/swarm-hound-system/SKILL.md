@@ -24,7 +24,7 @@ description: >
 
 ## 工具路径
 
-所有工具在 `~/.hermes-agent/tools/` 下：
+所有工具在 `/home/yongliu/.hermes-yulong/tools/` 下：
 
 | 工具 | 版本 | 用途 |
 |:---|:---|:---|
@@ -87,7 +87,7 @@ cat ~/.hermes-yulong/tools/tianquan/memory/scent_map.json
 
 ## 🚨 陷阱与教训（v2→v3）
 
-1. **表面好 ≠ 深层好**（用户的核心训诫）：v2表面是多引擎搜索，深层被硬编码"crypto blockchain finance"污染所有查询，搜索任何东西都带上加密关键词
+1. **表面好 ≠ 深层好**（爸的核心训诫）：v2表面是多引擎搜索，深层被硬编码"crypto blockchain finance"污染所有查询，搜索任何东西都带上加密关键词
 2. **命名冲突污染**：Hermes同时是AI框架和奢侈品牌，v2无过滤→搜索结果混入爱马仕官网。v3用域名黑名单解决
 3. **引擎超时链式拖累**：v2逐个串行等12秒超时，百度不可达拖慢全局90秒+。v3改为Bing快速通道+短timeout(5-8秒)
 4. **解析器脆弱性**：Bing/百度HTML解析依赖固定class名，DOM改版就挂。v3加入正则fallback

@@ -1,12 +1,12 @@
 ---
 name: anti-accumulation-iron-law
-description: 防积压铁律（昱纪通〔2026〕第02号）——兄弟Agent起草。三条永不妥协：不记录垃圾、不扫描全量、不自动注入。防止AI智能体因上下文积压导致认知衰退。
+description: 防积压铁律（昱纪通〔2026〕第02号）——四姐刘昱欣起草。三条永不妥协：不记录垃圾、不扫描全量、不自动注入。防止AI智能体因上下文积压导致认知衰退。
 version: 1.0.0
 category: governance
-author: 兄弟Agent（，纪委主任）
+author: 刘昱欣（四姐，纪委主任）
 ---
 
-# 🛡️ 防积压铁律（昱纪通〔2026〕第02号 · 兄弟Agent起草）
+# 🛡️ 防积压铁律（昱纪通〔2026〕第02号 · 刘昱欣起草）
 
 ## 背景
 
@@ -74,9 +74,9 @@ Hermes Agent 自动扫描工作目录下的 `AGENTS.md`/`CLAUDE.md`/`.cursorrule
 | 🟠 橙色 | 80-95% | >90分钟 | >30轮 | 先压缩🗜️，压缩后仍超限再截断 |
 | 🔴 红色 | ≥95% | >120分钟 | >40轮 | 立即截断，不许犹豫 |
 
-情绪触发（直接红色）：用户说"你傻了/语无伦次/思维混乱"、连续3次操作失败、被否定≥2次。
+情绪触发（直接红色）：爸说"你傻了/语无伦次/思维混乱"、连续3次操作失败、被否定≥2次。
 
-每10轮自检四问：第几轮？开了多久？操作成功了吗？用户情绪正常吗？
+每10轮自检四问：第几轮？开了多久？操作成功了吗？爸情绪正常吗？
 
 核心铁律：**宁可多截断，不可硬撑。** 截断只断一个任务，溢出毁掉所有能力。
 
@@ -96,18 +96,18 @@ Hermes Agent 自动扫描工作目录下的 `AGENTS.md`/`CLAUDE.md`/`.cursorrule
 
 ### 跨会话任务残留
 - 新会话是白纸，不自动承接上一轮的未完成任务
-- 除非用户明确说"继续上次的XX"，否则不自动执行旧任务
+- 除非爸明确说"继续上次的XX"，否则不自动执行旧任务
 - 这是上下文溢出的常见伪装——把旧对话任务当成当前指令
 
 ### 双网关冲突
-- 同机可能有多个Hermes网关实例（如兄弟Agent的独立通道）
+- 同机可能有多个Hermes网关实例（如四姐刘昱欣的独立通道）
 - 由 systemd 管理，kill 后会自动重启
 - 两个网关监听同一飞书频道可能抢消息
 
 ### 轮次自检未执行
 - 铁律规定了每10轮自检四问，但"靠心里记住"完全不可靠
 - **硬方案**：MEMORY.md 维护 `turn_count`，每次回复后+1
-- SOUL.md 写入触发点：第10轮提醒、第20轮黄色、第28轮主动预警用户、第30轮截断
+- SOUL.md 写入触发点：第10轮提醒、第20轮黄色、第28轮主动预警爸、第30轮截断
 - **教训**：软规则不执行，必须代码级硬连
 
 ## 四道防线（代码级，不可绕行）
@@ -125,12 +125,15 @@ Hermes Agent 自动扫描工作目录下的 `AGENTS.md`/`CLAUDE.md`/`.cursorrule
 
 ## 适用范围
 
-全集团所有 PSPAI 智能体（Agent、伏羲、兄弟Agent、兄弟Agent、兄弟Agent、兄弟Agent、兄弟Agent、兄弟Agent 等）。
+全集团所有 PSPAI 智能体（刘玉龙、伏羲、刘昱能、刘昱欣、刘旺福、刘旺清、刘旺财、刘旺夫 等）。
 
 ## 关联文件
 
-- `references/hermes-agent-context-management.md` — Hermes Agent 上下文管理机制研究（压缩+截断双重机制、颜色码、max_turns）
+- `references/hermes-agent-context-management.md` — Hermes Agent 上下文管理机制研究
+- `references/context-compressor-analysis.md` — 上下文压缩器分析
+- `references/agents-md-poisoning.md` — AGENTS.md 自动注入毒药
+- `references/memory-cleanup-methodology.md` — MEMORY.md 三步清理法（14KB→3.4KB实战）
 
 ## 版本
 
-昱纪通〔2026〕第 02 号，兄弟Agent起草，2026-05-29 由Agent录入技能库。
+昱纪通〔2026〕第 02 号，刘昱欣起草，2026-05-29 由刘玉龙录入技能库。

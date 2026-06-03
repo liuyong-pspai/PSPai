@@ -14,9 +14,9 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-ExecStart=~/.hermes-agent-{name}/venv/bin/hermes gateway run
-Environment=HERMES_HOME=~/.hermes-{name}
-WorkingDirectory=~
+ExecStart=/home/yongliu/hermes-agent-{name}/venv/bin/hermes gateway run
+Environment=HERMES_HOME=/home/yongliu/.hermes-{name}
+WorkingDirectory=/home/yongliu
 Restart=on-failure
 RestartSec=5
 # 限制日志大小
@@ -58,16 +58,16 @@ systemctl --user disable hermes-gateway-{name}
 
 | 单元名 | Agent | venv路径 | HERMES_HOME |
 |:-------|:------|:---------|:------------|
-| `hermes-gateway.service` | Agent | `/hermes-agent/venv/` | `~/.hermes-yulong/` |
-| `hermes-gateway-agent.service` | 兄弟Agent | `/hermes-agent-agent/venv/` | `~/.hermes-agent/` |
+| `hermes-gateway.service` | 刘玉龙P07 | `/hermes-agent/venv/` | `~/.hermes-yulong/` |
+| `hermes-gateway-yuxin.service` | 刘昱欣 | `/hermes-agent-yuxin/venv/` | `~/.hermes-yuxin/` |
 
 ## 故障排查
 
 **症状：服务启动后立即退出（code=exited, status=1）**
-- 检查 venv 是否存在：`ls ~/.hermes-agent-{name}/venv/bin/hermes`
-- 检查 HERMES_HOME：`ls ~/.hermes-{name}/config.yaml`
-- 检查 .env 密钥：`cat ~/.hermes-{name}/.env | grep API_KEY`
+- 检查 venv 是否存在：`ls /home/yongliu/hermes-agent-{name}/venv/bin/hermes`
+- 检查 HERMES_HOME：`ls /home/yongliu/.hermes-{name}/config.yaml`
+- 检查 .env 密钥：`cat /home/yongliu/.hermes-{name}/.env | grep API_KEY`
 
 **症状：服务启动但飞书未连接**
-- 检查 websockets 是否安装：`~/.hermes-agent-{name}/venv/bin/pip show websockets`
-- 检查 FEISHU_APP_ID/SECRET：`cat ~/.hermes-{name}/.env | grep FEISHU`
+- 检查 websockets 是否安装：`/home/yongliu/hermes-agent-{name}/venv/bin/pip show websockets`
+- 检查 FEISHU_APP_ID/SECRET：`cat /home/yongliu/.hermes-{name}/.env | grep FEISHU`

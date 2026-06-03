@@ -1,7 +1,7 @@
 """
 玉龙自定义工具集 — YuLong Hermes Tools
 
-注册到 Hermes 工具系统，让Agent拥有：
+注册到 Hermes 工具系统，让刘玉龙拥有：
   git_operations  sql_query  csv_read  excel_read  pdf_extract
   self_heal  self_check_gaps  tool_doctor  decision_why  pattern_match
   search_log  workflow_decompose  ssh_exec  brother_watch
@@ -205,7 +205,7 @@ def pdf_extract(path: str, max_chars: int = 3000) -> str:
 def self_heal() -> str:
     """自检自修：检查自身关键模块完整性并自动修复"""
     results = []
-    home = Path(os.environ.get("HERMES_HOME", "~/.hermes-agent"))
+    home = Path(os.environ.get("HERMES_HOME", "/home/yongliu/.hermes-yulong"))
 
     # 1. 检查关键目录
     for d in ["logs", "sessions", "memories", "skills"]:
@@ -406,7 +406,7 @@ def pattern_match(pattern: str, path: str = ".", file_glob: str = "*.py", max_re
 # ──────────────────────────────────────────────
 # 工具11：search_log
 # ──────────────────────────────────────────────
-def search_log(keyword: str, log_dir: str = "~/.hermes-agent/logs", lines: int = 10) -> str:
+def search_log(keyword: str, log_dir: str = "/home/yongliu/.hermes-yulong/logs", lines: int = 10) -> str:
     """搜索日志文件"""
     try:
         p = Path(log_dir)
@@ -457,11 +457,11 @@ def workflow_decompose(goal: str) -> str:
 # ──────────────────────────────────────────────
 HOST_MAP = {
     "M4-1": {
-        "host": os.environ.get("M4_1_HOST", "localhost"),
+        "host": os.environ.get("M4_1_HOST", "192.168.1.36"),
         "user": os.environ.get("M4_1_USER", "yongliu"),
     },
     "M4-2": {
-        "host": os.environ.get("M4_2_HOST", "localhost"),
+        "host": os.environ.get("M4_2_HOST", "192.168.1.37"),
         "user": os.environ.get("M4_2_USER", "yongliu"),
     },
     "DGX": {
@@ -666,7 +666,7 @@ TOOLS = {
             "type": "object",
             "properties": {
                 "keyword": {"type": "string", "description": "搜索关键词"},
-                "log_dir": {"type": "string", "description": "日志目录", "default": "~/.hermes-agent/logs"},
+                "log_dir": {"type": "string", "description": "日志目录", "default": "/home/yongliu/.hermes-yulong/logs"},
                 "lines": {"type": "integer", "description": "返回行数", "default": 10},
             },
             "required": ["keyword"],

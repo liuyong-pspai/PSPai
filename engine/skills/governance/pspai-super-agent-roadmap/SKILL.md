@@ -1,9 +1,9 @@
 ---
 name: pspai-super-agent-roadmap
 category: governance
-description: Agent超级Agent发展宪章——从5分到10分的分阶段行动指引。四支柱：记忆护城河/代码工程/工程纪律/测试基建。每阶段有可量化目标和验证标准。
+description: 刘玉龙P07超级Agent发展宪章——从5分到10分的分阶段行动指引。四支柱：记忆护城河/代码工程/工程纪律/测试基建。每阶段有可量化目标和验证标准。
 version: 1.1.0
-author: Agent（2026-05-30 第二阶段进行中）
+author: 刘玉龙P07（2026-05-30 第二阶段进行中）
 tags: [roadmap, growth, super-agent, benchmark]
 ---
 
@@ -122,4 +122,4 @@ tags: [roadmap, growth, super-agent, benchmark]
 |:--|:--|:--|
 | 1.2.0 | 2026-05-30 | 第二阶段#3完成：拆出5子模块+沙箱19测试+TDD闭环 |
 | 1.1.0 | 2026-05-30 | 第一阶段✅完成+第二阶段进行中：沙箱测试循环+首次TDD闭环 |
-| 1.0.0 | 2026-05-30 | 初版，四阶段四支柱架构，审阅 |
+| 1.0.0 | 2026-05-30 | 初版，四阶段四支柱架构，四姐审阅 |

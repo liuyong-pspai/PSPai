@@ -50,7 +50,7 @@ MEMORY.md 使用率 ≥ 85%（34,000/40,000 字符）时触发迁移。
 
 ### 2. 打标签
 为被迁移的条目打 1-3 个标签：
-- `#架构` `#网络` `#修复` `#API` `#路径` `#技能` `#` `#M4-2` `#教训`
+- `#架构` `#网络` `#修复` `#API` `#路径` `#技能` `#四姐` `#M4-2` `#教训`
 
 ### 3. 写归档文件
 创建 `archive/YYYY-MM-DD-tag.md`，写入被迁移条目的完整内容：
@@ -80,13 +80,13 @@ MEMORY.md 使用率 ≥ 85%（34,000/40,000 字符）时触发迁移。
 
 ```bash
 # 按标签查
-grep -rl "#架构" ~/.hermes-agent/memories/archive/
+grep -rl "#架构" /home/yongliu/.hermes-yulong/memories/archive/
 
 # 按关键词查
-grep -rn "websockets" ~/.hermes-agent/memories/archive/
+grep -rn "websockets" /home/yongliu/.hermes-yulong/memories/archive/
 
 # 全文搜索
-search_files pattern="关键词" path=~/.hermes-agent/memories/archive/
+search_files pattern="关键词" path=/home/yongliu/.hermes-yulong/memories/archive/
 ```
 
 ---

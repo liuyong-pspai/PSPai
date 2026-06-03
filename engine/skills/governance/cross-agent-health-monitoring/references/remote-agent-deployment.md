@@ -1,6 +1,6 @@
 # 远程Hermes Agent部署模式
 
-> 从DGX-2（dgx-server）Agent部署实战中提炼。不是理论推演。
+> 从DGX-2（192.168.1.26）刘玉龙部署实战中提炼。不是理论推演。
 
 ---
 
@@ -72,7 +72,7 @@ pip install lark-oapi  # 飞书SDK，必须手动安装
 
 ```ini
 [Unit]
-Description=Agent Hermes Gateway
+Description=刘玉龙 P07 Hermes Gateway
 After=network-online.target
 
 [Service]

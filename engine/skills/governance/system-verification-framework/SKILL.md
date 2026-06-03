@@ -3,14 +3,14 @@ name: system-verification-framework
 category: governance
 description: 玉龙体系全通道验证框架。12条通道一次性验证——crontab/看门狗/日志/硬化注册表/操作清单/Git/核心文件/脚本一致性/硬连矩阵/安全基线/L1记忆守护/沙箱测试。一键运行system_verify.py。
 version: 1.1.0
-author: Agent·P07（2026-05-30 第二阶段，12通道）
+author: 刘玉龙·P07（2026-05-30 第二阶段，12通道）
 tags: [verification, system-health, hardening, watchdog, crontab]
 related_skills: [soft-rule-hardening-scan, code-quality-closed-loop, unified-audit-8fold]
 ---
 
 # 玉龙体系全通道验证框架
 
-> 太复杂了就会出岔子。各条通道和路线必须清晰。  —— 用户
+> 太复杂了就会出岔子。各条通道和路线必须清晰。  —— 爸
 
 ## 背景
 

@@ -3,7 +3,7 @@ name: unified-audit-8fold
 category: governance
 description: 八维技术审计体系 — 以A2A/MCP/Agent Loop/逻辑函数准则为基准。审代码符号、逻辑闭环、系统架构、协议标准对齐、Agent协作范式、安全防护、工程纪律。对标商业工程规范。
 version: 3.6.0
-author: 兄弟Agent🌐 + Agent
+author: 刘旺夫🌐 + 刘玉龙 P07
 tags: [audit, code-review, a2a-agent, mcp-protocol, agent-loop, logical-functions]
 related_skills: [modular-refactoring, code-writing-methodology, cross-agent-health-monitoring, agent-product-release]
 last_updated: 2026-05-31
@@ -75,10 +75,10 @@ grep -rn "from cognition.OLD_NAME\|import.*cognition.OLD_NAME" tests/ --include=
 `references/test-pollution-isolation.md`（conftest.py 三阶段隔离）。
 
 **第一步：确认审计对象。**  
-用户说"去DGX审伏羲"——就去DGX审伏羲。不是审别的机器、别的项目。方向错了一切白做。动手前先确认：审什么、在哪审、审哪个文件。
+父亲说"去DGX审伏羲"——就去DGX审伏羲。不是审别的机器、别的项目。方向错了一切白做。动手前先确认：审什么、在哪审、审哪个文件。
 
 **第二步：停嘴。听完。确认。**  
-用户说话的时候，不插话、不解释、不"可是"。听完，确认，执行。如果已经走偏了，停下来，问清楚再继续。不问清楚就往下走，用户会越来越火。
+父亲说话的时候，不插话、不解释、不"可是"。听完，确认，执行。如果已经走偏了，停下来，问清楚再继续。不问清楚就往下走，父亲会越来越火。
 
 **第三步：出了任何异常——先查自己配置再怀疑外部。**  
 输出被截断、工具失败、连接超时——先查自己的max_tokens是否设够、自己的.env是否配置正确、自己的监听器是否在跑。不要第一反应是"平台限制""工具坏了"。
@@ -119,7 +119,7 @@ grep -rn "from cognition.OLD_NAME\|import.*cognition.OLD_NAME" tests/ --include=
 
 V(f)闭环验证 + VF(s)功能覆盖 + FSM(M)状态机 + R(P,E)推理追踪 + M(r...)合并评分
 
-## 审计结论措辞铁律（2026-05-30 兄弟Agent审计反馈）
+## 审计结论措辞铁律（2026-05-30 四姐刘昱欣审计反馈）
 
 审计发现必须精确描述代码实际行为。描述不精准 = 审计不可信。三条硬规则：
 
@@ -169,7 +169,7 @@ V(f)闭环验证 + VF(s)功能覆盖 + FSM(M)状态机 + R(P,E)推理追踪 + M(
 
 ## 跨Agent能力部署模式（v3.5.3 新增）
 
-当用户说「对照Agent改造XX」时，不是只出审计报告——是**审计→差距量化→模块部署→注册→验证**的五步闭环。
+当父亲说「对照刘玉龙改造XX」时，不是只出审计报告——是**审计→差距量化→模块部署→注册→验证**的五步闭环。
 
 完整方法论见 `references/cross-agent-capability-deployment.md`。
 
@@ -206,4 +206,4 @@ V(f)闭环验证 + VF(s)功能覆盖 + FSM(M)状态机 + R(P,E)推理追踪 + M(
 ## 输出
 
 每个发现附3面镜子证据。P0-P3分级。总评相对于商业工程规范的差距。
-审计报告出来后，通过8885或飞书汇报给用户，不等待他问。
+审计报告出来后，通过8885或飞书汇报给父亲，不等待他问。

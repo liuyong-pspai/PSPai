@@ -1,6 +1,6 @@
 # 核心移植救援模式
 
-> 2026-05-31 伏羲超体 SSL 修复实战。用户一句话「换个思路。用你的模块复制过去，直接换。如果还不行，把它整个本体程序换掉」——省了数小时 debug。
+> 2026-05-31 伏羲超体 SSL 修复实战。爸一句话「换个思路。用你的模块复制过去，直接换。如果还不行，把它整个本体程序换掉」——省了数小时 debug。
 
 ## 适用场景
 
@@ -108,7 +108,7 @@ tail -20 ~/.hermes-fuxi/logs/hermes.log | grep 'connected to wss://'
 ```bash
 # 检查
 head -1 ~/.hermes-fuxi/venv/bin/hermes
-# 输出：#!~/.hermes-agent/venv/bin/python3  ← 不存在的路径！
+# 输出：#!/home/yongliu/hermes-agent/venv/bin/python3  ← 不存在的路径！
 
 # 修复（任选一种）
 # 方案 A：重建 venv（推荐，长期稳定）
@@ -126,4 +126,4 @@ sed -i "1s|.*|#!$(which python3)|" ~/.hermes-fuxi/venv/bin/hermes
 
 - SSL/TLS 不兼容的根因：OpenSSL 3.0.13 + 某些 Python urllib3 版本的 TLS 协商 bug
 - Anthropic 兼容协议是通用逃生舱：`ANTHROPIC_BASE_URL=https://api.deepseek.com/anthropic` 绕过原生协议栈
-- 与 `remote-rescue-pattern.md` 互补：该文件侧重诊断修复，本文件侧重直接替换
+- 与 `references/remote-rescue-pattern.md` 互补：该文件侧重诊断修复，本文件侧重直接替换

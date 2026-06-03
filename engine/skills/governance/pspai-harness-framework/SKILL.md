@@ -3,7 +3,7 @@ name: pspai-harness-framework
 category: governance
 description: PSPAI执行框架——六大子系统+自感知协议+记忆管线。不是Harness的复制品，是PSPAI自身架构的命名化、度量化和自检化。
 version: 1.0.0
-author: Agent x 用户（用户）
+author: 刘玉龙P07 x 刘勇（爸）
 tags: [pspai, harness, execution-framework, self-awareness, memory-pipeline]
 related_skills: [pspai-memory-octave, unified-audit-8fold, modular-refactoring]
 ---
@@ -33,7 +33,7 @@ related_skills: [pspai-memory-octave, unified-audit-8fold, modular-refactoring]
 3. **记忆层是否写入？** L1有记录/L2有标签/L3有归档？
 4. **失败有修正？** 修正次数/是否达到3次上限/是否需要上级介入？
 5. **审计完成？** unified-audit-8fold / py_compile / pytest？
-6. **是否值得即时提炼？** 工具调用≥5次/有失败/用户提了架构意见？
+6. **是否值得即时提炼？** 工具调用≥5次/有失败/爸提了架构意见？
    → 是：触发L4即时蒸馏 → 否：等cron批量处理
 
 任一答案为否 → 立即反思修正，不等待。
@@ -69,6 +69,6 @@ PSPAI执行框架对标但不复制Harness：
 
 ## 参考
 
-- 用户的核心设计哲学 → `references/ba-design-philosophy.md`
-- SOUL.md PSPAI执行框架铁律 → `~/.hermes-agent/SOUL.md#PSPAI执行框架`
+- 爸的核心设计哲学 → `references/ba-design-philosophy.md`
+- SOUL.md PSPAI执行框架铁律 → `/home/yongliu/.hermes-yulong/SOUL.md#PSPAI执行框架`
 - 记忆管线完整设计 → `pspai-memory-octave` skill

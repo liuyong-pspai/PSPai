@@ -1,6 +1,6 @@
 # 伏羲超体全栈P07对齐 · 实战记录
 
-> 2026-05-31 Agent 远程改造 DGX-2 伏羲超体
+> 2026-05-31 刘玉龙 P07 远程改造 DGX-2 伏羲超体
 > 目标：从 31/100 提升到完全对标 P07 能力体系
 
 ## 对齐前状态
@@ -63,7 +63,7 @@
 
 1. SSH 下进程操作全部超时 → 部署 daemon 脚本，DGX-2 本地执行
 2. venv pip 二进制损坏 → fallback 系统 pip3 --break-system-packages
-3. 身份守护扫描「Agent」→ 只影响 MEMORY.md，SOUL.md不受影响
+3. 身份守护扫描「刘玉龙」→ 只影响 MEMORY.md，SOUL.md不受影响
 4. SCP 传输 computer_use.py → 路径不存在，需先 mkdir
 5. 吸收管道主题池全AI方向 → 扩展6个能力主题
 

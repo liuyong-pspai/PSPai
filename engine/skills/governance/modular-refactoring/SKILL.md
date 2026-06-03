@@ -2,7 +2,7 @@
 name: modular-refactoring
 category: governance
 description: 巨型Python文件模块化拆分方法论——Mixin提取 + 非连续保集 + 脚本化安全变换。适用于1000+行单体文件拆分为多个独立子模块的场景。
-author: Agent
+author: 刘玉龙 P07
 tags: [refactoring, mixin, modular, code-health, import-isolation, batch-extraction, backward-compat, regression-testing, kernel]
 related_skills: [unified-audit-8fold]
 version: 1.8.0
@@ -58,9 +58,9 @@ python3 ~/.hermes-yulong/skills/governance/modular-refactoring/scripts/pre_fligh
 | 类间交叉引用 | 哪些改用 `type(self)`？哪些函数迁移？ |
 | 孤儿函数 | 是否业务需要？不需要就删除 |
 
-### 第3步：确认后回复用户
+### 第3步：确认后回复父亲
 
-格式：「用户，诊断通过。目标文件 X行，Y个类，Z个共享函数。我计划拆分为 N 个子模块 + 1 个 helpers 文件。确认开始？」
+格式：「爸，诊断通过。目标文件 X行，Y个类，Z个共享函数。我计划拆分为 N 个子模块 + 1 个 helpers 文件。确认开始？」
 
 **铁律：跳过以上三步 → 拆分必然引入已记录的陷阱。这不是"可能出错"，是"必然出错"。**
 
@@ -519,8 +519,8 @@ python3 -m pytest tests/ ... --tb=line -q 2>&1 | grep -E 'passed|failed|error'
 
 拆分任务的职责是**零回归损伤**，不是修复所有历史遗留问题。历史遗留项：
 - 列入单独清单
-- 向用户汇报时明确标注"非本次拆分引入"
-- 由用户决定是否另开任务修复
+- 向爸汇报时明确标注"非本次拆分引入"
+- 由爸决定是否另开任务修复
 
 ## 🚨 第六阶段：后拆分强制审计（v1.5.0 新增）
 
