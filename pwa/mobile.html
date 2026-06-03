@@ -69,11 +69,12 @@ html,body{width:100%;height:100%;overflow:hidden;font-family:'PingFang SC','Micr
 
 /* 底部 */
 #dock{flex-shrink:0;padding:8px 8px;padding-bottom:max(14px,env(safe-area-inset-bottom));display:flex;align-items:center;justify-content:center;gap:8px;z-index:10;flex-wrap:wrap}
-#talk-btn{width:64px;height:64px;border-radius:50%;background:linear-gradient(135deg,var(--gold),#a08020);border:3px solid var(--gold-dim);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all 0.2s;position:relative;flex-shrink:0}
-#talk-btn:active,#talk-btn.active{transform:scale(1.15)}
+#talk-btn{width:64px;height:64px;border-radius:50%;background:linear-gradient(135deg,var(--gold),#a08020);border:3px solid var(--gold-dim);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all 0.2s;position:relative;flex-shrink:0;box-shadow:0 4px 20px rgba(200,168,78,0.15)}
+#talk-btn:active,#talk-btn.active{transform:scale(1.12);box-shadow:0 6px 30px var(--gold-dim)}
 #talk-btn.active{animation:tpulse 1.2s ease-in-out infinite}
 @keyframes tpulse{0%,100%{box-shadow:0 0 25px var(--gold-dim)}50%{box-shadow:0 0 60px var(--gold),0 0 100px var(--gold-dim)}}
-#talk-btn .icon{font-size:26px;color:#fff;pointer-events:none}
+#talk-btn .icon{width:26px;height:26px;pointer-events:none}
+#talk-btn .icon svg{width:100%;height:100%}
 #talk-ripple{position:absolute;inset:-6px;border-radius:50%;border:2px solid var(--gold);opacity:0}
 #talk-btn.active #talk-ripple{opacity:1;animation:ripple 1.5s ease-out infinite}
 @keyframes ripple{0%{inset:-6px;opacity:0.8}100%{inset:-30px;opacity:0}}
@@ -110,7 +111,7 @@ html,body{width:100%;height:100%;overflow:hidden;font-family:'PingFang SC','Micr
     <div class="char-btn sel" onclick="switchChar('longyuan')"><img src="img_longyuan.jpg"></div>
     <div id="talk-btn" ontouchstart="startTalk(event)" ontouchend="stopTalk(event)" onmousedown="startTalk(event)" onmouseup="stopTalk(event)">
       <div id="talk-ripple"></div>
-      <span class="icon">🎤</span>
+      <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg></span>
     </div>
     <div class="char-btn" onclick="switchChar('ling')"><img src="img_ling.jpg"></div>
     <div class="char-btn" onclick="switchChar('qingmo')"><img src="img_qingmo.jpg"></div>
