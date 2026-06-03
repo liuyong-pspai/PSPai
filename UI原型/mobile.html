@@ -93,6 +93,13 @@ html,body{width:100%;height:100%;overflow:hidden;font-family:'PingFang SC','Micr
 .theme-dot.sel{border-color:var(--gold);color:var(--gold)}
 
 @media(min-width:500px){#app{max-width:430px;margin:0 auto;border:1px solid rgba(255,255,255,0.04)}}
+
+/* 安装提示 */
+#install-banner{display:none;position:fixed;bottom:100px;left:12px;right:12px;z-index:150;background:rgba(0,0,0,0.92);border:1px solid var(--gold-dim);border-radius:14px;padding:14px 16px;align-items:center;gap:12px}
+#install-banner.show{display:flex}
+#install-banner .ib-close{position:absolute;top:6px;right:10px;color:#666;font-size:14px;cursor:pointer}
+#install-banner .ib-txt{flex:1;font-size:13px;color:#ccc;line-height:1.4}
+#install-banner button{padding:8px 16px;border-radius:8px;border:none;background:var(--gold);color:#000;font-size:14px;font-weight:bold;cursor:pointer;white-space:nowrap}
 </style>
 </head>
 <body>
@@ -147,6 +154,12 @@ html,body{width:100%;height:100%;overflow:hidden;font-family:'PingFang SC','Micr
   <button onclick="saveSettings()">保存连接</button>
   <button onclick="location.href='config.html'" style="background:rgba(255,255,255,0.08);color:#fff">⚙ 配置大模型</button>
   <span class="close" onclick="hideSettings()">取消</span>
+</div>
+
+<div id="install-banner">
+  <span class="ib-close" onclick="this.parentElement.classList.remove('show')">✕</span>
+  <div class="ib-txt">📲 安装到桌面，像App一样使用</div>
+  <button onclick="installPWA()">安装</button>
 </div>
 
 <script>
@@ -367,6 +380,30 @@ function saveSettings() {
 }
 
 // ====== 启动 ======
+let installPrompt = null;
+
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault();
+  installPrompt = e;
+  document.getElementById('install-banner').classList.add('show');
+});
+
+function installPWA() {
+  if (!installPrompt) {
+    alert('请使用浏览器菜单中的"添加到主屏幕"');
+    return;
+  }
+  installPrompt.prompt();
+  installPrompt.userChoice.then(r => {
+    document.getElementById('install-banner').classList.remove('show');
+    installPrompt = null;
+  });
+}
+
+window.addEventListener('appinstalled', () => {
+  document.getElementById('install-banner').classList.remove('show');
+});
+
 fetch('/api/config-file').then(function(r){return r.json()}).then(function(d){
   if(!d.exists) showSettings();
 }).catch(function(){});
