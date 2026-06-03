@@ -33,6 +33,7 @@ html,body{width:100%;height:100%;overflow:hidden;font-family:'PingFang SC','Micr
 #char-ring{width:130px;height:130px;border-radius:50%;padding:3px;transition:all 0.3s}
 #char-ring.listening{animation:ring 1.5s ease-in-out infinite}
 #char-ring.speaking{animation:speakring 0.6s ease-in-out infinite}
+#char-ring.thinking{animation:ring 0.8s ease-in-out infinite;box-shadow:0 0 30px var(--gold-dim)}
 @keyframes ring{0%,100%{box-shadow:0 0 12px var(--gold-dim)}50%{box-shadow:0 0 40px var(--gold),0 0 80px var(--gold-dim)}}
 @keyframes speakring{0%,100%{box-shadow:0 0 18px var(--gold-dim)}50%{box-shadow:0 0 50px var(--gold),0 0 90px var(--gold-dim)}}
 #char-ring img{width:100%;height:100%;border-radius:50%;object-fit:cover}
@@ -49,6 +50,12 @@ html,body{width:100%;height:100%;overflow:hidden;font-family:'PingFang SC','Micr
 #bubble .b{display:inline-block;padding:10px 18px;border-radius:16px;background:rgba(0,0,0,0.75);color:#fff;font-size:16px;max-width:90%;line-height:1.5;opacity:0;transform:translateY(10px);transition:all 0.25s}
 #bubble .b.show{opacity:1;transform:translateY(0)}
 
+/* 文字输入 */
+#text-input-area{display:none;padding:0 16px 8px;gap:8px;align-items:center}
+#text-input-area.show{display:flex}
+#text-input{flex:1;padding:10px 14px;border-radius:20px;border:1px solid rgba(255,255,255,0.12);background:rgba(255,255,255,0.06);color:#fff;font-size:15px;outline:none}
+#text-send{padding:10px 16px;border-radius:20px;border:none;background:var(--gold);color:#000;font-size:14px;font-weight:bold;cursor:pointer;flex-shrink:0}
+
 /* 底部 */
 #dock{flex-shrink:0;padding:10px 16px;padding-bottom:max(16px,env(safe-area-inset-bottom));display:flex;align-items:center;justify-content:center;gap:16px;z-index:10}
 #talk-btn{width:68px;height:68px;border-radius:50%;background:linear-gradient(135deg,var(--gold),#a08020);border:3px solid var(--gold-dim);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all 0.2s;position:relative;flex-shrink:0}
@@ -63,6 +70,9 @@ html,body{width:100%;height:100%;overflow:hidden;font-family:'PingFang SC','Micr
 .char-btn{width:38px;height:38px;border-radius:50%;overflow:hidden;border:2px solid rgba(255,255,255,0.08);cursor:pointer;opacity:0.35;transition:all 0.2s;flex-shrink:0}
 .char-btn:active,.char-btn.sel{opacity:1;border-color:var(--gold);transform:scale(1.12)}
 .char-btn img{width:100%;height:100%;object-fit:cover}
+
+#kb-btn{font-size:20px;cursor:pointer;opacity:0.5;transition:all 0.2s;flex-shrink:0}
+#kb-btn:active{opacity:1;transform:scale(1.15)}
 
 @media(min-width:500px){#app{max-width:430px;margin:0 auto;border:1px solid rgba(255,255,255,0.04)}}
 </style>
@@ -83,6 +93,11 @@ html,body{width:100%;height:100%;overflow:hidden;font-family:'PingFang SC','Micr
     <div id="bubble"><div class="b"></div></div>
   </div>
 
+  <div id="text-input-area">
+    <input id="text-input" type="text" placeholder="输入文字..." onkeydown="if(event.key==='Enter')sendText()">
+    <button id="text-send" onclick="sendText()">发送</button>
+  </div>
+
   <div id="dock">
     <div class="char-btn sel" onclick="switchChar('longyuan')"><img src="img_longyuan.jpg"></div>
     <div class="char-btn" onclick="switchChar('chiyu')"><img src="img_chiyu.jpg"></div>
@@ -92,21 +107,25 @@ html,body{width:100%;height:100%;overflow:hidden;font-family:'PingFang SC','Micr
     </div>
     <div class="char-btn" onclick="switchChar('ling')"><img src="img_ling.jpg"></div>
     <div class="char-btn" onclick="switchChar('qingmo')"><img src="img_qingmo.jpg"></div>
+    <span id="kb-btn" onclick="toggleTextInput()">⌨️</span>
   </div>
 </div>
 
 <div id="settings">
   <div style="color:var(--gold);font-size:16px;font-weight:bold">⚙️ 连接设置</div>
-  <input id="server-input" placeholder="例: 192.168.1.35:8765" value="">
+  <input id="server-input" placeholder="例: localhost:8089" value="">
   <button onclick="saveSettings()">连接</button>
-  <div id="settings-hint" style="color:#888;font-size:11px;text-align:center;max-width:280px">
-    输入小龙人引擎地址<br>同一WiFi下填局域网IP<br>出门在外需要公网地址
+  <div style="color:#888;font-size:11px;text-align:center;max-width:280px">
+    小龙人引擎地址<br>本机默认 localhost:8089<br>同一WiFi填局域网IP:8089
   </div>
   <span class="close" onclick="hideSettings()">取消</span>
 </div>
 
 <script>
-// ====== 角色 ======
+// ====== 配置 ======
+var API_BASE = 'http://localhost:8089';
+var charId = 'longyuan', recognition = null, isListening = false, currentUtterance = null;
+
 const CHARS = {
   longyuan:{name:'龙渊',tag:'沉稳温暖'},
   chiyu:{name:'赤羽',tag:'热血少年'},
@@ -116,46 +135,47 @@ const CHARS = {
   yeying:{name:'夜影',tag:'暗夜刺客'},
 };
 
-let ws = null, charId = 'longyuan', recognition = null;
-let isListening = false, currentUtterance = null;
-let serverAddr = localStorage.getItem('xlr_server') || '';
-
-// ====== WebSocket ======
-function connectWS() {
-  if (ws) { ws.close(); ws = null; }
-  let addr = serverAddr || location.hostname + ':8765';
-  if (!addr.includes(':')) addr += ':8765';
-  if (!addr.startsWith('w')) addr = 'ws://' + addr;
-  
-  document.getElementById('conn-dot').style.color = '#fa0';
-  document.getElementById('conn-dot').textContent = '● 连接中';
-  setStatus('连接中...');
-  
-  try {
-    ws = new WebSocket(addr);
-    ws.onopen = () => {
-      document.getElementById('conn-dot').style.color = '#4f8';
-      document.getElementById('conn-dot').textContent = '● 已连接';
-      setStatus('可以说话了');
-    };
-    ws.onclose = () => {
-      document.getElementById('conn-dot').style.color = '#f44';
-      document.getElementById('conn-dot').textContent = '● 离线';
-      setStatus('连接断开，点右上角设置');
-    };
-    ws.onerror = () => {
-      setStatus('连不上引擎，请检查地址');
-    };
-    ws.onmessage = (e) => {
-      const msg = JSON.parse(e.data);
-      if (msg.type === 'reply') speakText(msg.text);
-      else if (msg.type === 'interrupted') stopSpeaking();
-    };
-  } catch(e) {
+// ====== 引擎连接检测 ======
+function checkEngine() {
+  fetch(API_BASE+'/api/status').then(function(r){return r.json()}).then(function(d){
+    document.getElementById('conn-dot').style.color = '#4f8';
+    document.getElementById('conn-dot').textContent = '● 已连接';
+    if (!isListening) setStatus('可以说话了');
+  }).catch(function(){
     document.getElementById('conn-dot').style.color = '#f44';
     document.getElementById('conn-dot').textContent = '● 离线';
-    setStatus('连接失败，点右上角设置地址');
-  }
+  });
+}
+setInterval(checkEngine, 15000);
+checkEngine();
+
+// ====== 发送消息到引擎（HTTP REST API + 重试） ======
+function sendToEngine(text, attempt) {
+  attempt = attempt || 0;
+  var c = CHARS[charId];
+  document.getElementById('char-ring').classList.add('thinking');
+  setStatus('思考中...');
+  
+  fetch(API_BASE+'/api/chat', {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({message:text, charIndex:0, charName:c.name, lang:'zh'})
+  })
+  .then(function(r){return r.json()})
+  .then(function(data){
+    document.getElementById('char-ring').classList.remove('thinking');
+    if (data.reply) speakText(data.reply);
+    else setStatus('轻触金色按钮开始说话');
+  })
+  .catch(function(e){
+    if (attempt < 2) {
+      setTimeout(function(){sendToEngine(text, attempt+1)}, Math.pow(2,attempt)*1000);
+      return;
+    }
+    document.getElementById('char-ring').classList.remove('thinking');
+    setStatus('连接不上引擎，点右上角设置');
+    checkEngine();
+  });
 }
 
 // ====== TTS ======
@@ -164,14 +184,14 @@ function speakText(text) {
   document.getElementById('char-ring').classList.add('speaking');
   showBubble(text);
   
-  const u = new SpeechSynthesisUtterance(text);
+  var u = new SpeechSynthesisUtterance(text);
   u.lang = 'zh-CN'; u.rate = 1.05; u.pitch = 1.0;
-  u.onend = () => {
+  u.onend = function(){
     document.getElementById('char-ring').classList.remove('speaking');
     hideBubble();
     if (!isListening) setStatus('轻触金色按钮开始说话');
   };
-  u.onerror = () => {
+  u.onerror = function(){
     document.getElementById('char-ring').classList.remove('speaking');
     hideBubble();
   };
@@ -188,29 +208,43 @@ function stopSpeaking() {
   }
 }
 
-// ====== STT ======
+// ====== 文字输入 ======
+function toggleTextInput() {
+  var area = document.getElementById('text-input-area');
+  area.classList.toggle('show');
+  if (area.classList.contains('show')) document.getElementById('text-input').focus();
+}
+
+function sendText() {
+  var inp = document.getElementById('text-input'), text = inp.value.trim();
+  if (!text) return;
+  inp.value = '';
+  document.getElementById('text-input-area').classList.remove('show');
+  stopSpeaking();
+  sendToEngine(text);
+}
+
+// ====== STT（语音识别） ======
 function initRecognition() {
-  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!SR) { setStatus('浏览器不支持语音'); return null; }
-  const r = new SR();
+  var r = new SR();
   r.lang = 'zh-CN'; r.continuous = true; r.interimResults = true;
-  r.onresult = (e) => {
-    let text = '';
-    for (let i = e.resultIndex; i < e.results.length; i++)
+  r.onresult = function(e) {
+    var text = '';
+    for (var i = e.resultIndex; i < e.results.length; i++)
       text += e.results[i][0].transcript;
     if (e.results[e.results.length-1].isFinal && text.trim()) {
-      if (ws && ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({type:'text', text: text.trim()}));
-        setStatus('听到了，正在想...');
-      }
+      stopListening();
+      sendToEngine(text.trim());
     }
   };
-  r.onerror = (e) => {
+  r.onerror = function(e) {
     if (e.error === 'no-speech'||e.error==='aborted') return;
     if (e.error === 'not-allowed') setStatus('请允许麦克风权限');
     stopListening();
   };
-  r.onend = () => { if (isListening) { try{r.start()}catch(ex){} } };
+  r.onend = function(){ if(isListening){ try{r.start()}catch(ex){} } };
   return r;
 }
 
@@ -234,51 +268,49 @@ function stopListening() {
 
 // ====== 按钮 ======
 function startTalk(e) { e.preventDefault(); if (!isListening) startListening(); }
-function stopTalk(e) { e.preventDefault(); setTimeout(()=>{if(isListening)stopListening()},300); }
+function stopTalk(e) { e.preventDefault(); setTimeout(function(){if(isListening)stopListening()},300); }
 
-// ====== 角色 ======
+// ====== 角色切换 ======
 function switchChar(id) {
   charId = id;
-  const c = CHARS[id];
+  var c = CHARS[id];
   document.getElementById('char-img').src = 'img_'+id+'.jpg';
   document.getElementById('char-name').textContent = c.name;
   document.getElementById('char-tag').textContent = c.tag;
-  document.querySelectorAll('.char-btn').forEach(b => {
+  document.querySelectorAll('.char-btn').forEach(function(b){
     b.classList.toggle('sel', b.querySelector('img').src.includes('img_'+id));
   });
-  if (ws && ws.readyState === WebSocket.OPEN)
-    ws.send(JSON.stringify({type:'switch_character', character: id}));
   setStatus('切换到了'+c.name);
 }
 
 // ====== 设置 ======
 function showSettings() {
-  document.getElementById('server-input').value = serverAddr || location.hostname+':8765';
+  document.getElementById('server-input').value = API_BASE.replace('http://','');
   document.getElementById('settings').classList.add('show');
 }
 function hideSettings() { document.getElementById('settings').classList.remove('show'); }
 function saveSettings() {
-  serverAddr = document.getElementById('server-input').value.trim();
-  localStorage.setItem('xlr_server', serverAddr);
+  var addr = document.getElementById('server-input').value.trim();
+  if (!addr.startsWith('http')) addr = 'http://' + addr;
+  API_BASE = addr;
+  localStorage.setItem('xlr_api_base', API_BASE);
   hideSettings();
-  connectWS();
+  checkEngine();
 }
 
 // ====== UI ======
-function showBubble(t) { const b=document.querySelector('#bubble .b'); b.textContent=t; b.classList.add('show'); }
+function showBubble(t) { var b=document.querySelector('#bubble .b'); b.textContent=t; b.classList.add('show'); }
 function hideBubble() { document.querySelector('#bubble .b').classList.remove('show'); }
 function setStatus(t) { document.getElementById('status').textContent = t; }
 
 // ====== 启动 ======
-if (serverAddr) {
-  connectWS();
-} else {
-  showSettings();
-}
+var saved = localStorage.getItem('xlr_api_base');
+if (saved) API_BASE = saved;
+checkEngine();
 
 // 注册 Service Worker
 if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('sw.js').catch(()=>{});
+  navigator.serviceWorker.register('sw.js').catch(function(){});
 }
 </script>
 </body>
