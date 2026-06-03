@@ -119,12 +119,38 @@ jobs:
 
       - name: Build installer (Windows)
         if: matrix.platform == 'windows'
-        shell: cmd
+        shell: pwsh
         run: |
-          python installer/make_installer.py || python3 installer/make_installer.py
-          if %ERRORLEVEL% NEQ 0 exit /b 1
-          echo === dist contents ===
-          dir dist\
+          $BUILD = "xlr_build"
+          New-Item -ItemType Directory -Force -Path $BUILD, dist
+          Copy-Item -Recurse "UI原型/*" "$BUILD/frontend/"
+          Copy-Item "launcher.py" "$BUILD/"
+          Copy-Item "engine/dist/xiaolongren-engine-windows.exe" "$BUILD/xiaolongren-engine.exe"
+          # Create install.bat
+          @"
+          @echo off
+          chcp 65001 >nul
+          title XiaoLongRen Setup
+          echo ======================================
+          echo   XiaoLongRen Setup
+          echo ======================================
+          echo.
+          set "D=C:\XiaoLongRen"
+          echo [1/3] Copying files...
+          xcopy /E /I /Y /Q "%~dp0*" "%D%" >nul
+          cd /d "%D%"
+          echo [2/3] Installing Python dependencies...
+          python -m pip install -q PyYAML Pillow requests >nul 2>&1
+          echo [3/3] Launching...
+          start "" pythonw "%D%\launcher.py"
+          echo.
+          echo   Done! Browser opens for model setup.
+          timeout /t 3 >nul
+          exit
+          "@ | Out-File -Encoding ASCII "$BUILD/install.bat"
+          Compress-Archive -Path "$BUILD/*" -DestinationPath "dist/xiaolongren-setup.zip"
+          echo "=== dist contents ==="
+          Get-ChildItem dist/
 
       - name: Build installer (macOS/Linux)
         if: matrix.platform != 'windows'
