@@ -1,9 +1,10 @@
 const CACHE = 'xlr-v1';
 const ASSETS = [
   './mobile.html',
-  './index.html',
   './config.html',
   './manifest.json',
+  './icon-192.png',
+  './icon-512.png',
   './img_longyuan.jpg',
   './img_chiyu.jpg',
   './img_ling.jpg',
