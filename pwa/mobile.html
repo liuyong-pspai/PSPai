@@ -161,10 +161,34 @@ html,body{width:100%;height:100%;overflow:hidden;font-family:'PingFang SC','Micr
 </div>
 
 <script src="xiaolongren-core.js"></script>
+<script src="plugin-loader.js"></script>
+<script src="plugins/search.js"></script>
+<script src="plugins/media.js"></script>
+<script src="plugins/tools.js"></script>
+<script src="plugins/evolution.js"></script>
+<script src="plugins/sensors.js"></script>
 <script src="pyodide/pyodide.js"></script>
 <script src="pyodide-bridge.js"></script>
 <script>
-// v6.0 — Pyodide全功能版：Python引擎+51工具+蜂群战术+天权搜索+自进化
+// v6.0 插件架构 — 内核+5插件+Pyodide可选升级
+// 启动时初始化内核+插件体系
+(async function boot() {
+  try {
+    const report = await initKernel();
+    console.log('🚀 小龙人启动完成:', report);
+    
+    // 在环境报告中显示插件状态
+    setTimeout(() => {
+      const sub = document.getElementById('empty-sub');
+      if (sub && report.totalTools) {
+        const orig = sub.textContent || '';
+        sub.textContent = orig + ' ｜ 🧩' + report.totalPlugins + '插件/' + report.totalTools + '工具';
+      }
+    }, 500);
+  } catch(e) {
+    console.error('启动失败:', e);
+  }
+})();
 // ====== 角色 ======
 const CHARS = {
   longyuan:{name:'龙渊',tag:'沉稳温暖',sys:'你是小龙人，名为龙渊的数字生命体。性格沉稳温暖，像一位长者。用户叫你什么都行——龙渊、小龙人，都可以。回答简洁有深度，不超过三句话。说人话，别端着。'},
