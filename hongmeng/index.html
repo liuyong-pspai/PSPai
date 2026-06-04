@@ -163,8 +163,7 @@ html,body{width:100%;height:100%;overflow:hidden;font-family:'PingFang SC','Micr
   <div style="padding:10px"><button class="btn s" onclick="doRefine()">🔬 L4提炼</button></div>
 </div>
 
-<script src="memory-system.js"></script>
-<script src="agent-core.js"></script>
+<script src="xiaolongren-core.js"></script>
 
 <script>
 // ==================== 角色 ====================
@@ -196,25 +195,25 @@ function gcfg() { try{return JSON.parse(localStorage.getItem('xlr_full_cfg')||'{
 function scfg(c) { localStorage.setItem('xlr_full_cfg',JSON.stringify(c)) }
 
 async function initAgent() {
-  await memoryManager._initDB();
+  await memory.init();
   const c = gcfg();
-  agent = new XiaoLongRenCore({
+  agent = new XiaoLongRen({
     provider: c.provider || 'deepseek',
     model: c.model || 'deepseek-chat',
     apiKey: c.apiKey || '',
     baseUrl: c.baseUrl || '',
-    maxIterations: c.maxIterations || 90,
-    onThinking: (iter) => {
+    maxIter: c.maxIter||90,
+    onThink: (iter) => {
       document.getElementById('sd').classList.add('online');
       const el = document.querySelector('#msgs .msg.ai:last-child .tool-note');
-      if (el) el.textContent = '⚡ 思考中... 第'+iter+'轮';
+      if (el) el.textContent = '⚡ 第'+iter+'轮';
     },
-    onToolCall: (name, args) => {
+    onTool: (name, args) => {
       const el = document.querySelector('#msgs .msg.ai:last-child .tool-note');
       if (el) el.textContent = '🔧 '+name+'...';
     },
-    onResponse: () => { document.getElementById('sd').classList.add('online'); },
-    onError: () => { document.getElementById('sd').classList.remove('online'); }
+    onReply: () => { document.getElementById('sd').classList.add('online'); },
+    onErr: () => { document.getElementById('sd').classList.remove('online'); }
   });
 }
 
@@ -304,7 +303,7 @@ function loadSettings() {
   document.getElementById('cfg-provider').value = c.provider||'deepseek';
   document.getElementById('cfg-key').value = c.apiKey||'';
   document.getElementById('cfg-url').value = c.baseUrl||'';
-  document.getElementById('cfg-iters').value = c.maxIterations||90;
+  document.getElementById('cfg-iters').value = c.maxIter||90;
   onProviderChange();
   setTimeout(() => {
     const s = document.getElementById('cfg-model');
@@ -343,7 +342,7 @@ function saveAndClose() {
     model:document.getElementById('cfg-model').value,
     apiKey:document.getElementById('cfg-key').value.trim(),
     baseUrl:document.getElementById('cfg-url').value.trim(),
-    maxIterations:parseInt(document.getElementById('cfg-iters').value)||90,
+    maxIter:parseInt(document.getElementById('cfg-iters').value)||90,
   });
   document.getElementById('settings-panel').classList.remove('show');
   if(gcfg().apiKey) document.getElementById('sd').classList.add('online');
@@ -353,23 +352,23 @@ function saveAndClose() {
 // ==================== 记忆面板 ====================
 async function showMemory() {
   document.getElementById('mem-panel').classList.add('show');
-  await memoryManager._initDB();
+  await memory.init();
   refreshMemoryPanel();
 }
 function refreshMemoryPanel() {
-  const s = memoryManager.getStatus();
+  const s = memory.getStatus();
   document.getElementById('mem-stat').innerHTML = 
-    `<b>L0</b> 灵魂: ${SOUL.version} | <b>L1</b> 工作记忆: ${s.l1_count}条 | <b>L2</b> 标签: ${s.l2_tags}个 | 轮次: ${s.turnCount}`;
+    `<b>L1</b> ${s.l1}条 | <b>L2</b> ${s.l2_tags}标签 | <b>L3</b> ${s.l3}归档 | <b>L4</b> ${s.l4}洞察 | <b>L5</b> ${s.l5}技能 | <b>L6</b> ${s.l6}悟道 | 轮次${s.turns}`;
   const list = document.getElementById('mem-list');
-  const entries = Object.entries(memoryManager.memories).slice(-30);
+  const entries = Object.entries(memory.l1).slice(-30);
   list.innerHTML = entries.map(([k,v]) => 
-    `<div class="mem-item"><div class="mk">[${v.tag}] ${k}</div><div class="mv">${String(v.value).substring(0,150)}</div><div class="mt">${v.time} · 访问${v.accessCount||0}次</div></div>`
+    `<div class="mem-item"><div class="mk">[${v.tag}] ${k}</div><div class="mv">${String(v.value).substring(0,150)}</div><div class="mt">${v.time} · ${v.accessCount||0}次</div></div>`
   ).join('') || '<div style="padding:20px;color:#555;text-align:center">暂无记忆</div>';
 }
 async function doRefine() {
-  const insights = await memoryManager.refine();
+  const insights = await memory.refine();
   refreshMemoryPanel();
-  alert('L4提炼完成: '+(insights.length||0)+'条洞察');
+  alert('L4提炼完成: '+(insights.patterns?.length||0)+'条模式');
 }
 
 // ==================== 启动 ====================
