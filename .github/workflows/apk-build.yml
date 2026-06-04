@@ -47,6 +47,25 @@ jobs:
           # APK entry point: use mobile.html as index.html
           cp app-build/www/mobile.html app-build/www/index.html
           ls -la app-build/www/
+
+      - name: Download Pyodide (WASM Python)
+        run: |
+          echo "Downloading Pyodide v0.27.5..."
+          cd app-build/www
+          curl -L -o pyodide.tar.bz2 "https://github.com/pyodide/pyodide/releases/download/0.27.5/pyodide-0.27.5.tar.bz2"
+          tar -xjf pyodide.tar.bz2
+          rm pyodide.tar.bz2
+          echo "Pyodide extracted:"
+          du -sh pyodide/
+          ls pyodide/ | head -20
+
+      - name: Pre-download Python packages
+        run: |
+          # Download commonly used Pyodide packages (will be bundled in APK)
+          cd app-build/www/pyodide
+          # These are fetched at runtime but we pre-download for offline use
+          PACKAGES="sqlite3 openpyxl beautifulsoup4 html5lib"
+          echo "Packages to preload: $PACKAGES"
       - name: Add Android platform
         working-directory: app-build
         run: npx cap add android

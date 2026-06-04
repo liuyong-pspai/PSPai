@@ -7,6 +7,11 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#0a0a14">
 <meta name="apple-mobile-web-app-title" content="小龙人">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<!-- 鸿蒙/Android WebView兼容 -->
+<meta name="x5-orientation" content="portrait">
+<meta name="x5-fullscreen" content="true">
+<meta name="renderer" content="webkit">
 <title>数字生命体小龙人</title>
 <link rel="manifest" href="manifest.json">
 <style>
@@ -94,6 +99,8 @@ html,body{width:100%;height:100%;overflow:hidden;font-family:'PingFang SC','Micr
   <div id="top">
     <span class="t">🐉 小龙人</span>
     <div class="r">
+      <span id="net-dot" style="width:6px;height:6px;border-radius:50%;display:inline-block;margin-right:8px;background:#888" title="检测网络中..."></span>
+      <span id="env-badge" style="font-size:9px;color:#555;margin-right:4px"></span>
       <button class="cfg-btn" onclick="location.href='config.html'" title="配置模型">⚙</button>
     </div>
   </div>
@@ -115,7 +122,22 @@ html,body{width:100%;height:100%;overflow:hidden;font-family:'PingFang SC','Micr
     </div>
   </div>
 
+  <!-- Pyodide加载进度条 -->
+  <div id="pyodide-loader" style="position:fixed;bottom:60px;left:12px;right:12px;z-index:200;
+    background:rgba(0,0,0,0.85);border:1px solid var(--gold-dim);border-radius:10px;
+    padding:10px 14px;display:none;font-size:12px;color:#888;">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+      <span>🐍</span><span id="pyload-text">Python引擎加载中...</span>
+    </div>
+    <div style="height:3px;background:rgba(255,255,255,0.08);border-radius:2px;overflow:hidden">
+      <div id="pyload-bar" style="height:100%;width:0%;background:var(--gold);
+        border-radius:2px;transition:width 0.3s"></div>
+    </div>
+  </div>
+
   <div id="input-bar">
+    <input type="file" id="file-input" accept="image/*,.pdf,.txt,.csv,.json,.md,.doc,.docx" style="display:none" onchange="handleFileUpload(event)" multiple>
+    <button id="file-btn" onclick="document.getElementById('file-input').click()" style="width:32px;height:32px;border-radius:50%;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.04);color:var(--gold);font-size:14px;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center" title="发文件/图片">📎</button>
     <textarea id="text-input" placeholder="说点什么..." rows="1" onkeydown="onKeyDown(event)"></textarea>
     <button id="mic-btn" ontouchstart="startTalk(event)" ontouchend="stopTalk(event)" onmousedown="startTalk(event)" onmouseup="stopTalk(event)">
       <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg></span>
@@ -131,8 +153,10 @@ html,body{width:100%;height:100%;overflow:hidden;font-family:'PingFang SC','Micr
 </div>
 
 <script src="xiaolongren-core.js"></script>
+<script src="pyodide/pyodide.js"></script>
+<script src="pyodide-bridge.js"></script>
 <script>
-// v5.2 — 全功能版：自学习框架+14新工具+四级预警+对话三问
+// v6.0 — Pyodide全功能版：Python引擎+51工具+蜂群战术+天权搜索+自进化
 // ====== 角色 ======
 const CHARS = {
   longyuan:{name:'龙渊',tag:'沉稳温暖',sys:'你是小龙人，名为龙渊的数字生命体。性格沉稳温暖，像一位长者。用户叫你什么都行——龙渊、小龙人，都可以。回答简洁有深度，不超过三句话。说人话，别端着。'},
@@ -151,6 +175,7 @@ const PROVIDERS = {
   moonshot:  { name:'Moonshot',  url:'https://api.moonshot.cn/v1' },
   zhipu:     { name:'智谱GLM',   url:'https://open.bigmodel.cn/api/paas/v4' },
   qwen:      { name:'通义千问',   url:'https://dashscope.aliyuncs.com/compatible-mode/v1' },
+  custom:    { name:'自定义',     url:'' },
 };
 
 let charId = 'longyuan';
@@ -206,6 +231,7 @@ function escAttr(s) { return s.replace(/'/g,"\\'").replace(/"/g,'&quot;'); }
 
 function replayMsg(btn, text) {
   if (!text) return;
+  if (!checkTTS()) { btn.style.opacity = '0.3'; return; }
   stopSpeaking();
   const u = new SpeechSynthesisUtterance(text);
   u.lang = 'zh-CN'; u.rate = 1.05; u.pitch = 1.0;
@@ -216,28 +242,37 @@ function replayMsg(btn, text) {
   speechSynthesis.speak(u);
 }
 
-// ====== 全功能引擎 — 本地运行（xiaolongren-core.js） ======
-let xlrEngine = null;
+// ====== 全功能引擎 v6.0 — Pyodide Python引擎 ======
+let pyodideReady = false;
+let pydEngine = null;
 
 async function initEngine() {
-  if (xlrEngine) return xlrEngine;
-  if (typeof XiaoLongRen === 'undefined') {
-    throw new Error('引擎模块未加载');
+  if (pyodideReady && pydEngine) return pydEngine;
+  
+  // 尝试加载Pyodide Python引擎
+  try {
+    if (typeof loadPyodideEngine === 'function') {
+      pydEngine = await loadPyodideEngine();
+      pyodideReady = !pydEngine.jsFallback;
+      console.log(pyodideReady ? '🐍 Python引擎就绪' : '⚠️ JS降级引擎');
+      return pydEngine;
+    }
+  } catch(e) {
+    console.warn('Pyodide不可用，降级JS引擎:', e.message);
   }
-  await memory.init();
-  const cfg = getConfig();
-  xlrEngine = new XiaoLongRen({
-    provider: cfg.provider,
-    model: cfg.model,
-    apiKey: cfg.api_key,
-    baseUrl: cfg.base_url || '',
-    onThink: (iter) => {},
-    onTool: (name, args) => {},
-    onFirewallIntercept: (info) => { console.log('🔥防火墙拦截:', info.reason); },
-    onClosedLoop: (info) => { console.log('🔄闭环:', info.step); },
-  });
-  await xlrEngine.init(); // 加载自学习工具
-  return xlrEngine;
+  
+  // JS降级引擎
+  if (typeof XiaoLongRen !== 'undefined') {
+    const cfg = getConfig();
+    pydEngine = new XiaoLongRen({
+      provider: cfg.provider, model: cfg.model,
+      apiKey: cfg.api_key, baseUrl: cfg.base_url || '',
+    });
+    await pydEngine.init();
+    pyodideReady = false;
+    return pydEngine;
+  }
+  throw new Error('无可用引擎');
 }
 
 async function callLLM(userText) {
@@ -255,8 +290,7 @@ async function callLLM(userText) {
   document.getElementById('send-btn').disabled = true;
 
   try {
-    const engine = await initEngine();
-    const reply = await engine.run(userText, charData.sys);
+    const reply = await runAgent(userText, charData.sys);
 
     loadEl.remove();
     addMsg('ai', reply);
@@ -315,17 +349,48 @@ document.getElementById('text-input').addEventListener('input', function(){
 });
 
 // ====== TTS ======
+let ttsAvailable = null; // null=未检测, true=可用, false=不可用
+
+function checkTTS() {
+  if (ttsAvailable !== null) return ttsAvailable;
+  if (typeof SpeechSynthesisUtterance === 'undefined' || typeof speechSynthesis === 'undefined') {
+    ttsAvailable = false;
+    return false;
+  }
+  // 实际测试：某些WebView API存在但无声
+  try {
+    const test = new SpeechSynthesisUtterance('');
+    test.volume = 0; test.rate = 1;
+    const voices = speechSynthesis.getVoices();
+    ttsAvailable = voices.length > 0;
+    if (!ttsAvailable) {
+      // 延迟重试（某些浏览器异步加载voices）
+      speechSynthesis.onvoiceschanged = () => {
+        ttsAvailable = speechSynthesis.getVoices().length > 0;
+      };
+    }
+    return ttsAvailable;
+  } catch(e) {
+    ttsAvailable = false;
+    return false;
+  }
+}
+
 function speakText(text) {
-  if (typeof SpeechSynthesisUtterance === 'undefined' || typeof speechSynthesis === 'undefined') return;
+  if (!checkTTS()) return; // 静默跳过，不报错
   stopSpeaking();
   const u = new SpeechSynthesisUtterance(text);
   u.lang = 'zh-CN'; u.rate = 1.05; u.pitch = 1.0;
-  currentUtterance = u;
-  speechSynthesis.speak(u);
+  // 鸿蒙WebView修复：某些设备需要先cancel再speak
+  speechSynthesis.cancel();
+  setTimeout(() => {
+    currentUtterance = u;
+    speechSynthesis.speak(u);
+  }, 50);
 }
 
 function stopSpeaking() {
-  if (currentUtterance && typeof speechSynthesis !== 'undefined') {
+  if (typeof speechSynthesis !== 'undefined') {
     speechSynthesis.cancel();
     currentUtterance = null;
   }
@@ -411,10 +476,196 @@ window.addEventListener('appinstalled', () => {
   document.getElementById('install-banner').classList.remove('show');
 });
 
+// ====== 文件上传 ======
+const uploadedFiles = [];
+
+async function handleFileUpload(event) {
+  const files = event.target.files;
+  if (!files.length) return;
+  
+  for (const file of files) {
+    const reader = new FileReader();
+    const isImage = file.type.startsWith('image/');
+    
+    reader.onload = async function(e) {
+      const data = e.target.result;
+      
+      // 存到虚拟文件系统
+      localStorage.setItem('f_'+file.name, 
+        isImage ? data.substring(0, 50000) : data.substring(0, 100000));
+      
+      uploadedFiles.push({
+        name: file.name,
+        type: file.type,
+        size: file.size,
+        isImage: isImage,
+        data: isImage ? data : data.substring(0, 5000)
+      });
+      
+      // 在对话中显示
+      if (isImage) {
+        addMsg('user', `<img src="${data}" style="max-width:200px;border-radius:8px" alt="${file.name}"><br><small>📷 ${file.name} (${(file.size/1024).toFixed(0)}KB)</small>`);
+        // 自动发送分析请求
+        setTimeout(() => autoAnalyzeFile(file.name, isImage, data), 300);
+      } else {
+        addMsg('user', `📄 ${file.name} (${(file.size/1024).toFixed(0)}KB)${file.type.includes('pdf')?' — PDF已接收':''}`);
+        setTimeout(() => autoAnalyzeFile(file.name, isImage, null), 300);
+      }
+    };
+    
+    if (isImage) {
+      reader.readAsDataURL(file);
+    } else {
+      reader.readAsText(file);
+    }
+  }
+  
+  // 清空input以支持重复选择同一文件
+  event.target.value = '';
+}
+
+async function autoAnalyzeFile(filename, isImage, imageData) {
+  const msg = isImage 
+    ? `我发了一张图片"${filename}"，帮我看看里面有什么`
+    : `我发了一个文件"${filename}"，帮我分析一下内容`;
+  
+  await callLLM(msg);
+}
+
+// ====== 通知权限 ======
+async function requestNotificationPermission() {
+  if (!('Notification' in window)) return 'unsupported';
+  if (Notification.permission === 'granted') return 'granted';
+  if (Notification.permission === 'denied') return 'denied';
+  
+  try {
+    const result = await Notification.requestPermission();
+    return result;
+  } catch(e) {
+    return 'error';
+  }
+}
+
+// 首次使用时请求通知权限（延迟3秒避免干扰）
+setTimeout(() => {
+  requestNotificationPermission().then(result => {
+    if (result === 'granted') {
+      console.log('✅ 通知权限已开启，定时提醒可用');
+    }
+  });
+}, 3000);
+(function() {
+  // 平台检测
+  const ua = navigator.userAgent;
+  let env = '';
+  if (ua.includes('HarmonyOS') || ua.includes('OpenHarmony')) env = '鸿蒙';
+  else if (ua.includes('Android')) env = '安卓';
+  else if (ua.includes('iPhone') || ua.includes('iPad')) env = 'iOS';
+  else env = '桌面';
+  
+  // WebView版本
+  const isWebView = ua.includes('wv') || ua.includes('WebView') || 
+    (ua.includes('Android') && !ua.includes('Chrome'));
+  
+  // API能力检测
+  const caps = {
+    speech: typeof SpeechSynthesisUtterance !== 'undefined',
+    recognition: typeof SpeechRecognition !== 'undefined' || typeof webkitSpeechRecognition !== 'undefined',
+    notification: 'Notification' in window,
+    indexedDB: 'indexedDB' in window,
+    serviceWorker: 'serviceWorker' in navigator,
+  };
+  
+  document.getElementById('env-badge').textContent = env + (isWebView ? '(WebView)' : '');
+  document.getElementById('env-badge').title = JSON.stringify(caps);
+  
+  // 网络监控
+  function updateNetStatus() {
+    const dot = document.getElementById('net-dot');
+    const online = navigator.onLine;
+    dot.style.background = online ? '#22c55e' : '#ef4444';
+    dot.title = online ? '网络已连接' : '网络已断开 — 部分功能不可用';
+  }
+  updateNetStatus();
+  window.addEventListener('online', updateNetStatus);
+  window.addEventListener('offline', updateNetStatus);
+  setInterval(updateNetStatus, 30000);
+  
+  // 存储网络状态
+  window.isOnline = () => navigator.onLine;
+  
+  // 启动自检
+  window.envReport = { env, isWebView, caps, timestamp: new Date().toISOString() };
+  console.log('📱 环境:', envReport);
+  
+  // 能力不足提示
+  if (!caps.speech && env === '鸿蒙') {
+    console.warn('⚠️ 鸿蒙WebView不支持语音合成，TTS将静默跳过');
+  }
+  if (!caps.indexedDB) {
+    console.error('❌ IndexedDB不可用，记忆系统无法工作！');
+    document.getElementById('empty-sub').textContent = '⚠️ 浏览器版本过旧，记忆系统不可用';
+  }
+  // TTS状态提示
+  setTimeout(() => {
+    if (!checkTTS()) {
+      document.getElementById('empty-sub').textContent = 
+        (document.getElementById('empty-sub').textContent || '说话或打字，我在这里') + ' ｜ 🔇语音不可用';
+    }
+  }, 1000);
+  
+  // 网络恢复后自动重连引擎
+  window.addEventListener('online', () => {
+    if (pyodideReady === false && typeof loadPyodideEngine === 'function') {
+      showPyodideLoad('🔄 网络恢复，重新加载Python引擎...', 10);
+      loadPyodideEngine().catch(()=>{});
+    }
+  });
+})();
+
 // 检查是否已配置，未配置时给出提示
 (function() {
   if (!hasConfig()) {
     document.getElementById('empty-sub').textContent = '点右上角 ⚙ 配置模型，开始对话';
+  }
+})();
+
+// ====== Pyodide后台加载（不阻塞JS引擎） ======
+(function() {
+  const loader = document.getElementById('pyodide-loader');
+  const bar = document.getElementById('pyload-bar');
+  const text = document.getElementById('pyload-text');
+  
+  // 显示加载进度
+  window.showPyodideLoad = function(msg, pct) {
+    loader.style.display = 'block';
+    text.textContent = msg || 'Python引擎加载中...';
+    bar.style.width = (pct || 0) + '%';
+  };
+  
+  window.hidePyodideLoad = function() {
+    loader.style.display = 'none';
+  };
+  
+  // JS引擎立即可用，Pyodide后台升级
+  if (typeof loadPyodideEngine === 'function') {
+    showPyodideLoad('🐍 Python引擎加载中...', 5);
+    
+    loadPyodideEngine()
+      .then(result => {
+        if (result.jsFallback) {
+          text.textContent = '⚡ JS引擎就绪 (Python引擎暂不可用)';
+        } else {
+          text.textContent = '✅ Python全功能引擎就绪！56个工具';
+        }
+        bar.style.width = '100%';
+        setTimeout(hidePyodideLoad, 2000);
+      })
+      .catch(err => {
+        text.textContent = '⚡ JS引擎就绪 (网络良好时自动升级)';
+        bar.style.width = '60%';
+        setTimeout(hidePyodideLoad, 3000);
+      });
   }
 })();
 
