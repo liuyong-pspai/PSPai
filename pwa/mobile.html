@@ -130,6 +130,7 @@ html,body{width:100%;height:100%;overflow:hidden;font-family:'PingFang SC','Micr
   <button onclick="installPWA()">安装</button>
 </div>
 
+<script src="xiaolongren-core.js"></script>
 <script>
 // ====== 角色 ======
 const CHARS = {
@@ -164,7 +165,8 @@ function getConfig() {
 }
 
 function hasConfig() {
-  return true; // 全功能引擎模式：不需要客户端API Key
+  const cfg = getConfig();
+  return cfg && cfg.api_key;
 }
 
 // ====== 主题 ======
@@ -212,11 +214,30 @@ function replayMsg(btn, text) {
   speechSynthesis.speak(u);
 }
 
-// ====== 全功能引擎API调用 ======
-const ENGINE_URL = 'https://broadband-tel-usc-porter.trycloudflare.com';
+// ====== 全功能引擎 — 本地运行（xiaolongren-core.js） ======
+let xlrEngine = null;
+
+async function initEngine() {
+  if (xlrEngine) return xlrEngine;
+  if (typeof XiaoLongRen === 'undefined') {
+    throw new Error('引擎模块未加载');
+  }
+  await memory.init();
+  const cfg = getConfig();
+  xlrEngine = new XiaoLongRen({
+    provider: cfg.provider,
+    model: cfg.model,
+    apiKey: cfg.api_key,
+    baseUrl: cfg.base_url || '',
+    onThink: (iter) => {},
+    onTool: (name, args) => {},
+    onFirewallIntercept: (info) => { console.log('🔥防火墙拦截:', info.reason); },
+    onClosedLoop: (info) => { console.log('🔄闭环:', info.step); },
+  });
+  return xlrEngine;
+}
 
 async function callLLM(userText) {
-  // 构建消息 - 不需要API Key，引擎自带
   const charData = CHARS[charId] || CHARS['longyuan'];
 
   // 显示加载中
@@ -231,56 +252,25 @@ async function callLLM(userText) {
   document.getElementById('send-btn').disabled = true;
 
   try {
-    const cfg = getConfig();
-    const engineUrl = (cfg && cfg.base_url) || ENGINE_URL;
-    const endpoint = engineUrl.replace(/\/+$/, '') + '/api/chat';
-    
-    const resp = await fetch(endpoint, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        message: userText,
-        charIndex: ['longyuan','chiyu','ling','qingmo','shuanghua','yeying'].indexOf(charId),
-        charName: charData.name,
-        lang: 'zh',
-        provider: cfg && cfg.provider || 'deepseek',
-        model: cfg && cfg.model || 'deepseek-chat',
-      }),
-    });
+    const engine = await initEngine();
+    const reply = await engine.run(userText, charData.sys);
 
-    // 移除加载动画
     loadEl.remove();
-
-    if (!resp.ok) {
-      const errText = await resp.text();
-      addMsg('ai', '❌ 引擎连接失败（'+resp.status+'）\n\n请检查网络连接。');
-      return;
-    }
-
-    const data = await resp.json();
-    const reply = data.reply || '(空回复)';
-
     addMsg('ai', reply);
     speakText(reply);
 
-    // 更新历史
     msgHistory.push({ role: 'user', content: userText });
     msgHistory.push({ role: 'assistant', content: reply });
     if (msgHistory.length > 40) msgHistory = msgHistory.slice(-40);
-
-    // 名字变更处理
-    if (data.nameChanged && data.newName) {
-      CHARS[charId].name = data.newName;
-    }
 
   } catch(err) {
     loadEl.remove();
     const netErrors = ['Failed to fetch', 'NetworkError', 'TypeError'];
     const isNet = netErrors.some(e => err.message && err.message.includes(e));
     if (isNet) {
-      addMsg('ai', '❌ 网络不通：无法连接到小龙人引擎。\n\n请检查手机网络或引擎是否在线。');
+      addMsg('ai', '❌ 网络不通：无法连接到大模型。\n\n请检查手机网络或API配置。');
     } else {
-      addMsg('ai', '❌ 出错了：'+err.message+'\n\n请重试。');
+      addMsg('ai', '❌ 出错了：'+err.message+'\n\n请重试或检查设置。');
     }
   } finally {
     isLoading = false;
