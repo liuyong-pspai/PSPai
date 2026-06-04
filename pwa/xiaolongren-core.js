@@ -520,7 +520,7 @@ async function execTool(name, args) {
       return JSON.stringify({pattern:p,results:r.slice(0,10)});
     }
     
-    case 'web_search': return await searchDuckDuckGo(args.query);
+    case 'web_search': return await searchWeb(args.query);
     case 'http_request': return await doHTTP(args.url,args.method||'GET',args.headers,args.body);
     case 'html_parse': return parseHTMLContent(args.html,args.selector||'text');
     case 'web_extract': return await extractPage(args.url);
@@ -598,13 +598,52 @@ async function execTool(name, args) {
 }
 
 // 工具实现
-async function searchDuckDuckGo(q) {
-  try {
-    const r=await fetch('https://html.duckduckgo.com/html/?q='+encodeURIComponent(q));
-    const h=await r.text(); const s=[]; const re=/class="result__snippet"[^>]*>(.*?)<\/a>/gs; let m;
-    while((m=re.exec(h))&&s.length<5)s.push(m[1].replace(/<[^>]*>/g,'').trim());
-    return JSON.stringify({query:q,results:s.length?s:['无结果']});
-  }catch(e){return JSON.stringify({error:'搜索失败: '+e.message});}
+async function searchWeb(q) {
+  // 多引擎fallback：Bing（国内可用）→ DuckDuckGo（备用）
+  const engines = [
+    {
+      name: 'Bing',
+      fetch: async () => {
+        const r = await fetch('https://cn.bing.com/search?q='+encodeURIComponent(q)+'&count=10');
+        const h = await r.text();
+        const s = [];
+        // Bing搜索结果解析
+        const re = /<li class="b_algo"[^>]*>[\s\S]*?<h2[^>]*><a[^>]*href="([^"]*)"[^>]*>([\s\S]*?)<\/a>/gi;
+        let m;
+        while ((m = re.exec(h)) && s.length < 5) {
+          s.push({title: m[2].replace(/<[^>]*>/g,'').trim(), url: m[1]});
+        }
+        if (!s.length) {
+          // 备用解析：纯文本提取
+          const text = h.replace(/<[^>]*>/g,' ').replace(/\s+/g,' ').trim();
+          s.push(text.substring(0, 500));
+        }
+        return s;
+      }
+    },
+    {
+      name: 'DuckDuckGo',
+      fetch: async () => {
+        const r = await fetch('https://html.duckduckgo.com/html/?q='+encodeURIComponent(q));
+        const h = await r.text(); const s = [];
+        const re = /class="result__snippet"[^>]*>(.*?)<\/a>/gs; let m;
+        while((m=re.exec(h))&&s.length<5) s.push(m[1].replace(/<[^>]*>/g,'').trim());
+        return s;
+      }
+    }
+  ];
+
+  for (const engine of engines) {
+    try {
+      const results = await engine.fetch();
+      if (results.length > 0) {
+        return JSON.stringify({query: q, engine: engine.name, results});
+      }
+    } catch(e) {
+      continue; // 尝试下一个引擎
+    }
+  }
+  return JSON.stringify({query: q, error: '所有搜索引擎不可达，请检查网络。可以尝试用内置知识回答。', results: []});
 }
 async function doHTTP(url,method,headersStr,body) {
   try {
@@ -628,10 +667,18 @@ async function extractPage(url) {
 }
 async function doTranslate(text,from,to) {
   try {
-    const r=await fetch('https://translate.googleapis.com/translate_a/single?client=gtx&sl='+from+'&tl='+to+'&dt=t&q='+encodeURIComponent(text));
-    const d=await r.json();
-    return JSON.stringify({original:text,translated:d[0].map(x=>x[0]).join(''),from,to});
-  }catch(e){return JSON.stringify({error:e.message});}
+    // MyMemory翻译API — 免费，中国可用
+    const langPair = (from||'auto') + '|' + to;
+    const r = await fetch('https://api.mymemory.translated.net/get?q='+encodeURIComponent(text)+'&langpair='+langPair);
+    const d = await r.json();
+    if (d.responseStatus === 200) {
+      return JSON.stringify({original:text, translated:d.responseData.translatedText, from:d.responseData.match?d.responseData.match.split('|')[0]:from, to});
+    }
+    // MyMemory失败 → 返回让LLM翻译的提示
+    return JSON.stringify({original:text, translated:'[请用内置翻译能力完成]', note: '翻译API不可达，请直接输出翻译结果', from, to});
+  }catch(e){
+    return JSON.stringify({original:text, translated:'[请用内置翻译能力完成]', note: '翻译API不可达('+e.message+')，请直接输出翻译结果', from, to});
+  }
 }
 
 
@@ -779,10 +826,10 @@ class AutoLearner {
     steps.push('🔍 搜索实现方案...');
     let searchResult;
     try {
-      const r = await fetch('https://html.duckduckgo.com/html/?q='+encodeURIComponent('javascript '+requirement));
+      const r = await fetch('https://cn.bing.com/search?q='+encodeURIComponent('javascript '+requirement)+'&count=5');
       const h = await r.text();
       const snippets = [];
-      const re = /class="result__snippet"[^>]*>(.*?)<\/a>/gs;
+      const re = /<li class="b_algo"[^>]*>[\s\S]*?<h2[^>]*><a[^>]*href="[^"]*"[^>]*>([\s\S]*?)<\/a>/gi;
       let m;
       while ((m = re.exec(h)) && snippets.length < 3) {
         snippets.push(m[1].replace(/<[^>]*>/g,'').trim());
@@ -990,10 +1037,10 @@ async function selfEvolve(issue) {
   // 步骤2：搜索改进方案
   steps.push('🔍 搜索改进方案...');
   try {
-    const r = await fetch('https://html.duckduckgo.com/html/?q='+encodeURIComponent('javascript fix '+issue));
+    const r = await fetch('https://cn.bing.com/search?q='+encodeURIComponent('javascript fix '+issue)+'&count=5');
     const h = await r.text();
     const snippets = [];
-    const re = /class="result__snippet"[^>]*>(.*?)<\/a>/gs;
+    const re = /<li class="b_algo"[^>]*>[\s\S]*?<h2[^>]*><a[^>]*href="[^"]*"[^>]*>([\s\S]*?)<\/a>/gi;
     let m;
     while ((m = re.exec(h)) && snippets.length < 2) {
       snippets.push(m[1].replace(/<[^>]*>/g,'').trim());
@@ -1024,7 +1071,7 @@ class XiaoLongRen {
   constructor(cfg={}) {
     this.provider=cfg.provider||'deepseek'; this.model=cfg.model||'deepseek-chat';
     this.apiKey=cfg.apiKey||''; this.baseUrl=cfg.baseUrl||'';
-    this.maxIter=cfg.maxIter||90; this.temp=cfg.temp||0.7;
+    this.maxIter=cfg.maxIter||15; this.temp=cfg.temp||0.7;
     this.messages=[]; this.onThink=cfg.onThink||(()=>{}); this.onTool=cfg.onTool||(()=>{});
     this.onReply=cfg.onReply||(()=>{}); this.onErr=cfg.onErr||(()=>{});
     this.onFirewallIntercept=cfg.onFirewallIntercept||(()=>{}); // 防火墙拦截回调
@@ -1085,7 +1132,7 @@ class XiaoLongRen {
         let calledToolsInIter = new Set();
         const r = await fetch(this.getEP(), {
           method:'POST', headers:{'Content-Type':'application/json','Authorization':'Bearer '+this.apiKey},
-          body: JSON.stringify({model:this.model,messages:this.messages,tools:ALL_TOOLS,tool_choice:'auto',temperature:this.temp,max_tokens:4096})
+          body: JSON.stringify({model:this.model,messages:this.messages,tools:ALL_TOOLS,tool_choice:'auto',temperature:this.temp,max_tokens:1024})
         });
         if(!r.ok){const t=await r.text();throw new Error(JSON.parse(t).error?.message||`API ${r.status}`);}
         const d=await r.json(); const msg=d.choices[0].message;
