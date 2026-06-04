@@ -1,8 +1,10 @@
-const CACHE = 'xlr-v1';
+const CACHE = 'xlr-v6';
 const ASSETS = [
+  './',
   './mobile.html',
   './config.html',
   './manifest.json',
+  './xiaolongren-core.js',
   './icon-192.png',
   './icon-512.png',
   './img_longyuan.jpg',

@@ -537,7 +537,38 @@ async function execTool(name, args) {
     case 'memory_enlighten': return JSON.stringify(await memory.enlighten());
     case 'memory_cleanup': return JSON.stringify(await memory.cleanup());
     
-    case 'calculator': try{const s=args.expression.replace(/[^0-9+\-*/().%\s]/g,'');return JSON.stringify({expression:args.expression,result:Function('"use strict";return('+s+')')()});}catch(e){return JSON.stringify({error:e.message});}
+    case 'calculator': {
+      const sanitized = args.expression.replace(/[^0-9+\-*/().%\s]/g, '');
+      if (!sanitized) return JSON.stringify({error:'无效表达式'});
+      const tokens = sanitized.match(/\d+\.?\d*|[+\-*/%()]/g);
+      if (!tokens) return JSON.stringify({error:'无法解析'});
+      try {
+        const out=[], ops=[], prec={'+':1,'-':1,'*':2,'/':2,'%':2};
+        for(const t of tokens) {
+          if(/\d/.test(t)) { out.push(parseFloat(t)); }
+          else if(t==='(') { ops.push(t); }
+          else if(t===')') {
+            while(ops.length&&ops[ops.length-1]!=='(') {
+              const b=out.pop(),a=out.pop(),op=ops.pop();
+              out.push(op==='+'?a+b:op==='-'?a-b:op==='*'?a*b:op==='/'?a/b:a%b);
+            }
+            ops.pop();
+          } else {
+            while(ops.length&&prec[ops[ops.length-1]]>=prec[t]) {
+              const b=out.pop(),a=out.pop(),op=ops.pop();
+              out.push(op==='+'?a+b:op==='-'?a-b:op==='*'?a*b:op==='/'?a/b:a%b);
+            }
+            ops.push(t);
+          }
+        }
+        while(ops.length) {
+          const b=out.pop(),a=out.pop(),op=ops.pop();
+          out.push(op==='+'?a+b:op==='-'?a-b:op==='*'?a*b:op==='/'?a/b:a%b);
+        }
+        const r=out[0];
+        return JSON.stringify({expression:args.expression,result:Number.isFinite(r)?r:null});
+      } catch(e) { return JSON.stringify({error:'计算出错'}); }
+    }
     case 'get_time': {const n=new Date();return JSON.stringify({iso:n.toISOString(),local:n.toLocaleString('zh-CN'),tz:Intl.DateTimeFormat().resolvedOptions().timeZone,weekday:['日','一','二','三','四','五','六'][n.getDay()]});}
     case 'set_timer': setTimeout(()=>{if(Notification.permission==='granted')new Notification('⏰小龙人',{body:args.message});},args.seconds*1000); return JSON.stringify({seconds:args.seconds,status:'set'});
     case 'send_notification': if(Notification.permission==='granted')new Notification(args.title,{body:args.body}); return JSON.stringify({status:'sent'});
@@ -545,9 +576,17 @@ async function execTool(name, args) {
       if (typeof SpeechSynthesisUtterance === 'undefined' || typeof speechSynthesis === 'undefined') {
         return JSON.stringify({status:'unavailable', note:'当前环境不支持语音合成（WebView限制）', text:args.text.substring(0,100)});
       }
-      const u=new SpeechSynthesisUtterance(args.text);u.lang='zh-CN';
-      speechSynthesis.speak(u);
-      return JSON.stringify({status:'speaking',text:args.text.substring(0,100)});
+      // 选最佳中文语音
+      const voices = speechSynthesis.getVoices();
+      const zhVoice = voices.find(v => v.lang.startsWith('zh')) || voices.find(v => v.lang.startsWith('en'));
+      const u = new SpeechSynthesisUtterance(args.text);
+      u.lang = zhVoice ? zhVoice.lang : 'zh-CN';
+      if (zhVoice) u.voice = zhVoice;
+      u.rate = 1.0; u.pitch = 1.0;
+      // 鸿蒙WebView兼容：先cancel再speak
+      speechSynthesis.cancel();
+      setTimeout(() => speechSynthesis.speak(u), 50);
+      return JSON.stringify({status:'speaking',voice:zhVoice?.name||'default',text:args.text.substring(0,100)});
     }
     case 'translate': return await doTranslate(args.text,args.from||'auto',args.to);
     case 'json_parse': try{return JSON.stringify({parsed:JSON.parse(args.text)});}catch(e){return JSON.stringify({error:e.message});}
@@ -604,8 +643,12 @@ async function searchWeb(q) {
     {
       name: 'Bing',
       fetch: async () => {
-        const r = await fetch('https://cn.bing.com/search?q='+encodeURIComponent(q)+'&count=10');
-        const h = await r.text();
+        const ctrl = new AbortController();
+        const timer = setTimeout(() => ctrl.abort(), 8000);
+        try {
+          const r = await fetch('https://cn.bing.com/search?q='+encodeURIComponent(q)+'&count=10', {signal: ctrl.signal});
+          clearTimeout(timer);
+          const h = await r.text();
         const s = [];
         // Bing搜索结果解析
         const re = /<li class="b_algo"[^>]*>[\s\S]*?<h2[^>]*><a[^>]*href="([^"]*)"[^>]*>([\s\S]*?)<\/a>/gi;
@@ -619,6 +662,7 @@ async function searchWeb(q) {
           s.push(text.substring(0, 500));
         }
         return s;
+        } catch(e) { clearTimeout(timer); return []; }
       }
     },
     {
