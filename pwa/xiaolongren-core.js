@@ -538,7 +538,14 @@ async function execTool(name, args) {
     case 'get_time': {const n=new Date();return JSON.stringify({iso:n.toISOString(),local:n.toLocaleString('zh-CN'),tz:Intl.DateTimeFormat().resolvedOptions().timeZone,weekday:['日','一','二','三','四','五','六'][n.getDay()]});}
     case 'set_timer': setTimeout(()=>{if(Notification.permission==='granted')new Notification('⏰小龙人',{body:args.message});},args.seconds*1000); return JSON.stringify({seconds:args.seconds,status:'set'});
     case 'send_notification': if(Notification.permission==='granted')new Notification(args.title,{body:args.body}); return JSON.stringify({status:'sent'});
-    case 'text_to_speech': {const u=new SpeechSynthesisUtterance(args.text);u.lang='zh-CN';speechSynthesis.speak(u);return JSON.stringify({status:'speaking',text:args.text.substring(0,100)});}
+    case 'text_to_speech': {
+      if (typeof SpeechSynthesisUtterance === 'undefined' || typeof speechSynthesis === 'undefined') {
+        return JSON.stringify({status:'unavailable', note:'当前环境不支持语音合成（WebView限制）', text:args.text.substring(0,100)});
+      }
+      const u=new SpeechSynthesisUtterance(args.text);u.lang='zh-CN';
+      speechSynthesis.speak(u);
+      return JSON.stringify({status:'speaking',text:args.text.substring(0,100)});
+    }
     case 'translate': return await doTranslate(args.text,args.from||'auto',args.to);
     case 'json_parse': try{return JSON.stringify({parsed:JSON.parse(args.text)});}catch(e){return JSON.stringify({error:e.message});}
     case 'text_analyze': {const t=args.text;return JSON.stringify({chars:t.length,words:t.split(/[\s，。！？,.!?]+/).filter(Boolean).length,lines:t.split('\n').length,preview:t.substring(0,200)});}
@@ -955,6 +962,9 @@ class XiaoLongRen {
         if(msg.tool_calls?.length>0) {
           this.messages.push({role:'assistant',content:msg.content||'',tool_calls:msg.tool_calls.map(tc=>({id:tc.id,type:'function',function:{name:tc.function.name,arguments:tc.function.arguments}}))});
           
+          let needsRetry = false;
+          let retryReason = '';
+          
           for(const tc of msg.tool_calls) {
             const args = (()=>{try{return JSON.parse(tc.function.arguments)}catch(e){return{}}})();
             this.onTool(tc.function.name, args);
@@ -971,20 +981,24 @@ class XiaoLongRen {
               this.onClosedLoop({step: CLOSED_LOOP_STEPS.VERIFY, tool: tc.function.name, ok: false, error: verification.error});
               
               if (verification.retry) {
-                // 注入修正指令
-                this.messages.push({role:'tool',tool_call_id:tc.id,content:result});
-                this.messages.push({
-                  role:'system',
-                  content: `⚠️ 工具 ${tc.function.name} 执行出现问题：${verification.error}。${verification.suggestion || ''}。请换一种方式重试，不要重复同样的参数。`
-                });
-                continue; // 不给LLM直接回复的机会，让它重试
+                needsRetry = true;
+                retryReason = `${tc.function.name}: ${verification.error}`;
               }
             } else {
               verifiedCount++;
               this.onClosedLoop({step: CLOSED_LOOP_STEPS.VERIFY, tool: tc.function.name, ok: true});
             }
             
+            // 始终推送工具结果（保持消息结构完整）
             this.messages.push({role:'tool',tool_call_id:tc.id,content:result});
+          }
+          
+          // 全部工具处理完后，有需要重试的注入修正指令
+          if (needsRetry) {
+            this.messages.push({
+              role:'system',
+              content: `⚠️ 工具执行出现问题：${retryReason}。请换一种方式重试，不要重复同样的参数。`
+            });
           }
           
           memory.errorCount=0; memory.consecutiveErrors=0;
