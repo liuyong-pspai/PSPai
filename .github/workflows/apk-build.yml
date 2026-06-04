@@ -88,3 +88,40 @@ jobs:
         with:
           name: xiaolongren-apk
           path: app-build/android/app/build/outputs/apk/debug/app-debug.apk
+
+      - name: Upload to Gitee Release
+        env:
+          GITEE_TOKEN: 70b927d52f0f8970e14adfc57c4efb72
+        run: |
+          APK_PATH="app-build/android/app/build/outputs/apk/debug/app-debug.apk"
+          APK_NAME="xiaolongren-v1.5.0.apk"
+          
+          # Get or create Gitee release
+          RELEASE_RESP=$(curl -s -H "Content-Type: application/json" \
+            "https://gitee.com/api/v5/repos/lii-the-unyielding/xiaolongren/releases/tags/v1.5.0?access_token=${GITEE_TOKEN}")
+          
+          RELEASE_ID=$(echo "$RELEASE_RESP" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('id',''))")
+          
+          if [ -z "$RELEASE_ID" ]; then
+            echo "Creating new release..."
+            RELEASE_RESP=$(curl -s -X POST -H "Content-Type: application/json" \
+              -d '{"tag_name":"v1.5.0","name":"v1.5.0 - 全功能本地引擎","body":"八层记忆/三刀防火墙/六步闭环全硬连，本地引擎运行不依赖云端"}' \
+              "https://gitee.com/api/v5/repos/lii-the-unyielding/xiaolongren/releases?access_token=${GITEE_TOKEN}")
+            RELEASE_ID=$(echo "$RELEASE_RESP" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('id',''))")
+          fi
+          
+          echo "Release ID: $RELEASE_ID"
+          
+          # Delete old APK asset if exists
+          ASSETS_RESP=$(curl -s "https://gitee.com/api/v5/repos/lii-the-unyielding/xiaolongren/releases/${RELEASE_ID}/assets?access_token=${GITEE_TOKEN}")
+          OLD_ID=$(echo "$ASSETS_RESP" | python3 -c "import sys,json; assets=json.load(sys.stdin); ids=[a['id'] for a in assets if 'apk' in a.get('name','')]; print(ids[0] if ids else '')")
+          if [ -n "$OLD_ID" ]; then
+            curl -s -X DELETE "https://gitee.com/api/v5/repos/lii-the-unyielding/xiaolongren/releases/${RELEASE_ID}/assets/${OLD_ID}?access_token=${GITEE_TOKEN}"
+          fi
+          
+          # Upload APK
+          curl -s -X POST \
+            -F "file=@${APK_PATH}" \
+            "https://gitee.com/api/v5/repos/lii-the-unyielding/xiaolongren/releases/${RELEASE_ID}/assets?name=${APK_NAME}&access_token=${GITEE_TOKEN}"
+          
+          echo "Done uploading to Gitee"
