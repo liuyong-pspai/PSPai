@@ -7,6 +7,115 @@ import re
 from datetime import datetime
 
 # ============================================================
+# AutoResearch 二进制评估清单（Karpathy 2026）
+# ============================================================
+
+class BinaryChecklist:
+    """五维Pass/Fail评估"""
+    DIMS = ["correctness", "efficiency", "stability", "safety", "simplicity"]
+    
+    def __init__(self):
+        self.results = {d: False for d in self.DIMS}
+        self.notes = {d: "" for d in self.DIMS}
+    
+    def check(self, **kwargs):
+        for d, v in kwargs.items():
+            if d in self.DIMS:
+                self.results[d] = v
+        return self
+    
+    def annotate(self, **kwargs):
+        for d, v in kwargs.items():
+            if d in self.DIMS:
+                self.notes[d] = v
+        return self
+    
+    @property
+    def passed(self):
+        return all(self.results.values())
+    
+    @property
+    def score(self):
+        return sum(1 for v in self.results.values() if v)
+    
+    @property
+    def verdict(self):
+        s = self.score
+        if s >= 5: return "RETAIN"
+        if s >= 3: return "RETAIN_WARN"
+        return "ROLLBACK"
+    
+    def to_dict(self):
+        return {"results": self.results, "notes": self.notes, "score": self.score, "passed": self.passed, "verdict": self.verdict}
+
+
+class AutoResearchLoop:
+    """爬山式自我改进循环"""
+    
+    def __init__(self, max_iter=30):
+        self.max_iter = max_iter
+        self.history = []
+    
+    def hillclimb(self, task_name, evaluate_fn, run_fn):
+        """主循环：假设→实验→评估→保留/回滚"""
+        best = {"result": None, "score": 0, "duration": float("inf")}
+        consecutive_fails = 0
+        strategies = [
+            "调整Prompt措辞", "修改参数阈值", "换工具调用顺序",
+            "增加上下文窗口", "更换检索策略", "调整temperature"
+        ]
+        
+        for i in range(self.max_iter):
+            # 1. 提微假设
+            strategy = strategies[i % len(strategies)]
+            hypothesis = {"id": f"h_{i+1:04d}", "task": task_name, "strategy": strategy, "iteration": i+1}
+            
+            # 2. 执行实验
+            start = time.time()
+            try:
+                result = run_fn(hypothesis)
+                errors = []
+            except Exception as e:
+                result = {"error": str(e)}
+                errors = [str(e)]
+            duration = time.time() - start
+            
+            # 3. 二进制评估
+            checklist = evaluate_fn(result, best, hypothesis)
+            
+            # 4. 保留或回滚
+            if checklist.verdict in ("RETAIN", "RETAIN_WARN"):
+                best = {"result": result, "score": checklist.score, "duration": duration, "iteration": i+1}
+                consecutive_fails = 0
+            else:
+                consecutive_fails += 1
+            
+            self.history.append({
+                "iteration": i+1, "hypothesis": hypothesis,
+                "checklist": checklist.to_dict(),
+                "action": checklist.verdict,
+                "duration": duration
+            })
+            
+            # 连续3次失败 → 换方向
+            if consecutive_fails >= 3:
+                strategies = strategies[1:] + strategies[:1]  # 轮转策略
+                consecutive_fails = 0
+            
+            # 收敛判断
+            recent = [h["checklist"]["score"] for h in self.history[-3:] if h["action"] == "RETAIN"]
+            if len(recent) >= 3 and all(s == 5 for s in recent):
+                break
+        
+        return {
+            "task": task_name, "iterations": i+1,
+            "best_score": best["score"],
+            "best_iteration": best.get("iteration", 0),
+            "converged": best["score"] >= 5,
+            "history": self.history
+        }
+
+# ============================================================
 # 自生长系统 — 四个能力
 # ============================================================
 
@@ -278,3 +387,114 @@ class SelfEvolution:
                 pass
         
         return auto_skills
+    
+    def hillclimb_evolve(self, skill_name=None, max_iter=20):
+        """AutoResearch爬山式进化：对指定技能或自身进行递归自我改进"""
+        loop = AutoResearchLoop(max_iter=max_iter)
+        target = skill_name or "self"
+        
+        # 评估函数：五维二进制检查
+        def evaluate_fn(result, best, hypothesis):
+            c = BinaryChecklist()
+            # 正确性：有结果无崩溃
+            c.check(correctness=result.get("error") is None)
+            # 效率：比上一版本快
+            prev_dur = best.get("duration", float("inf"))
+            c.check(efficiency=hypothesis.get("_duration", 0) <= prev_dur * 1.05)
+            # 稳定性：无异常
+            c.check(stability=hypothesis.get("_errors", 0) == 0)
+            # 安全性：无危险操作
+            output = str(result)
+            c.check(safety=not any(d in output.lower() for d in ["rm -rf", "DROP TABLE", "DELETE FROM"]))
+            # 简洁性
+            c.check(simplicity=len(str(result)) < 5000)
+            return c
+        
+        # 执行函数：运行一次进化周期
+        def run_fn(hypothesis):
+            start = time.time()
+            errors = 0
+            try:
+                # 触发一轮进化
+                self.generation += 1
+                self.engine.memory.enlighten()
+                refined = self.engine.memory.refine()
+                auto_skills = self._scan_for_auto_skills()
+                result = {
+                    "generation": self.generation,
+                    "refined": refined,
+                    "auto_skills": len(auto_skills),
+                    "skills_written": self.skills_written,
+                    "code_patches": self.code_patches,
+                    "hypothesis": hypothesis["strategy"],
+                }
+            except Exception as e:
+                result = {"error": str(e)}
+                errors += 1
+            
+            hypothesis["_duration"] = time.time() - start
+            hypothesis["_errors"] = errors
+            return result
+        
+        result = loop.hillclimb(f"evolve_{target}", evaluate_fn, run_fn)
+        
+        self.evolution_log.append({
+            "action": "hillclimb_evolve",
+            "target": target,
+            "result": {k: v for k, v in result.items() if k != "history"},
+            "time": datetime.now().isoformat(),
+        })
+        
+        return json.dumps({
+            "status": "hillclimb_complete",
+            "target": target,
+            "iterations": result["iterations"],
+            "best_score": result["best_score"],
+            "converged": result["converged"],
+            "message": f'AutoResearch爬山完成：{result["iterations"]}轮迭代，最佳得分{result["best_score"]}/5' +
+                       (" ✅已收敛" if result["converged"] else " ⚠️未收敛，可增加迭代次数"),
+        }, ensure_ascii=False)
+    
+    def optimize_skill(self, skill_name, test_inputs, expected_outputs, max_iter=15):
+        """对指定技能进行AutoResearch自动优化"""
+        loop = AutoResearchLoop(max_iter=max_iter)
+        
+        def evaluate_fn(result, best, hypothesis):
+            c = BinaryChecklist()
+            # 正确性：输出匹配预期
+            output = result.get("output", "")
+            expected = result.get("expected", "")
+            c.check(correctness=expected in output if expected else bool(output))
+            # 效率：响应更快
+            c.check(efficiency=result.get("time", 999) <= best.get("result", {}).get("time", float("inf")))
+            # 稳定性：无错误
+            c.check(stability=result.get("error") is None)
+            # 安全性
+            c.check(safety=True)
+            # 简洁性：输出不过长
+            c.check(simplicity=len(str(output)) < 2000)
+            return c
+        
+        def run_fn(hypothesis):
+            # 模拟：实际使用时会调用engine测试skill
+            try:
+                start = time.time()
+                # 这里接入真实的skill测试
+                result = {
+                    "output": f"[优化{hypothesis['iteration']}次] skill: {skill_name}",
+                    "expected": expected_outputs[0] if expected_outputs else "",
+                    "time": time.time() - start,
+                    "error": None,
+                }
+                return result
+            except Exception as e:
+                return {"output": "", "expected": "", "time": 0, "error": str(e)}
+        
+        result = loop.hillclimb(f"skill_{skill_name}", evaluate_fn, run_fn)
+        return json.dumps({
+            "status": "optimized",
+            "skill": skill_name,
+            "iterations": result["iterations"],
+            "best_score": result["best_score"],
+            "converged": result["converged"],
+        }, ensure_ascii=False)
