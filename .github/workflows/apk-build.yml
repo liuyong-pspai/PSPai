@@ -118,6 +118,6 @@ jobs:
           # Upload APK
           curl -s -X POST \
             -F "file=@${APK_PATH}" \
-            "https://gitee.com/api/v5/repos/lii-the-unyielding/xiaolongren/releases/${RELEASE_ID}/assets?name=${APK_NAME}&access_token=${GITEE_TOKEN}"
+            "https://gitee.com/api/v5/repos/lii-the-unyielding/xiaolongren/releases/${RELEASE_ID}/attach_files?name=${APK_NAME}&access_token=${GITEE_TOKEN}"
           
           echo "Done uploading to Gitee"
