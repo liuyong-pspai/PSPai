@@ -97,26 +97,22 @@ jobs:
           APK_NAME="xiaolongren-v1.5.0.apk"
           
           # Get or create Gitee release
-          RELEASE_RESP=$(curl -s -H "Content-Type: application/json" \
-            "https://gitee.com/api/v5/repos/lii-the-unyielding/xiaolongren/releases/tags/v1.5.0?access_token=${GITEE_TOKEN}")
-          
-          RELEASE_ID=$(echo "$RELEASE_RESP" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('id',''))")
+          RELEASE_RESP=$(curl -s "https://gitee.com/api/v5/repos/lii-the-unyielding/xiaolongren/releases/tags/v1.5.0?access_token=${GITEE_TOKEN}")
+          RELEASE_ID=$(echo "$RELEASE_RESP" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('id','') if d else '')")
           
           if [ -z "$RELEASE_ID" ]; then
             echo "Creating new release..."
             RELEASE_RESP=$(curl -s -X POST -H "Content-Type: application/json" \
-              -d '{"tag_name":"v1.5.0","name":"v1.5.0 - 全功能本地引擎","body":"八层记忆/三刀防火墙/六步闭环全硬连，本地引擎运行不依赖云端"}' \
+              -d '{"tag_name":"v1.5.0","name":"v1.5.0 - 全功能本地引擎","body":"八层记忆/三刀防火墙/六步闭环全硬连，本地引擎运行不依赖云端","target_commitish":"master"}' \
               "https://gitee.com/api/v5/repos/lii-the-unyielding/xiaolongren/releases?access_token=${GITEE_TOKEN}")
-            RELEASE_ID=$(echo "$RELEASE_RESP" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('id',''))")
+            RELEASE_ID=$(echo "$RELEASE_RESP" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('id','') if d else '')")
           fi
           
           echo "Release ID: $RELEASE_ID"
           
-          # Delete old APK asset if exists
-          ASSETS_RESP=$(curl -s "https://gitee.com/api/v5/repos/lii-the-unyielding/xiaolongren/releases/${RELEASE_ID}/assets?access_token=${GITEE_TOKEN}")
-          OLD_ID=$(echo "$ASSETS_RESP" | python3 -c "import sys,json; assets=json.load(sys.stdin); ids=[a['id'] for a in assets if 'apk' in a.get('name','')]; print(ids[0] if ids else '')")
-          if [ -n "$OLD_ID" ]; then
-            curl -s -X DELETE "https://gitee.com/api/v5/repos/lii-the-unyielding/xiaolongren/releases/${RELEASE_ID}/assets/${OLD_ID}?access_token=${GITEE_TOKEN}"
+          if [ -z "$RELEASE_ID" ]; then
+            echo "Failed to get or create release"
+            exit 1
           fi
           
           # Upload APK
