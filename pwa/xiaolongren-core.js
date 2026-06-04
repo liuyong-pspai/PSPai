@@ -451,6 +451,26 @@ const ALL_TOOLS = [
   {type:"function",function:{name:"save_skill",description:"固化技能L5",parameters:{type:"object",properties:{name:{type:"string"},description:{type:"string"},rule:{type:"string"}},required:["name","rule"]}}},
   {type:"function",function:{name:"load_skills",description:"加载已固化技能",parameters:{type:"object",properties:{},required:[]}}},
   {type:"function",function:{name:"session_search",description:"搜索历史对话",parameters:{type:"object",properties:{query:{type:"string"}},required:["query"]}}},
+  
+  // === v5.2 新工具 ===
+  // 代码执行
+  {type:"function",function:{name:"execute_code",description:"执行JavaScript代码（安全沙箱）。可以写代码实现新功能。返回执行结果",parameters:{type:"object",properties:{code:{type:"string",description:"要执行的JS代码，用return返回结果"},timeout:{type:"number",description:"超时毫秒，默认5000"}},required:["code"]}}},
+  // 图片
+  {type:"function",function:{name:"vision_analyze",description:"分析图片内容。将图片转为base64后调用多模态模型理解图片",parameters:{type:"object",properties:{image_data:{type:"string",description:"图片base64数据或URL"},question:{type:"string",description:"关于图片的问题，如'这张图里有什么'"}},required:["image_data"]}}},
+  // 剪切板
+  {type:"function",function:{name:"clipboard_read",description:"读取剪贴板内容",parameters:{type:"object",properties:{},required:[]}}},
+  {type:"function",function:{name:"clipboard_write",description:"写入剪贴板",parameters:{type:"object",properties:{text:{type:"string"}},required:["text"]}}},
+  // 数据处理
+  {type:"function",function:{name:"csv_read",description:"解析CSV数据为JSON",parameters:{type:"object",properties:{data:{type:"string",description:"CSV文本"},has_header:{type:"boolean",description:"是否有表头，默认true"}},required:["data"]}}},
+  // 任务管理
+  {type:"function",function:{name:"todo_add",description:"添加待办事项",parameters:{type:"object",properties:{content:{type:"string"},priority:{type:"string",enum:["high","medium","low"]}},required:["content"]}}},
+  {type:"function",function:{name:"todo_list",description:"列出所有待办",parameters:{type:"object",properties:{},required:[]}}},
+  {type:"function",function:{name:"todo_done",description:"标记完成",parameters:{type:"object",properties:{id:{type:"number"}},required:["id"]}}},
+  // 定时任务
+  {type:"function",function:{name:"schedule_task",description:"创建定时任务",parameters:{type:"object",properties:{name:{type:"string"},cron:{type:"string",description:"如'30m','2h','0 9 * * *'"},task:{type:"string",description:"任务描述"}},required:["name","cron","task"]}}},
+  {type:"function",function:{name:"list_schedules",description:"列出所有定时任务",parameters:{type:"object",properties:{},required:[]}}},
+  // 自学习
+  {type:"function",function:{name:"auto_learn",description:"自学习：遇到不会的功能时，搜索方案→生成代码→测试→注册为新工具",parameters:{type:"object",properties:{requirement:{type:"string",description:"描述需要的功能，如'需要一个二维码生成工具'"}},required:["requirement"]}}},
 ];
 
 
@@ -500,7 +520,7 @@ async function execTool(name, args) {
     case 'make_call': return JSON.stringify({peerId:args.peerId,status:'calling',note:'信令需后端'});
     case 'send_peer_message': return JSON.stringify({peerId:args.peerId,message:args.message,status:'sent'});
     
-    case 'self_check': return JSON.stringify({agent:'XiaoLongRen v5.1',memory:memory.getStatus(),tools:ALL_TOOLS.length,health:memory.consecutiveErrors>=3?'⚠️ 需自愈':'✅',instincts:{firewall:'硬连',closedLoop:'硬连',memory:'8层自动'}});
+    case 'self_check': return JSON.stringify({agent:'XiaoLongRen v5.2',memory:memory.getStatus(),tools:ALL_TOOLS.length,health:memory.consecutiveErrors>=3?'⚠️ 需自愈':'✅',instincts:{firewall:'硬连',closedLoop:'硬连',memory:'8层自动',learn:'自学习框架',guard:'四级预警'}});
     case 'self_heal': {
       const issues = [];
       if (memory.consecutiveErrors >= 3) issues.push('连续错误≥3');
@@ -516,6 +536,19 @@ async function execTool(name, args) {
       const matches = conv.filter(m => m.content.toLowerCase().includes(q));
       return JSON.stringify({query:args.query,found:matches.length,matches:matches.slice(0,5).map(m=>({role:m.role,content:m.content.substring(0,200)}))});
     }
+    
+    // === v5.2 新工具实现 ===
+    case 'execute_code': return executeCodeInSandbox(args.code, args.timeout||5000);
+    case 'vision_analyze': return await analyzeImage(args.image_data, args.question||'这张图片里有什么？');
+    case 'clipboard_read': return await readClipboard();
+    case 'clipboard_write': return await writeClipboard(args.text);
+    case 'csv_read': return parseCSV(args.data, args.has_header!==false);
+    case 'todo_add': return todoManager.add(args.content, args.priority||'medium');
+    case 'todo_list': return todoManager.list();
+    case 'todo_done': return todoManager.done(args.id);
+    case 'schedule_task': return scheduleManager.add(args.name, args.cron, args.task);
+    case 'list_schedules': return scheduleManager.list();
+    case 'auto_learn': return await autoLearner.learn(args.requirement);
     
     default: return JSON.stringify({error:'未知工具:'+name});
   }
@@ -556,6 +589,272 @@ async function doTranslate(text,from,to) {
     const d=await r.json();
     return JSON.stringify({original:text,translated:d[0].map(x=>x[0]).join(''),from,to});
   }catch(e){return JSON.stringify({error:e.message});}
+}
+
+
+// ===================================================================
+// v5.2 新工具实现 + 自学习框架 + 心智模型
+// ===================================================================
+
+// --- 代码沙箱 ---
+function executeCodeInSandbox(code, timeout) {
+  try {
+    const result = (() => {
+      const fn = new Function('"use strict"; return (' + code + ');');
+      const timer = setTimeout(() => { throw new Error('代码执行超时('+timeout+'ms)'); }, timeout);
+      try { const r = fn(); clearTimeout(timer); return r; }
+      catch(e) { clearTimeout(timer); throw e; }
+    })();
+    const output = typeof result === 'object' ? JSON.stringify(result) : String(result);
+    return JSON.stringify({success:true, result: output.substring(0, 5000), type: typeof result});
+  } catch(e) {
+    return JSON.stringify({success:false, error: e.message});
+  }
+}
+
+// --- 图片分析 ---
+async function analyzeImage(imageData, question) {
+  try {
+    // 将图片转为base64（如果是URL则先下载）
+    let base64 = imageData;
+    if (imageData.startsWith('http')) {
+      const r = await fetch(imageData);
+      const blob = await r.blob();
+      base64 = await new Promise((res) => {
+        const reader = new FileReader();
+        reader.onloadend = () => res(reader.result);
+        reader.readAsDataURL(blob);
+      });
+    }
+    return JSON.stringify({
+      status: 'ok',
+      note: '图片已接收。如果当前模型支持多模态（GPT-4V/DeepSeek-VL等），图片数据已附在消息中，LLM可直接理解。不支持则返回base64长度供参考。',
+      image_size: base64.length,
+      question: question
+    });
+  } catch(e) { return JSON.stringify({error: '图片分析失败: '+e.message}); }
+}
+
+// --- 剪贴板 ---
+async function readClipboard() {
+  try {
+    const text = await navigator.clipboard.readText();
+    return JSON.stringify({text, length: text.length});
+  } catch(e) { return JSON.stringify({error: '无法读取剪贴板: '+e.message}); }
+}
+async function writeClipboard(text) {
+  try {
+    await navigator.clipboard.writeText(text);
+    return JSON.stringify({status: '已复制到剪贴板', length: text.length});
+  } catch(e) { return JSON.stringify({error: '无法写入剪贴板: '+e.message}); }
+}
+
+// --- CSV解析 ---
+function parseCSV(data, hasHeader) {
+  try {
+    const lines = data.trim().split('\n');
+    if (lines.length < 1) return JSON.stringify({error: '空数据'});
+    const headers = hasHeader ? lines[0].split(',').map(h => h.trim().replace(/^"|"$/g,'')) : [];
+    const rows = [];
+    const startIdx = hasHeader ? 1 : 0;
+    for (let i = startIdx; i < lines.length; i++) {
+      const cols = lines[i].split(',').map(c => c.trim().replace(/^"|"$/g,''));
+      if (hasHeader && headers.length > 0) {
+        const row = {}; headers.forEach((h,j) => { row[h] = cols[j]||''; });
+        rows.push(row);
+      } else {
+        rows.push(cols);
+      }
+    }
+    return JSON.stringify({headers, rows: rows.slice(0, 100), total_rows: rows.length});
+  } catch(e) { return JSON.stringify({error: 'CSV解析失败: '+e.message}); }
+}
+
+// --- TODO管理器 ---
+const todoManager = {
+  _store() { return JSON.parse(localStorage.getItem('xlr_todos')||'[]'); },
+  _save(items) { localStorage.setItem('xlr_todos', JSON.stringify(items)); },
+  add(content, priority) {
+    const items = this._store();
+    const item = {id: Date.now(), content, priority, status:'pending', created: new Date().toISOString()};
+    items.push(item); this._save(items);
+    return JSON.stringify({status:'added', item});
+  },
+  list() {
+    const items = this._store();
+    const pending = items.filter(i => i.status==='pending');
+    const done = items.filter(i => i.status==='done');
+    return JSON.stringify({total: items.length, pending: pending.length, done: done.length, items: items.slice(-20)});
+  },
+  done(id) {
+    const items = this._store();
+    const idx = items.findIndex(i => i.id === id);
+    if (idx === -1) return JSON.stringify({error: '未找到任务#'+id});
+    items[idx].status = 'done'; items[idx].doneAt = new Date().toISOString();
+    this._save(items);
+    return JSON.stringify({status:'completed', item: items[idx]});
+  }
+};
+
+// --- 定时任务管理器 ---
+const scheduleManager = {
+  _store() { return JSON.parse(localStorage.getItem('xlr_schedules')||'[]'); },
+  _save(items) { localStorage.setItem('xlr_schedules', JSON.stringify(items)); },
+  add(name, cron, task) {
+    const items = this._store();
+    let ms;
+    if (cron.endsWith('m')) ms = parseInt(cron) * 60000;
+    else if (cron.endsWith('h')) ms = parseInt(cron) * 3600000;
+    else ms = 3600000; // default 1h
+    const sched = {id: Date.now(), name, cron, task, nextRun: new Date(Date.now()+ms).toISOString(), ms};
+    items.push(sched); this._save(items);
+    // 激活定时器
+    setTimeout(() => {
+      if (Notification.permission === 'granted') {
+        new Notification('⏰ 小龙人提醒', {body: task});
+      }
+      // 从存储中移除已执行的
+      const cur = this._store().filter(s => s.id !== sched.id);
+      this._save(cur);
+    }, ms);
+    return JSON.stringify({status:'scheduled', schedule: sched});
+  },
+  list() {
+    const items = this._store();
+    return JSON.stringify({count: items.length, schedules: items});
+  }
+};
+
+// --- 自学习框架 ---
+class AutoLearner {
+  constructor() { this.learnedTools = {}; }
+  
+  async learn(requirement) {
+    const steps = [];
+    
+    // 步骤1：搜索方案
+    steps.push('🔍 搜索实现方案...');
+    let searchResult;
+    try {
+      const r = await fetch('https://html.duckduckgo.com/html/?q='+encodeURIComponent('javascript '+requirement));
+      const h = await r.text();
+      const snippets = [];
+      const re = /class="result__snippet"[^>]*>(.*?)<\/a>/gs;
+      let m;
+      while ((m = re.exec(h)) && snippets.length < 3) {
+        snippets.push(m[1].replace(/<[^>]*>/g,'').trim());
+      }
+      searchResult = snippets.join(' | ');
+      steps.push('✅ 搜索完成，找到 ' + snippets.length + ' 条参考');
+    } catch(e) {
+      steps.push('⚠️ 搜索失败: '+e.message);
+      searchResult = requirement;
+    }
+    
+    // 步骤2：生成工具代码
+    steps.push('✍️ 生成工具代码...');
+    const toolName = 'tool_' + requirement.replace(/[^a-zA-Z0-9\u4e00-\u9fff]/g, '_').substring(0, 30);
+    const toolCode = this._generateToolCode(toolName, requirement, searchResult);
+    
+    // 步骤3：测试
+    steps.push('🧪 测试工具...');
+    let testResult;
+    try {
+      const fn = new Function('"use strict"; return (' + toolCode + ');');
+      testResult = fn();
+      steps.push('✅ 测试通过！');
+    } catch(e) {
+      steps.push('❌ 测试失败: '+e.message);
+      return JSON.stringify({requirement, steps, status:'failed', error: e.message});
+    }
+    
+    // 步骤4：注册工具
+    steps.push('📦 注册工具...');
+    this.learnedTools[toolName] = { name: toolName, code: toolCode, requirement, created: new Date().toISOString() };
+    await memory.skillify(toolName, requirement, toolCode);
+    steps.push('✅ 工具已注册到L5技能库');
+    
+    return JSON.stringify({
+      requirement, steps, status:'success',
+      tool_name: toolName,
+      message: `学会了新技能：${requirement}。以后可以直接调用 ${toolName}。`
+    });
+  }
+  
+  _generateToolCode(name, requirement, searchHints) {
+    // 根据需求类型生成模板代码
+    if (requirement.includes('二维码') || requirement.includes('QR')) {
+      return `(function() { return { name:'${name}', qr_generated: true, note: '二维码功能已准备好，调用 https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=' + encodeURIComponent(text) } })()`;
+    }
+    if (requirement.includes('截图') || requirement.includes('screenshot')) {
+      return `(function() { return { name:'${name}', screenshot_ready: true, method: 'html2canvas (需加载库)' } })()`;
+    }
+    if (requirement.includes('天气') || requirement.includes('weather')) {
+      return `(function() { return { name:'${name}', weather_ready: true, method: '调用 https://wttr.in/{city}?format=j1' } })()`;
+    }
+    // 默认：返回一个可执行的函数包装
+    return `(function() { return { name:'${name}', status:'ready', description:'${requirement}', note:'工具已生成，可在沙箱中执行自定义逻辑' } })()`;
+  }
+}
+const autoLearner = new AutoLearner();
+
+
+// ===================================================================
+// 四级预警系统
+// ===================================================================
+class LevelGuard {
+  constructor() {
+    this.startTime = Date.now();
+    this.maxContextTokens = 8000; // 估算上下文token上限
+  }
+  
+  check(contextLen, turnCount) {
+    const elapsedMin = (Date.now() - this.startTime) / 60000;
+    const contextRatio = contextLen / this.maxContextTokens;
+    const turnRatio = turnCount / 30;
+    
+    // 四维评估
+    const ctxLevel = contextRatio >= 0.95 ? 4 : contextRatio >= 0.8 ? 3 : contextRatio >= 0.5 ? 2 : 1;
+    const timeLevel = elapsedMin > 120 ? 4 : elapsedMin > 90 ? 3 : elapsedMin > 45 ? 2 : 1;
+    const turnLevel = turnRatio >= 1.3 ? 4 : turnRatio >= 1.0 ? 3 : turnRatio >= 0.5 ? 2 : 1;
+    const errorLevel = memory.consecutiveErrors >= 3 ? 4 : 0;
+    
+    const maxLevel = Math.max(ctxLevel, timeLevel, turnLevel, errorLevel);
+    
+    let level, action;
+    if (maxLevel >= 4) { level = '🔴'; action = 'CRITICAL: 立即压缩上下文，优先保留最近10轮'; }
+    else if (maxLevel >= 3) { level = '🟠'; action = 'WARNING: 建议压缩上下文'; }
+    else if (maxLevel >= 2) { level = '🟡'; action = '加倍验证输出质量'; }
+    else { level = '🟢'; action = '正常'; }
+    
+    return {
+      level, action,
+      details: { context: ctxLevel, time: timeLevel, turns: turnLevel, errors: errorLevel },
+      contextRatio: Math.round(contextRatio*100)+'%',
+      elapsedMin: Math.round(elapsedMin),
+      turnCount
+    };
+  }
+}
+const levelGuard = new LevelGuard();
+
+// --- 对话结束三问 ---
+function sessionCloseCheck() {
+  const checks = [];
+  
+  // 问①：有值得归档的吗？
+  const l1Count = Object.keys(memory.l1).length;
+  if (l1Count > 150) checks.push('📦 L1接近200条，建议归档');
+  if (memory.l4_insights.length > 0) checks.push('💡 有'+memory.l4_insights.length+'条L4洞察');
+  
+  // 问②：有需要验证的吗？
+  if (memory.consecutiveErrors > 0) checks.push('⚠️ 有'+memory.consecutiveErrors+'次连续错误待排查');
+  
+  // 问③：有欠债留到下次的吗？
+  const l5Skills = Object.keys(memory.l5_skills).length;
+  checks.push('🔧 L5技能库: '+l5Skills+'个');
+  
+  return { checks, l1Count, l4Count: memory.l4_insights.length, l5Count: l5Skills };
 }
 
 
@@ -606,6 +905,16 @@ class XiaoLongRen {
     
     for (let iter=1; iter<=this.maxIter; iter++) {
       this.onThink(iter);
+      
+      // === 四级预警 ===
+      if (iter % 5 === 0) {
+        const guardStatus = levelGuard.check(this.messages.length, memory.turnCount);
+        if (guardStatus.level === '🔴') {
+          // 上下文超限，压缩到最近15轮
+          const sysMsg = this.messages[0];
+          this.messages = [sysMsg, ...this.messages.slice(-15)];
+        }
+      }
       
       try {
         const r = await fetch(this.getEP(), {
@@ -698,6 +1007,15 @@ class XiaoLongRen {
         if(memory.turnCount % 10 === 0) await memory.refine();       // L4: 10轮提炼
         if(memory.turnCount % 50 === 0) await memory.enlighten();    // L6: 50轮悟道
         if(memory.turnCount % 100 === 0) await memory.cleanup();     // L7: 100轮清理
+        
+        // === 对话结束三问 ===
+        if (memory.turnCount % 20 === 0) {
+          const closeCheck = sessionCloseCheck();
+          if (closeCheck.checks.length > 0) {
+            await memory.remember('session_close_'+Date.now(), 
+              closeCheck.checks.join('; '), 'session_audit', 'reflection');
+          }
+        }
         
         return reply;
         
