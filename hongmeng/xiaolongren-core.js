@@ -71,6 +71,18 @@ const TALKING_PATTERNS = [
   '你不妨','你可以尝试','建议使用','推荐你','你可以通过'
 ];
 
+// 空转变体：承诺了搜索但没真正搜
+const SEARCH_PROMISE_PATTERNS = [
+  '我搜', '我再搜', '我查', '我帮你查', '我帮你搜', '帮你查', '帮你搜',
+  '搜一下', '查一下', '找一下', '我找', '我帮你找'
+];
+
+// 推测代替执行：用分析代替行动
+const SPECULATION_PATTERNS = [
+  '可能是', '也许是', '大概是', '估计是', '应该是',
+  '可能是由于', '问题可能是', '原因可能是'
+];
+
 function isOperationalRequest(text) {
   return OP_KEYWORDS.some(kw => text.includes(kw));
 }
@@ -86,7 +98,7 @@ function isTalkingNotDoing(reply) {
  * - 刀③：每次回复前自检
  * 返回 {pass, reason} — pass=false时拦截回复，强制重试
  */
-function firewallAudit(userMsg, assistantReply, hadToolCalls, turnCount) {
+function firewallAudit(userMsg, assistantReply, hadToolCalls, calledTools, turnCount) {
   // 刀①：操作型请求无工具调用
   if (!hadToolCalls && isOperationalRequest(userMsg)) {
     // 检查是否是"空转"——只动嘴不动手
@@ -95,6 +107,20 @@ function firewallAudit(userMsg, assistantReply, hadToolCalls, turnCount) {
     }
     if (isTalkingNotDoing(assistantReply)) {
       return { pass: false, reason: '刀①拦截：检测到"建议你/你可以试试"等空转话术' };
+    }
+  }
+  
+  // 刀①增强：承诺搜索但未执行（即使调了其他工具也算空转）
+  const promisedSearch = SEARCH_PROMISE_PATTERNS.some(p => assistantReply.includes(p));
+  const actuallySearched = calledTools && calledTools.has('web_search');
+  if (promisedSearch && !actuallySearched) {
+    return { pass: false, reason: '刀①拦截：回复中说"' + SEARCH_PROMISE_PATTERNS.find(p => assistantReply.includes(p)) + '"但没有调用web_search，空头承诺' };
+  }
+  
+  // 刀①增强：用推测代替行动（"可能是XX原因"而不是搜出来的结果）
+  if (isOperationalRequest(userMsg) && !hadToolCalls) {
+    if (SPECULATION_PATTERNS.some(p => assistantReply.includes(p))) {
+      return { pass: false, reason: '刀①拦截：推测代替执行——检测到"可能是/应该是"等猜测性语言' };
     }
   }
   
@@ -917,6 +943,7 @@ class XiaoLongRen {
       }
       
       try {
+        let calledToolsInIter = new Set();
         const r = await fetch(this.getEP(), {
           method:'POST', headers:{'Content-Type':'application/json','Authorization':'Bearer '+this.apiKey},
           body: JSON.stringify({model:this.model,messages:this.messages,tools:ALL_TOOLS,tool_choice:'auto',temperature:this.temp,max_tokens:4096})
@@ -934,6 +961,7 @@ class XiaoLongRen {
             this.onClosedLoop({step: CLOSED_LOOP_STEPS.EXECUTE, tool: tc.function.name});
             
             totalToolCalls++;
+            calledToolsInIter.add(tc.function.name);
             const result = await execTool(tc.function.name, args);
             
             // === 步骤5：验证修正（硬编码） ===
@@ -967,7 +995,7 @@ class XiaoLongRen {
         const reply = msg.content||'';
         
         // === 三刀防火墙：回复前硬检测 ===
-        const audit = firewallAudit(userMsg, reply, totalToolCalls > 0, iter);
+        const audit = firewallAudit(userMsg, reply, totalToolCalls > 0, calledToolsInIter, iter);
         if (!audit.pass && firewallRetryCount < 1) {
           firewallRetryCount++;
           this.onFirewallIntercept({reason: audit.reason, reply: reply.substring(0, 100)});
