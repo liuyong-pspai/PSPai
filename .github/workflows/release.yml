@@ -230,6 +230,27 @@ jobs:
           # Allow cleartext for local dev
           sed -i 's/android:usesCleartextTraffic="false"/android:usesCleartextTraffic="true"/' \
             app-build/android/app/src/main/AndroidManifest.xml 2>/dev/null || true
+          # Replace default Capacitor icons with 小龙人 icons
+          for density in mdpi hdpi xhdpi xxhdpi xxxhdpi; do
+            cp android-app/res/mipmap-${density}/ic_launcher.png app-build/android/app/src/main/res/mipmap-${density}/ic_launcher.png
+            cp android-app/res/mipmap-${density}/ic_launcher_round.png app-build/android/app/src/main/res/mipmap-${density}/ic_launcher_round.png 2>/dev/null || true
+          done
+          # Remove adaptive icon XML so Android uses our PNG icons
+          rm -f app-build/android/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml 2>/dev/null || true
+          rm -f app-build/android/app/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml 2>/dev/null || true
+          rm -f app-build/android/app/src/main/res/drawable/ic_launcher_foreground.xml 2>/dev/null || true
+          # Network security config for API access
+          cp android-app/res/xml/network_security_config.xml app-build/android/app/src/main/res/xml/
+          sed -i 's|<application|<application android:networkSecurityConfig="@xml/network_security_config"|' \
+            app-build/android/app/src/main/AndroidManifest.xml
+          # Fix Kotlin stdlib duplicate class conflict (Capacitor v8 known issue)
+          cat >> app-build/android/app/build.gradle << 'GRADLEEOF'
+
+          configurations.all {
+              exclude group: 'org.jetbrains.kotlin', module: 'kotlin-stdlib-jdk7'
+              exclude group: 'org.jetbrains.kotlin', module: 'kotlin-stdlib-jdk8'
+          }
+          GRADLEEOF
 
       - name: Build APK
         working-directory: app-build/android
