@@ -235,6 +235,7 @@ async function initEngine() {
     onFirewallIntercept: (info) => { console.log('🔥防火墙拦截:', info.reason); },
     onClosedLoop: (info) => { console.log('🔄闭环:', info.step); },
   });
+  await xlrEngine.init(); // 加载自学习工具
   return xlrEngine;
 }
 
