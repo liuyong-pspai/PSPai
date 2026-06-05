@@ -11,14 +11,22 @@
  */
 
 // ============================================================
-// 八层永生记忆 (IndexedDB)
+// 八层永生记忆 (IndexedDB + 内存降级)
 // ============================================================
 const memory = (function() {
   let db = null;
+  let fallbackMode = false;
+  const fallbackStore = new Map();  // IndexedDB不可用时的内存降级
   const DB_NAME = 'xiaolongren_memory';
   const DB_VER = 6;
 
   async function open() {
+    // 检测IndexedDB可用性
+    if (typeof indexedDB === 'undefined') {
+      console.warn('[记忆] IndexedDB不可用，降级为内存存储（刷新后丢失）');
+      fallbackMode = true;
+      return 'fallback';
+    }
     return new Promise((resolve, reject) => {
       const req = indexedDB.open(DB_NAME, DB_VER);
       req.onupgradeneeded = (e) => {
@@ -29,31 +37,55 @@ const memory = (function() {
         if (!d.objectStoreNames.contains('conversations')) d.createObjectStore('conversations', {keyPath:'id',autoIncrement:true});
       };
       req.onsuccess = (e) => { db = e.target.result; resolve(db); };
-      req.onerror = (e) => reject(e.target.error);
+      req.onerror = (e) => {
+        console.warn('[记忆] IndexedDB打开失败，降级为内存存储:', e.target.error?.message);
+        fallbackMode = true;
+        resolve('fallback');
+      };
     });
   }
 
-  function tx(store, mode='readwrite') { return db.transaction(store, mode).objectStore(store); }
+  function tx(store, mode='readwrite') {
+    if (fallbackMode) return null;
+    if (!db || typeof db === 'string') return null;
+    return db.transaction(store, mode).objectStore(store);
+  }
 
   async function getL1(key) {
+    if (fallbackMode) return fallbackStore.get('l1_' + key) || null;
+    if (!db || typeof db === 'string') return null;
     return new Promise(r => { const req = tx('l1','readonly').get(key); req.onsuccess=()=>r(req.result?.value); req.onerror=()=>r(null); });
   }
   async function setL1(key, value) {
+    if (fallbackMode) { fallbackStore.set('l1_' + key, value); return true; }
+    if (!db || typeof db === 'string') { fallbackStore.set('l1_' + key, value); return true; }
     return new Promise(r => { tx('l1').put({key,value,time:Date.now()}).onsuccess=()=>r(true); });
   }
   async function addL4(patterns) {
+    if (fallbackMode) { const k = 'l4_' + Date.now(); fallbackStore.set(k, {patterns,time:Date.now()}); return true; }
+    if (!db || typeof db === 'string') return true;
     return new Promise(r => { tx('l4').add({patterns,time:Date.now()}).onsuccess=()=>r(true); });
   }
   async function saveSkill(name, desc, rule) {
+    if (fallbackMode) { fallbackStore.set('l5_' + name, {name,description:desc,rule,time:Date.now()}); return true; }
+    if (!db || typeof db === 'string') { fallbackStore.set('l5_' + name, {name,description:desc,rule,time:Date.now()}); return true; }
     return new Promise(r => { tx('l5').put({name,description:desc,rule,time:Date.now()}).onsuccess=()=>r(true); });
   }
   async function getSkills() {
+    if (fallbackMode) { const r=[]; fallbackStore.forEach((v,k)=>{if(k.startsWith('l5_'))r.push(v);}); return r; }
+    if (!db || typeof db === 'string') return [];
     return new Promise(r => { const req=tx('l5','readonly').getAll(); req.onsuccess=()=>r(req.result||[]); });
   }
   async function saveConversation(messages) {
+    if (fallbackMode || !db || typeof db === 'string') {
+      const arr = fallbackStore.get('conversations') || [];
+      if (arr.length > 5) arr.shift();
+      arr.push({messages, time: Date.now()});
+      fallbackStore.set('conversations', arr);
+      return true;
+    }
     return new Promise(r => {
       const store = tx('conversations');
-      // Keep last 5 conversations
       const countReq = store.count();
       countReq.onsuccess = async () => {
         if (countReq.result > 5) {
@@ -67,6 +99,10 @@ const memory = (function() {
     });
   }
   async function loadConversation() {
+    if (fallbackMode || !db || typeof db === 'string') {
+      const arr = fallbackStore.get('conversations') || [];
+      return arr.length ? arr[arr.length - 1].messages : [];
+    }
     return new Promise(r => {
       const req = tx('conversations','readonly').getAll();
       req.onsuccess = () => { const all = req.result||[]; r(all.length?all[all.length-1].messages:[]); };
@@ -75,6 +111,7 @@ const memory = (function() {
 
   return {
     init: open,
+    isFallback: () => fallbackMode,
     l1: { get: getL1, set: setL1 },
     l4: { add: addL4 },
     l5: { save: saveSkill, getAll: getSkills },
@@ -260,8 +297,87 @@ class XiaoLongRen {
 // ============================================================
 // 内核初始化（由mobile.html调用）
 // ============================================================
+// ============================================================
+// 兼容性能力检测
+// ============================================================
+function detectCapabilities() {
+  const caps = {
+    indexedDB: false,
+    localStorage: false,
+    webSocket: false,
+    speechInput: false,
+    speechOutput: false,
+    serviceWorker: false,
+    issues: [],
+    tips: [],
+  };
+
+  // IndexedDB (记忆持久化)
+  caps.indexedDB = typeof indexedDB !== 'undefined';
+  if (!caps.indexedDB) {
+    caps.issues.push('記憶');
+    caps.tips.push('换用普通模式（非隐私/无痕）记忆可永久保存');
+  }
+
+  // localStorage (配置持久化)
+  try {
+    localStorage.setItem('_xlr_test', '1');
+    localStorage.removeItem('_xlr_test');
+    caps.localStorage = true;
+  } catch(e) {
+    caps.issues.push('配置');
+  }
+
+  // WebSocket
+  caps.webSocket = typeof WebSocket !== 'undefined';
+
+  // 语音输入
+  caps.speechInput = !!(window.SpeechRecognition || window.webkitSpeechRecognition);
+  if (!caps.speechInput) {
+    caps.tips.push('换Chrome/Edge浏览器可使用语音输入');
+  }
+
+  // 语音输出 (TTS)
+  caps.speechOutput = typeof SpeechSynthesisUtterance !== 'undefined' && typeof speechSynthesis !== 'undefined';
+  if (!caps.speechOutput) {
+    caps.tips.push('当前浏览器不支持语音播报，可换Chrome/Edge');
+  }
+
+  // Service Worker
+  caps.serviceWorker = 'serviceWorker' in navigator;
+
+  // 环境标识
+  const ua = navigator.userAgent || '';
+  caps.isMobile = /Mobi|Android|iPhone/i.test(ua);
+  caps.isAndroid = /Android/i.test(ua);
+  caps.isIOS = /iPhone|iPad/i.test(ua);
+  caps.isHarmonyOS = /HarmonyOS|OpenHarmony/i.test(ua);
+  caps.isWebView = /wv|WebView/i.test(ua) || (caps.isAndroid && !/Chrome/i.test(ua));
+  caps.browser = ua.includes('Firefox') ? 'Firefox' :
+                 ua.includes('Edg') ? 'Edge' :
+                 ua.includes('Chrome') ? 'Chrome' :
+                 ua.includes('Safari') ? 'Safari' : '其他';
+
+  return caps;
+}
+
+// 全局能力报告（启动时填充）
+let systemCapabilities = null;
+
 async function initKernel() {
   console.log('[内核] 初始化...');
+
+  // 0. 能力检测
+  systemCapabilities = detectCapabilities();
+  console.log('[内核] 环境:', 
+    (systemCapabilities.isMobile ? '📱' : '🖥️') +
+    (systemCapabilities.isAndroid ? 'Android' : systemCapabilities.isIOS ? 'iOS' : systemCapabilities.isHarmonyOS ? '鸿蒙' : 'Desktop') +
+    '/' + systemCapabilities.browser,
+    systemCapabilities.issues.length ? '⚠️' + systemCapabilities.issues.join(',') + '受限' : '✅全部正常'
+  );
+  if (systemCapabilities.tips.length) {
+    console.log('[内核] 💡 建议:', systemCapabilities.tips.join('; '));
+  }
 
   // 1. 初始化记忆
   await memory.init();
@@ -272,7 +388,10 @@ async function initKernel() {
 
   // 3. 报告
   const report = XLR.report();
-  console.log(`[内核] ${report.totalPlugins}个插件, ${report.totalTools}个工具就绪`);
+  report.memoryFallback = memory.isFallback();
+  report.capabilities = systemCapabilities;
+  console.log(`[内核] ${report.totalPlugins}个插件, ${report.totalTools}个工具就绪` + 
+    (report.memoryFallback ? ' ⚠️记忆降级' : ''));
   console.log('[内核] 插件详情:', JSON.stringify(report.plugins));
 
   return report;

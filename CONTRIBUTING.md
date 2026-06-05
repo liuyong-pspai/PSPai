@@ -1,69 +1,79 @@
-# 贡献指南
+# 🤝 参与贡献 · Contributing to XiaoLongRen
 
-感谢你对 **小龙人（XiaoLongRen）** 项目的关注！
+欢迎参与小龙人项目！无论你是开发者、设计师还是普通用户，都可以贡献力量。
 
-## 🌟 如何贡献
+Welcome! Contributions from developers, designers, and users are all welcome.
 
-### 报告Bug
+---
 
-1. 在 [Issues](https://github.com/liuyong-pspai/PSPai/issues) 中搜索，确认未有人报告过
-2. 创建新 Issue，描述：
-   - 操作系统与版本
-   - 复现步骤
-   - 期望行为 vs 实际行为
-   - 截图/日志（如有）
+## 🐛 报告Bug · Bug Reports
 
-### 提交代码
+1. 打开 Issues → New Issue → Bug Report
+2. 描述问题：什么操作？什么现象？什么环境？
+3. 附上截图（如有）
 
-1. **Fork** 本仓库
-2. 创建特性分支：`git checkout -b feature/你的特性`
-3. 遵循现有代码风格（Python: PEP 8）
-4. 确保 `python3 ci_preflight.sh` 通过
-5. 提交 Pull Request，描述改动内容与原因
+Describe: what you did, what happened, what should have happened, your environment.
 
-### Pull Request 规范
+---
 
-- 一个 PR 只做一件事
-- 标题简洁清晰（中英文均可）
-- 关联对应 Issue（`Closes #123`）
-- 包含必要的文档更新
+## 💡 功能建议 · Feature Requests
 
-## 📋 开发环境
+在 Issues 中提交，标签用 `enhancement`。
+告诉我们需要什么功能、为什么需要它。
 
-```bash
-# 克隆仓库
-git clone https://github.com/liuyong-pspai/PSPai.git
-cd PSPai
+Tag with `enhancement`. Tell us what you need and why.
 
-# 安装依赖
-pip install -r requirements.txt
+---
 
-# 启动开发服务器
-python3 UI原型/server.py
-# 浏览器打开 http://localhost:8088
+## 🔌 开发插件 · Writing Plugins
+
+小龙人支持插件扩展。插件放在 `plugins/` 目录：
+
+```javascript
+// plugins/my-tool.js
+XLR.registerPlugin({
+  name: 'my-tool',
+  label: { zh: '我的工具', en: 'My Tool' },
+  tools: [
+    {
+      name: 'hello',
+      description: { zh: '打招呼', en: 'Say hello' },
+      params: { name: 'string' },
+      handler(params) { return `你好 ${params.name}！`; }
+    }
+  ]
+});
 ```
 
-## 🏗️ 项目结构
+---
+
+## 📐 代码规范 · Code Style
+
+- JavaScript ES6+
+- 缩进2空格
+- 函数注释用JSDoc
+- 提交信息用中文
+
+---
+
+## 📄 协议 · License
+
+体验层：MIT License
+内核引擎：PSPAI Core License
+
+---
+
+## 🏗️ 项目结构 · Project Structure
 
 ```
-PSPai/
-├── UI原型/         # 前端界面
-│   ├── index.html  # 主页面
-│   ├── server.py   # 开发服务器
-│   └── lang/       # 语言包
-├── engine/         # 开源引擎组件
-├── README.md       # 项目说明
-├── CHANGELOG.md    # 更新日志
-└── start.sh        # 一键启动
+pwa/
+├── index.html          — 电脑版UI
+├── mobile.html         — 手机版UI
+├── xiaolongren-core.js — 核心引擎
+├── plugin-loader.js    — 插件加载器
+├── plugins/            — 插件目录
+├── lang/               — 语言包
+├── launcher.py         — 桌面启动器
+├── install.bat/sh      — 安装脚本
+└── assets/             — 资源文件
 ```
-
-## 🤝 行为准则
-
-- 尊重每一位贡献者
-- 建设性讨论，对事不对人
-- 帮助新人融入项目
-- 中文/English 均可交流
-
-## 📄 协议
-
-本项目采用 **AGPL-3.0** 协议。贡献代码即表示你同意在该协议下授权你的代码。

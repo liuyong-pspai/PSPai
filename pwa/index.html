@@ -122,6 +122,12 @@ html,body{width:100%;height:100%;overflow:hidden;font-family:'PingFang SC','Micr
 #chat-input-main::placeholder{color:#4a4a5a}
 #chat-send{flex-shrink:0;width:32px;height:32px;border-radius:50%;background:var(--accent);border:none;color:#fff;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all 0.15s}
 #chat-send:active{transform:scale(0.9)}
+#mic-btn-pc{flex-shrink:0;width:32px;height:32px;border-radius:50%;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.04);color:#888;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all 0.15s}
+#mic-btn-pc:hover{color:#ccc;border-color:rgba(255,255,255,0.2)}
+#mic-btn-pc.active{background:var(--gold);color:#000;border-color:var(--gold);animation:tpulse 1s ease-in-out infinite}
+#interim-text-pc{flex-shrink:0;text-align:center;font-size:12px;color:var(--accent);min-height:18px;padding:0 10px 4px;opacity:0;transition:opacity 0.2s}
+#interim-text-pc.show{opacity:1}
+@keyframes tpulse{0%,100%{box-shadow:0 0 4px var(--gold-dim)}50%{box-shadow:0 0 14px var(--gold)}}
 .msg-row{display:flex;margin-bottom:6px;animation:ci 0.3s ease}
 .msg-row.rtl{justify-content:flex-end}
 .msg-bbl{max-width:78%;padding:8px 12px;border-radius:14px;font-size:13px;line-height:1.5;word-break:break-word}
@@ -134,13 +140,26 @@ html,body{width:100%;height:100%;overflow:hidden;font-family:'PingFang SC','Micr
 .conn-dot{display:inline-block;width:7px;height:7px;border-radius:50%;margin-left:8px;flex-shrink:0}
 .conn-online{background:#4ade80;box-shadow:0 0 6px rgba(74,222,128,0.5)}
 .conn-offline{background:#f44;box-shadow:0 0 6px rgba(255,68,68,0.5)}
+.plugin-status{font-size:10px;color:var(--accent);margin-left:6px;opacity:0.7}
+.compat-dot{display:inline-block;width:7px;height:7px;border-radius:50%;margin-left:6px;flex-shrink:0;cursor:help}
+.compat-ok{background:#4ade80;box-shadow:0 0 6px rgba(74,222,128,0.3)}
+.compat-warn{background:#f59e0b;box-shadow:0 0 6px rgba(245,158,11,0.5);animation:pulse 2s ease-in-out infinite}
+.compat-err{background:#f44;box-shadow:0 0 6px rgba(255,68,68,0.5)}
 </style>
+<!-- 插件体系 v6.0：内核+加载器+5插件 -->
+<script src="xiaolongren-core.js"></script>
+<script src="plugin-loader.js"></script>
+<script src="plugins/search.js"></script>
+<script src="plugins/media.js"></script>
+<script src="plugins/tools.js"></script>
+<script src="plugins/evolution.js"></script>
+<script src="plugins/sensors.js"></script>
 </head>
 <body>
 
 <div id="main">
   <div id="bar">
-    <div class="bl"><span id="sm-avatar">🐉</span><span id="sm-name">龙渊</span><span id="conn-indicator" class="conn-dot conn-offline" title="引擎离线"></span></div>
+    <div class="bl"><span id="sm-avatar"><img src="avatar-48.png" width="24" height="24" style="border-radius:4px;vertical-align:middle" alt="小龙人"></span><span id="sm-name">龙渊</span><span id="conn-indicator" class="conn-dot conn-offline" title="引擎离线"></span><span id="compat-indicator" class="compat-dot compat-ok" title="环境检测中..."></span></div>
     <div class="br">
       <button class="lang-btn" onclick="toggleLang()">🌐 <span data-i18n="lang_label">中</span></button>
       <span onclick="showPanel('memo')">📝</span>
@@ -161,6 +180,7 @@ html,body{width:100%;height:100%;overflow:hidden;font-family:'PingFang SC','Micr
     <div id="ntag"><div class="cn">龙渊</div><div class="cd">龙宫少主 · 金瞳龙角</div></div>
     <div class="arr r" onclick="event.stopPropagation();nc()">▶</div>
   </div>
+  <div id="interim-text-pc"></div>
 
   <div id="stream">
     <div class="card"><div class="ch" data-i18n="card1_t">📊 新能源车市场调研</div><div class="cb" data-i18n="card1_b">2026年新能源车三强格局已定：比亚迪、特斯拉、问界。比亚迪靠垂直整合成本优势领跑，特斯拉FSD入华可能改写格局，问界在高端SUV站稳。详细数据已整理。<br><span style="color:var(--accent2)">📎 附：2026新能源车市场报告.pdf</span></div><div class="ct"><span data-i18n="today">今天</span> 08:32 · <span class="bdg ok" data-i18n="authorized">已授权</span></div></div>
@@ -171,6 +191,7 @@ html,body{width:100%;height:100%;overflow:hidden;font-family:'PingFang SC','Micr
 
   <div id="chat-bar">
     <input type="text" id="chat-input-main" data-i18n-ph="chat_ph" onkeydown="if(event.key==='Enter')sendChat()" onclick="event.stopPropagation()">
+    <button id="mic-btn-pc" onclick="toggleMicPC()" title="语音输入"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg></button>
     <button id="chat-send" onclick="sendChat()">↑</button>
   </div>
 
@@ -429,7 +450,6 @@ function editName(i){
 function saveName(i,name){
   var key=i<0?'__custom_'+(-i-1):chars[i].id;
   charNames[key]=name;saveCharNames();
-  fetch(API_BASE+'/api/name',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({charIndex:i,name:name,lang:lang})}).catch(function(){});
   var cn=document.querySelector('#ntag .cn');
   cn.textContent=name;cn.style.cursor='pointer';cn.title=t('rename_hint');
   cn.onclick=function(e){e.stopPropagation();editName(i);};
@@ -439,10 +459,10 @@ function saveName(i,name){
 function pc(){if(!hasCustom()){ac((cur-1+chars.length)%chars.length);return}if(cur===0)ac(-3);else if(cur===-1)ac(-2);else if(cur===-2)ac(-3);else if(cur===-3)ac(chars.length-1);else ac(cur-1)}
 function nc(){if(!hasCustom()){ac((cur+1)%chars.length);return}if(cur===chars.length-1)ac(-1);else if(cur===-1)ac(-2);else if(cur===-2)ac(-3);else if(cur===-3)ac(0);else ac(cur+1)}
 
-// === 首次运行检测 === 无配置 → 跳转配置向导
-fetch('/api/config-file').then(function(r){return r.json()}).then(function(d){if(!d.exists){location.href='/config.html'}}).catch(function(){});
+// === 配置检测 === 从localStorage读取（与mobile版/config.html统一）
+function getConfig(){try{var raw=localStorage.getItem('xiaolongren_config');return raw?JSON.parse(raw):null}catch(e){return null}}
+function hasConfig(){var cfg=getConfig();return cfg&&cfg.api_key}
 // =====================
-var API_BASE=(function(){var h=location.hostname;var p=location.port;return p&&p!=='8088'?location.protocol+'//'+h+':8089':location.protocol+'//'+h+':8089'})();
 
 function getMsgKey(){return 'xiaolongren_msgs_'+cur}
 function loadMessages(){
@@ -522,67 +542,23 @@ function buildRoles(){
 var curPanel=null;
 function showPanel(id){if(curPanel)hidePanel(curPanel);curPanel=id;if(id==='role')buildRoles();if(id==='model')renderModels();document.getElementById('ov-'+id).classList.add('show')}
 function hidePanel(id){document.getElementById('ov-'+id).classList.remove('show');if(curPanel===id)curPanel=null}
-var defaultModels=[
-  {id:'pspai',name:'PSPAI Engine',descKey:'pspai_desc',emoji:'🔮',key:'builtin'},
-  {id:'qw',name:'千问 Qwen3',descKey:'qw_desc',emoji:'☁️',key:''},
-  {id:'db',name:'豆包 Seedance',descKey:'db_desc',emoji:'⚡',key:''},
-  {id:'zp',name:'智谱 GLM',descKey:'zp_desc',emoji:'🧠',key:''}
-];
-var userModels=JSON.parse(localStorage.getItem('xiaolongren_models')||'[]');
-var curModel='ds';
+// ====== 模型配置 — 统一跳转config.html ======
+var defaultModels=[{id:'configure',name:'配置大模型',descKey:'cfg_desc',emoji:'⚙️',key:'go'}];
+var curModel='configure';
 
-function getModels(){return defaultModels.concat(userModels)}
+function getModels(){return defaultModels}
 function renderModels(){
   var list=document.getElementById('model-list');
   if(!list)return;
-  var models=getModels();
-  var self=this;
-  list.innerHTML=models.map(function(m){
-    var desc=m.descKey?t(m.descKey):(m.desc||t('cust_desc'));
-    var status=m.key||m.key==='builtin'?t('model_cfg'):t('model_need');
-    return '<div class="mdl'+(m.id===curModel?' sel':'')+'" id="mdl-'+m.id+'" onclick="pickModel(\''+m.id+'\')"><div class="mi">'+(m.emoji||'🤖')+'</div><div class="mf">'+m.name+'<div class="md">'+status+'</div></div><div class="ms" style="opacity:'+(m.id===curModel?1:0)+'">●</div></div>';
-  }).join('');
+  var cfg=getConfig();
+  var status=cfg?(cfg.provider||'')+' · '+(cfg.model||''):'未配置';
+  list.innerHTML='<div class="mdl sel" onclick="window.open(\'config.html\',\'_self\')"><div class="mi">⚙️</div><div class="mf">配置大模型<div class="md">'+status+'</div></div><div class="ms">→</div></div>';
 }
+function pickModel(id){window.open('config.html','_self');}
+function addModel(){}
+function saveApiKey(){}
 
-function pickModel(id){
-  var models=getModels();var m=models.find(function(x){return x.id===id});
-  if(!m)return;
-  document.querySelectorAll('.mdl').forEach(function(el){el.classList.remove('sel')});
-  var mdlEl=document.getElementById('mdl-'+id);if(mdlEl)mdlEl.classList.add('sel');
-  if(m.key||m.key==='builtin'){curModel=id;renderModels();setTimeout(function(){hidePanel('model')},400)}
-  else{
-    document.getElementById('apikey-model-name').textContent=m.name;
-    document.getElementById('apikey-input').value='';
-    pendingModelId=id;
-    showPanel('apikey');
-  }
-}
-
-var pendingModelId='';
-function saveApiKey(){
-  var key=document.getElementById('apikey-input').value.trim();
-  if(!key){alert(t('enter_key'));return}
-  var models=getModels();var m=models.find(function(x){return x.id===pendingModelId});
-  if(m){m.key=key;if(defaultModels.every(function(d){return d.id!==m.id})){var idx=userModels.findIndex(function(u){return u.id===m.id});if(idx>=0)userModels[idx]=m;localStorage.setItem('xiaolongren_models',JSON.stringify(userModels))}}
-  curModel=pendingModelId;renderModels();
-  hidePanel('apikey');hidePanel('model');
-}
-
-function addModel(){
-  var name=document.getElementById('addmodel-name').value.trim();
-  var key=document.getElementById('addmodel-key').value.trim();
-  if(!name){alert(t('enter_model'));return}
-  var id='m'+Date.now();
-  userModels.push({id:id,name:name,descKey:'',emoji:'🤖',key:key||''});
-  localStorage.setItem('xiaolongren_models',JSON.stringify(userModels));
-  document.getElementById('addmodel-name').value='';
-  document.getElementById('addmodel-key').value='';
-  hidePanel('addmodel');
-  renderModels();
-  if(!key){pendingModelId=id;document.getElementById('apikey-model-name').textContent=name;document.getElementById('apikey-input').value='';showPanel('apikey')}
-  else{curModel=id;renderModels();}
-}
-
+setTimeout(function(){renderModels()}, 100);
 setTimeout(function(){renderModels()}, 100);
 function addMemo(){var i=document.getElementById('memo-input'),t=i.value.trim();if(!t)return;var d=document.createElement('div');d.className='memo-item';d.innerHTML='<div class="mdot"></div><div class="mtxt">'+t+'</div><div class="mact" onclick="delMemo(this)">✕</div>';document.getElementById('memo-list').appendChild(d);i.value=''}
 function delMemo(el){el.parentElement.remove()}
@@ -592,51 +568,52 @@ function tg(n){perms[n]=!perms[n];document.getElementById('sw-'+n).classList.tog
 function openChat(){
   document.getElementById('chat-input-main').focus();
 }
-// ====== fetch 重试 + 指数退避 ======
-function fetchWithRetry(url,options,maxRetries){
-  return new Promise(function(resolve,reject){
-    var attempt=0;
-    function doFetch(){
-      fetch(url,options).then(resolve).catch(function(err){
-        attempt++;
-        if(attempt<maxRetries){
-          var delay=Math.pow(2,attempt)*300;
-          setTimeout(doFetch,delay);
-        }else{
-          reject(err);
-        }
-      });
-    }
-    doFetch();
+// ====== 直接调大模型API (无需Python后端) ======
+var ENGINE = null;
+function getEngine() {
+  if (ENGINE) return ENGINE;
+  var cfg = getConfig();
+  if (!cfg) return null;
+  ENGINE = new XiaoLongRen({
+    provider: cfg.provider, model: cfg.model,
+    apiKey: cfg.api_key, baseUrl: cfg.base_url || '',
   });
+  return ENGINE;
 }
-function sendChat(){
-  var inp=document.getElementById('chat-input-main'),msg=inp.value.trim();
-  if(!msg)return;
-  var stream=document.getElementById('stream');
-  var cname=cur<0?getCharName(cur):chars[cur].name;
-  stream.innerHTML+='<div class="msg-row rtl"><div class="msg-bbl">'+msg+'</div></div>';
-  saveMessage('user',msg);
-  inp.value='';stream.scrollTop=stream.scrollHeight;
+
+function sendChat() {
+  var inp = document.getElementById('chat-input-main'), msg = inp.value.trim();
+  if (!msg) return;
+  var stream = document.getElementById('stream');
+
+  // 检查配置
+  if (!hasConfig()) {
+    stream.innerHTML += '<div class="msg-row"><div class="msg-bbl">⚙️ 还没配置大模型～ 点右上角设置，选提供商+填API Key就能用啦。</div></div>';
+    inp.value = ''; stream.scrollTop = stream.scrollHeight;
+    return;
+  }
+
+  stream.innerHTML += '<div class="msg-row rtl"><div class="msg-bbl">' + msg + '</div></div>';
+  saveMessage('user', msg);
+  inp.value = ''; stream.scrollTop = stream.scrollHeight;
   document.getElementById('speak-indicator').classList.add('active');
-  fetchWithRetry(API_BASE+'/api/chat',{
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({message:msg,charIndex:cur,charName:cname,lang:lang})
-  }, 3).then(function(r){return r.json()})
-  .then(function(data){
-    stream.innerHTML+='<div class="msg-row"><div class="msg-bbl">'+data.reply+'<span class="spk-btn" onclick="speak(this)">🔊</span></div></div>';
-    saveMessage('bot',data.reply);
-    stream.scrollTop=stream.scrollHeight;
+
+  var engine = getEngine();
+  if (!engine) {
+    stream.innerHTML += '<div class="msg-row"><div class="msg-bbl">❌ 引擎初始化失败，请检查配置。</div></div>';
     document.getElementById('speak-indicator').classList.remove('active');
-    if(data.nameChanged&&data.charIndex===cur){
-      charNames[data.charIndex<0?'__custom_'+(-data.charIndex-1):chars[data.charIndex].id]=data.newName;
-      saveCharNames();
-      ac(cur);
-    }
-  })
-  .catch(function(){
-    stream.innerHTML+='<div class="msg-row"><div class="msg-bbl">'+t('backend_down')+'</div></div>';
+    return;
+  }
+
+  var charData = cur < 0 ? null : chars[cur];
+  var sysPrompt = charData ? charData.sys : '你是小龙人，一个能干的AI助手。';
+  engine.chat(msg, sysPrompt).then(function(reply) {
+    stream.innerHTML += '<div class="msg-row"><div class="msg-bbl">' + reply + '<span class="spk-btn" onclick="speak(this)">🔊</span></div></div>';
+    saveMessage('bot', reply);
+    stream.scrollTop = stream.scrollHeight;
+    document.getElementById('speak-indicator').classList.remove('active');
+  }).catch(function(err) {
+    stream.innerHTML += '<div class="msg-row"><div class="msg-bbl">❌ ' + (err.message || '网络不通，请检查连接和API配置') + '</div></div>';
     document.getElementById('speak-indicator').classList.remove('active');
   });
 }
@@ -685,23 +662,112 @@ function speak(el){
 // Init — 动态语言索引 → 自动检测可用语言
 initI18n();
 
-// ====== 引擎连接状态检测 (每30秒ping /api/health) ======
-function checkEngineHealth() {
-    fetch(API_BASE + '/api/health')
-        .then(function(r) { return r.json(); })
-        .then(function(d) {
-            if (d.ok) {
-                document.getElementById('conn-indicator').className = 'conn-dot conn-online';
-                document.getElementById('conn-indicator').title = '引擎在线';
-            }
-        })
-        .catch(function() {
-            document.getElementById('conn-indicator').className = 'conn-dot conn-offline';
-            document.getElementById('conn-indicator').title = '引擎离线';
-        });
+// ====== 连接状态检测 ======
+function checkConnStatus() {
+    var dot = document.getElementById('conn-indicator');
+    if (!hasConfig()) {
+        dot.className = 'conn-dot conn-offline';
+        dot.title = '未配置API';
+        return;
+    }
+    // 配置存在=在线（下次发消息时会实际验证）
+    dot.className = 'conn-dot conn-online';
+    dot.title = '已配置 · 直连大模型';
 }
-setInterval(checkEngineHealth, 30000);
-checkEngineHealth();  // 立即检测一次
+setInterval(checkConnStatus, 30000);
+checkConnStatus();
+</script>
+<!-- 插件体系初始化：内核+插件自诊断 -->
+<script>
+(async function bootPlugins() {
+  try {
+    const report = await initKernel();
+    console.log('🚀 小龙人电脑版启动: ' + report.totalPlugins + '插件/' + report.totalTools + '工具');
+    
+    // 顶栏插件状态
+    const smName = document.getElementById('sm-name');
+    if (smName && report.totalTools) {
+      const span = document.createElement('span');
+      span.className = 'plugin-status';
+      span.textContent = '🧩' + report.totalTools + '工具';
+      smName.parentNode.appendChild(span);
+    }
+
+    // 兼容性指示灯
+    const compatDot = document.getElementById('compat-indicator');
+    if (compatDot && report.capabilities) {
+      const caps = report.capabilities;
+      const hasMemIssue = !caps.indexedDB;
+      const hasSpeechIssue = !caps.speechInput && !caps.speechOutput;
+      
+      if (caps.issues.length === 0) {
+        compatDot.className = 'compat-dot compat-ok';
+        compatDot.title = '运行正常';
+      } else if (hasMemIssue) {
+        compatDot.className = 'compat-dot compat-warn';
+        compatDot.title = '隐私模式下记忆不保存。' + (caps.tips.length ? caps.tips.join('；') : '');
+      } else if (hasSpeechIssue) {
+        compatDot.className = 'compat-dot compat-ok';
+        compatDot.title = caps.tips.length ? caps.tips.join('；') : '';
+      } else {
+        compatDot.className = 'compat-dot compat-warn';
+        compatDot.title = caps.tips.length ? caps.tips.join('；') : '';
+      }
+    }
+  } catch(e) {
+    console.error('插件体系启动失败:', e);
+    const conn = document.getElementById('conn-indicator');
+    if (conn) { conn.className = 'conn-dot conn-offline'; conn.title = '插件加载失败'; }
+    const compatDot = document.getElementById('compat-indicator');
+    if (compatDot) { compatDot.className = 'compat-dot compat-err'; compatDot.title = '插件体系启动失败'; }
+  }
+})();
+</script>
+<!-- 语音输入 (SpeechRecognition) -->
+<script>
+let pcRecognition = null, pcListening = false;
+
+function initPCRecognition() {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) return null;
+  const r = new SR();
+  r.lang = 'zh-CN'; r.continuous = false; r.interimResults = true;
+  r.onresult = function(e) {
+    let text = '';
+    for (let i = e.resultIndex; i < e.results.length; i++)
+      text += e.results[i][0].transcript;
+    var itEl = document.getElementById('interim-text-pc');
+    itEl.textContent = text;
+    itEl.classList.add('show');
+    if (e.results[e.results.length-1].isFinal && text.trim()) {
+      itEl.textContent = '';
+      itEl.classList.remove('show');
+      document.getElementById('chat-input-main').value = text.trim();
+      sendChat();
+    }
+  };
+  r.onerror = function(e) {
+    if (e.error === 'no-speech' || e.error === 'aborted') return;
+    stopMicPC();
+  };
+  r.onend = function() { stopMicPC(); };
+  return r;
+}
+
+function toggleMicPC() {
+  if (pcListening) { stopMicPC(); return; }
+  if (!pcRecognition) pcRecognition = initPCRecognition();
+  if (!pcRecognition) { alert('浏览器不支持语音输入。请使用Chrome或Edge。'); return; }
+  try { pcRecognition.start(); } catch(ex) {}
+  pcListening = true;
+  document.getElementById('mic-btn-pc').classList.add('active');
+}
+
+function stopMicPC() {
+  if (pcRecognition) { try { pcRecognition.stop(); } catch(ex) {} }
+  pcListening = false;
+  document.getElementById('mic-btn-pc').classList.remove('active');
+}
 </script>
 </body>
 </html>

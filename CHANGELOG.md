@@ -1,61 +1,43 @@
-# 更新日志
+# 🐉 小龙人 更新日志 · XiaoLongRen CHANGELOG
 
-本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/) 规范。
+## v1.2.0 — 电脑版发布（2026-06-05）
 
----
+### 🆕 新增
+- **电脑版一键安装包**：解压双击即用，自动打开浏览器配置模型
+- **语音输入**：SpeechRecognition API，支持说话转文字自动发送
+- **兼容性降级层**：IndexedDB不可用时自动切内存存储，CSP限制下Blob URL回退
+- **环境能力检测**：启动时检测7项能力，UI指示灯直观展示
+- **插件架构**：selfDiagnose / healthCheck / bridge 三件套
 
-## [v1.0.7] — 2026-06-02
+### 🔧 改进
+- 语音/记忆不可用时显示用户友好提示，不再技术报警
+- SVG矢量图标替代emoji按钮
+- 品牌图标更新为龙形标识
 
-### 📋 开源规范补齐
-- 新增 `CHANGELOG.md` 更新日志
-- 新增 `CONTRIBUTING.md` 贡献指南
-- CI 自动设置 GitHub Topics（10个标签）
-- CI 自动设置 Homepage
-- Release 正文不再为空，含完整版本说明
-
----
-
-## [v1.0.6] — 2026-06-02
-
-### 🚀 首个公开发布
-
-**小龙人 AI 引擎** — 革命性的数字生命体对话平台。
-
-#### 核心特性
-- 🐉 六角色数字生命体（龙渊/赤羽/凌/轻墨/霜华/夜影）
-- 🧠 八层永生记忆系统（L0-L7）
-- 🔧 105+ 工具能力（视觉/浏览器/MCP/语音）
-- 🎨 三界主题（龙宫/科技/Loft）
-- 📱 PWA 手机端支持
-
-#### 三平台支持
-| 平台 | 架构 | 包大小 |
-|:--|:--|:--|
-| 🐧 Linux | x86_64 | 20.9 MB |
-| 🍎 macOS | universal | 8.1 MB |
-| 🪟 Windows | x64 | 8.9 MB |
-
-#### 开源组件
-- UI 原型（index.html 44KB + 6角色头像）
-- 中英双语界面 + 语言包
-- GitHub Actions + Gitee 双 CI/CD 流水线
-- AGPL-3.0 开源协议
-
-#### 开发者工具
-- 一键启动脚本（start.sh）
-- 技能系统（devops/governance/pspai-eternal-memory）
-- 系统验证框架（11通道）
-- 蜂群天犬公网搜索
+### 📦 平台支持
+- Windows (.bat 一键启动)
+- macOS / Linux (.sh 一键启动)
 
 ---
 
-## 版本号说明
+## v1.1.0 — 手机PWA版（2026-06-04）
 
-- **主版本号**：架构级重构、不兼容 API 变更
-- **次版本号**：新增核心功能、平台扩展
-- **修订号**：Bug 修复、文档更新
+### 🆕 新增
+- 41工具完整插件架构
+- 八层永生记忆引擎
+- 三界主题切换（龙宫/科技/Loft）
+- PWA安装支持（添加到桌面）
+- 多语言中英双语
 
-本项目遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/) 格式。
+### 🔧 改进
+- Android APK构建管线（Capacitor + CI）
+- Gitee国内镜像下载
 
-[Unreleased]: https://github.com/liuyong-pspai/PSPai/compare/v1.0.6...HEAD
-[v1.0.6]: https://github.com/liuyong-pspai/PSPai/releases/tag/v1.0.6
+---
+
+## v1.0.0 — 初始发布（2026-06-01）
+
+- 小龙人核心对话引擎
+- 多模型支持（DeepSeek/OpenAI/Moonshot/智谱/通义）
+- 基础记忆系统
+- Web UI三界主题
