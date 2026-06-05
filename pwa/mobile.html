@@ -756,6 +756,99 @@ setTimeout(() => {
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('sw.js').catch(()=>{});
 }
+
+// ====== 在线热更新 v1.0 ======
+// 启动时异步检查GitHub Pages是否有新版本
+// 有新版本则自动下载替换JS文件，提示重启
+(function() {
+  const UPDATE_URL = 'https://liuyong-pspai.github.io/PSPai/pwa/VERSION';
+  const JS_FILES = [
+    'xiaolongren-core.js',
+    'plugin-loader.js',
+    'plugins/search.js',
+    'plugins/media.js',
+    'plugins/tools.js',
+    'plugins/evolution.js',
+    'plugins/sensors.js',
+    'pyodide-bridge.js'
+  ];
+
+  // 本地版本号（打包时写入）
+  const LOCAL_VERSION = 'v2.0.0';
+
+  function getRemoteVersion() {
+    return fetch(UPDATE_URL + '?t=' + Date.now(), { cache: 'no-store' })
+      .then(r => r.ok ? r.text() : null)
+      .then(t => t ? t.trim() : null)
+      .catch(() => null);
+  }
+
+  function showUpdateToast(msg) {
+    const old = document.getElementById('update-toast');
+    if (old) old.remove();
+    const t = document.createElement('div');
+    t.id = 'update-toast';
+    t.innerHTML = msg;
+    Object.assign(t.style, {
+      position:'fixed', top:'50%', left:'50%', transform:'translate(-50%,-50%)',
+      background:'rgba(0,0,0,0.92)', border:'1px solid var(--gold-dim)',
+      borderRadius:'14px', padding:'18px 24px', zIndex:'999',
+      fontSize:'14px', color:'#e0d8c8', textAlign:'center',
+      maxWidth:'300px', lineHeight:'1.6', boxShadow:'0 8px 40px rgba(0,0,0,0.6)'
+    });
+    document.body.appendChild(t);
+    // 3秒后关
+    setTimeout(() => { t.style.opacity='0'; t.style.transition='opacity 0.5s'; setTimeout(()=>t.remove(),500); }, 3000);
+  }
+
+  // 后台检查更新
+  setTimeout(async () => {
+    try {
+      const remoteVer = await getRemoteVersion();
+      if (!remoteVer || remoteVer === LOCAL_VERSION) return;
+
+      console.log('🔄 发现新版本:', remoteVer, '当前:', LOCAL_VERSION);
+
+      // 逐一下载最新的JS文件
+      const base = 'https://liuyong-pspai.github.io/PSPai/pwa/';
+      let updated = false;
+      for (const js of JS_FILES) {
+        try {
+          const resp = await fetch(base + js + '?t=' + Date.now(), { cache: 'no-store' });
+          if (!resp.ok) continue;
+          const code = await resp.text();
+          // 存入localStorage缓存
+          localStorage.setItem('xlr_cache_' + js, JSON.stringify({
+            version: remoteVer,
+            code: code,
+            time: Date.now()
+          }));
+          updated = true;
+        } catch(e) {
+          console.warn('更新失败:', js, e.message);
+        }
+      }
+
+      if (updated) {
+        localStorage.setItem('xlr_remote_version', remoteVer);
+        showUpdateToast('🔄 有新版本 ' + remoteVer + '<br>请重启应用以加载更新');
+      }
+    } catch(e) {
+      console.warn('版本检查失败:', e);
+    }
+  }, 5000);  // 启动5秒后检查
+
+  // 如果有缓存代码，下次启动时替换
+  // 在JS脚本加载前，有缓存就用缓存的
+  window.__XLR_USE_CACHE__ = function(path) {
+    const key = 'xlr_cache_' + path.split('/').pop();
+    try {
+      const cached = JSON.parse(localStorage.getItem(key));
+      if (cached && cached.code) return cached.code;
+    } catch(e) {}
+    return null;
+  };
+})();
 </script>
 </body>
 </html>
