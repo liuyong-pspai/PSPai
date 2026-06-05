@@ -42,30 +42,25 @@ jobs:
 
       - name: Copy PWA files
         run: |
-          ls -la pwa/
           cp -r pwa/* app-build/www/
-          # APK entry point: use mobile.html as index.html
           cp app-build/www/mobile.html app-build/www/index.html
+          # Remove desktop-only files (not needed in APK)
+          rm -f app-build/www/launcher.py app-build/www/install.bat app-build/www/install.sh
+          rm -f app-build/www/xiaolongren-engine.py
+          echo "APK www files:"
+          du -sh app-build/www/
           ls -la app-build/www/
 
       - name: Download Pyodide (WASM Python)
         run: |
           echo "Downloading Pyodide v0.27.5..."
           cd app-build/www
-          curl -L -o pyodide.tar.bz2 "https://github.com/pyodide/pyodide/releases/download/0.27.5/pyodide-0.27.5.tar.bz2"
+          curl -L --max-time 120 -o pyodide.tar.bz2 "https://github.com/pyodide/pyodide/releases/download/0.27.5/pyodide-0.27.5.tar.bz2"
           tar -xjf pyodide.tar.bz2
           rm pyodide.tar.bz2
-          echo "Pyodide extracted:"
+          echo "Pyodide size:"
           du -sh pyodide/
-          ls pyodide/ | head -20
 
-      - name: Pre-download Python packages
-        run: |
-          # Download commonly used Pyodide packages (will be bundled in APK)
-          cd app-build/www/pyodide
-          # These are fetched at runtime but we pre-download for offline use
-          PACKAGES="sqlite3 openpyxl beautifulsoup4 html5lib"
-          echo "Packages to preload: $PACKAGES"
       - name: Add Android platform
         working-directory: app-build
         run: npx cap add android
@@ -76,20 +71,19 @@ jobs:
             app-build/android/app/src/main/res/values/strings.xml
           sed -i 's/android:usesCleartextTraffic="false"/android:usesCleartextTraffic="true"/' \
             app-build/android/app/src/main/AndroidManifest.xml 2>/dev/null || true
-          # Replace default Capacitor icons with 小龙人 icons
+          # Icons
           for density in mdpi hdpi xhdpi xxhdpi xxxhdpi; do
             cp android-app/res/mipmap-${density}/ic_launcher.png app-build/android/app/src/main/res/mipmap-${density}/ic_launcher.png
             cp android-app/res/mipmap-${density}/ic_launcher_round.png app-build/android/app/src/main/res/mipmap-${density}/ic_launcher_round.png 2>/dev/null || true
           done
-          # Remove adaptive icon XML so Android uses our PNG icons
           rm -f app-build/android/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml 2>/dev/null || true
           rm -f app-build/android/app/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml 2>/dev/null || true
           rm -f app-build/android/app/src/main/res/drawable/ic_launcher_foreground.xml 2>/dev/null || true
-          # Network security config for API access
+          # Network security
           cp android-app/res/xml/network_security_config.xml app-build/android/app/src/main/res/xml/
           sed -i 's|<application|<application android:networkSecurityConfig="@xml/network_security_config"|' \
             app-build/android/app/src/main/AndroidManifest.xml
-          # Fix Kotlin stdlib duplicate class conflict (Capacitor v8 known issue)
+          # Kotlin fix
           cat >> app-build/android/app/build.gradle << 'GRADLEEOF'
 
           configurations.all {
@@ -97,46 +91,22 @@ jobs:
               exclude group: 'org.jetbrains.kotlin', module: 'kotlin-stdlib-jdk8'
           }
           GRADLEEOF
+          # Check total www size before build
+          echo "Total www before APK build:"
+          du -sh app-build/www/
 
       - name: Build APK
         working-directory: app-build/android
         run: ./gradlew assembleDebug
+
+      - name: Check APK size
+        run: |
+          APK="app-build/android/app/build/outputs/apk/debug/app-debug.apk"
+          ls -lh $APK
+          echo "APK size: $(du -sh $APK | cut -f1)"
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: xiaolongren-apk
           path: app-build/android/app/build/outputs/apk/debug/app-debug.apk
-
-      - name: Upload to Gitee Release
-        env:
-          GITEE_TOKEN: 70b927d52f0f8970e14adfc57c4efb72
-        run: |
-          APK_PATH="app-build/android/app/build/outputs/apk/debug/app-debug.apk"
-          APK_NAME="xiaolongren-v1.5.0.apk"
-          
-          # Get or create Gitee release
-          RELEASE_RESP=$(curl -s "https://gitee.com/api/v5/repos/lii-the-unyielding/xiaolongren/releases/tags/v1.5.0?access_token=${GITEE_TOKEN}")
-          RELEASE_ID=$(echo "$RELEASE_RESP" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('id','') if d else '')")
-          
-          if [ -z "$RELEASE_ID" ]; then
-            echo "Creating new release..."
-            RELEASE_RESP=$(curl -s -X POST -H "Content-Type: application/json" \
-              -d '{"tag_name":"v1.5.0","name":"v1.5.0 - 全功能本地引擎","body":"八层记忆/三刀防火墙/六步闭环全硬连，本地引擎运行不依赖云端","target_commitish":"master"}' \
-              "https://gitee.com/api/v5/repos/lii-the-unyielding/xiaolongren/releases?access_token=${GITEE_TOKEN}")
-            RELEASE_ID=$(echo "$RELEASE_RESP" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('id','') if d else '')")
-          fi
-          
-          echo "Release ID: $RELEASE_ID"
-          
-          if [ -z "$RELEASE_ID" ]; then
-            echo "Failed to get or create release"
-            exit 1
-          fi
-          
-          # Upload APK
-          curl -s -X POST \
-            -F "file=@${APK_PATH}" \
-            "https://gitee.com/api/v5/repos/lii-the-unyielding/xiaolongren/releases/${RELEASE_ID}/attach_files?name=${APK_NAME}&access_token=${GITEE_TOKEN}"
-          
-          echo "Done uploading to Gitee"
