@@ -1,4 +1,6 @@
-
-# secrets
-.env
 *.env
+.env
+pwa/__pycache__/
+pwa/pyodide/
+pwa/pyodide.tar.bz2
+# secrets

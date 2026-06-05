@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; connect-src 'self' https://api.deepseek.com https://api.openai.com https://api.anthropic.com https://api.moonshot.cn https://open.bigmodel.cn https://dashscope.aliyuncs.com; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; frame-ancestors 'none'; base-uri 'self';">
 <title>🐉 小龙人 | XiaoLongRen</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -147,6 +148,7 @@ html,body{width:100%;height:100%;overflow:hidden;font-family:'PingFang SC','Micr
 .compat-err{background:#f44;box-shadow:0 0 6px rgba(255,68,68,0.5)}
 </style>
 <!-- 插件体系 v6.0：内核+加载器+5插件 -->
+<script src="pyodide-bridge.js"></script>
 <script src="xiaolongren-core.js"></script>
 <script src="plugin-loader.js"></script>
 <script src="plugins/search.js"></script>
@@ -298,6 +300,9 @@ html,body{width:100%;height:100%;overflow:hidden;font-family:'PingFang SC','Micr
 <input type="file" id="cust-file" accept="image/*" onchange="handleAvatarUpload(event)">
 
 <script>
+// ====== HTML安全转义（防XSS） ======
+function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
 // ====== 国际化 (i18n) — 多语言包架构 ======
 // lang/index.json 定义可用语言。加语言：丢JSON+更新index.json即可。
 var AVAIL_LANGS = [];      // [{code:'zh', name:'中文', native:'中'}, ...]
@@ -471,7 +476,8 @@ function loadMessages(){
   var stream=document.getElementById('stream');
   var html='';
   msgs.forEach(function(m){
-    html+='<div class="msg-row'+(m.role==='user'?' rtl':'')+'"><div class="msg-bbl">'+m.text+'</div></div>';
+    var text = esc(m.text);
+    html+='<div class="msg-row'+(m.role==='user'?' rtl':'')+'"><div class="msg-bbl">'+text+'</div></div>';
   });
   stream.innerHTML=html;
   stream.scrollTop=stream.scrollHeight;
@@ -518,7 +524,7 @@ function buildRoles(){
     d.className='rc'+(i===cur?' sel':'');
     d.style.setProperty('--ic',c.accent);d.style.setProperty('--irgb',c.rgb);
     var rname=getCharName(i);
-    d.innerHTML='<div class="rsvg"><img src="'+c.img+'"></div><div class="rn">'+c.emoji+' '+rname+'</div><div class="rt">'+c.tag.split('·')[0]+'</div><div class="rchk">✅</div>';
+    d.innerHTML='<div class="rsvg"><img src="'+c.img+'"></div><div class="rn">'+esc(c.emoji+' '+rname)+'</div><div class="rt">'+esc(c.tag.split('·')[0])+'</div><div class="rchk">✅</div>';
     d.onclick=function(){ac(i);hidePanel('role')};
     g.appendChild(d);
   });
@@ -529,7 +535,7 @@ function buildRoles(){
     cd.style.setProperty('--ic','#ffd700');cd.style.setProperty('--irgb','255,215,0');
     if(img){
       var cname=getCharName(idx);
-      cd.innerHTML='<div class="rsvg"><img src="'+img+'"></div><div class="rn">📷 '+cname+'</div><div class="rt" style="display:flex;gap:8px;justify-content:center;font-size:7px"><span onclick="event.stopPropagation();editCustomNameFromPanel('+idx+')" style="color:var(--accent);cursor:pointer">'+t('rename')+'</span><span onclick="event.stopPropagation();clearCustomAvatar('+s+')" style="color:#e04040;cursor:pointer">'+t('remove')+'</span></div><div class="rchk">✅</div>';
+      cd.innerHTML='<div class="rsvg"><img src="'+img+'"></div><div class="rn">📷 '+esc(cname)+'</div><div class="rt" style="display:flex;gap:8px;justify-content:center;font-size:7px"><span onclick="event.stopPropagation();editCustomNameFromPanel('+idx+')" style="color:var(--accent);cursor:pointer">'+esc(t('rename'))+'</span><span onclick="event.stopPropagation();clearCustomAvatar('+s+')" style="color:#e04040;cursor:pointer">'+esc(t('remove'))+'</span></div><div class="rchk">✅</div>';
       cd.onclick=(function(i){return function(){ac(i);hidePanel('role')}})(idx);
     }else{
       cd.innerHTML='<div class="rsvg" style="display:flex;align-items:center;justify-content:center;font-size:20px">📷</div><div class="rn">'+t('add_avatar')+'</div><div class="rt" style="font-size:9px">'+(s+1)+'/3</div><div class="rchk">✅</div>';
@@ -560,7 +566,7 @@ function saveApiKey(){}
 
 setTimeout(function(){renderModels()}, 100);
 setTimeout(function(){renderModels()}, 100);
-function addMemo(){var i=document.getElementById('memo-input'),t=i.value.trim();if(!t)return;var d=document.createElement('div');d.className='memo-item';d.innerHTML='<div class="mdot"></div><div class="mtxt">'+t+'</div><div class="mact" onclick="delMemo(this)">✕</div>';document.getElementById('memo-list').appendChild(d);i.value=''}
+function addMemo(){var i=document.getElementById('memo-input'),t=i.value.trim();if(!t)return;var d=document.createElement('div');d.className='memo-item';d.innerHTML='<div class="mdot"></div><div class="mtxt">'+esc(t)+'</div><div class="mact" onclick="delMemo(this)">✕</div>';document.getElementById('memo-list').appendChild(d);i.value=''}
 function delMemo(el){el.parentElement.remove()}
 var perms={read:true,speak:true,act:false,admin:false};
 function tg(n){perms[n]=!perms[n];document.getElementById('sw-'+n).classList.toggle('on',perms[n])}
@@ -586,34 +592,74 @@ function sendChat() {
   if (!msg) return;
   var stream = document.getElementById('stream');
 
+  // 安全追加消息
+  function appendMsg(text, isUser, isError) {
+    var div = document.createElement('div');
+    div.className = 'msg-row' + (isUser ? ' rtl' : '');
+    var bbl = document.createElement('div');
+    bbl.className = 'msg-bbl';
+    bbl.textContent = text;
+    div.appendChild(bbl);
+    if (!isUser && !isError) {
+      var spk = document.createElement('span');
+      spk.className = 'spk-btn';
+      spk.textContent = '🔊';
+      spk.onclick = function(){ speak(this); };
+      bbl.appendChild(spk);
+    }
+    stream.appendChild(div);
+  }
+
   // 检查配置
   if (!hasConfig()) {
-    stream.innerHTML += '<div class="msg-row"><div class="msg-bbl">⚙️ 还没配置大模型～ 点右上角设置，选提供商+填API Key就能用啦。</div></div>';
+    appendMsg('⚙️ 还没配置大模型～ 点右上角设置，选提供商+填API Key就能用啦。', false, false);
     inp.value = ''; stream.scrollTop = stream.scrollHeight;
     return;
   }
 
-  stream.innerHTML += '<div class="msg-row rtl"><div class="msg-bbl">' + msg + '</div></div>';
+  appendMsg(msg, true, false);
   saveMessage('user', msg);
   inp.value = ''; stream.scrollTop = stream.scrollHeight;
   document.getElementById('speak-indicator').classList.add('active');
 
   var engine = getEngine();
   if (!engine) {
-    stream.innerHTML += '<div class="msg-row"><div class="msg-bbl">❌ 引擎初始化失败，请检查配置。</div></div>';
+    appendMsg('❌ 引擎初始化失败，请检查配置。', false, true);
     document.getElementById('speak-indicator').classList.remove('active');
     return;
   }
 
   var charData = cur < 0 ? null : chars[cur];
   var sysPrompt = charData ? charData.sys : '你是小龙人，一个能干的AI助手。';
+
+  // Pyodide优先 → JS引擎降级 → 直连LLM兜底
+  if (typeof runAgent !== 'undefined') {
+    runAgent(msg, sysPrompt).then(function(reply) {
+      appendMsg(reply, false, false);
+      saveMessage('bot', reply);
+      stream.scrollTop = stream.scrollHeight;
+      document.getElementById('speak-indicator').classList.remove('active');
+    }).catch(function(err) {
+      appendMsg(err.message || '网络不通，请检查连接和API配置', false, true);
+      document.getElementById('speak-indicator').classList.remove('active');
+    });
+    return;
+  }
+
+  // JS引擎兜底
+  var engine = getEngine();
+  if (!engine) {
+    appendMsg('❌ 引擎初始化失败，请检查配置。', false, true);
+    document.getElementById('speak-indicator').classList.remove('active');
+    return;
+  }
   engine.chat(msg, sysPrompt).then(function(reply) {
-    stream.innerHTML += '<div class="msg-row"><div class="msg-bbl">' + reply + '<span class="spk-btn" onclick="speak(this)">🔊</span></div></div>';
+    appendMsg(reply, false, false);
     saveMessage('bot', reply);
     stream.scrollTop = stream.scrollHeight;
     document.getElementById('speak-indicator').classList.remove('active');
   }).catch(function(err) {
-    stream.innerHTML += '<div class="msg-row"><div class="msg-bbl">❌ ' + (err.message || '网络不通，请检查连接和API配置') + '</div></div>';
+    appendMsg(err.message || '网络不通，请检查连接和API配置', false, true);
     document.getElementById('speak-indicator').classList.remove('active');
   });
 }

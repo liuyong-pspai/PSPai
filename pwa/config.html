@@ -300,6 +300,12 @@ let currentStep = 0;
 // ============================================================
 // 渲染
 // ============================================================
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.appendChild(document.createTextNode(str));
+  return div.innerHTML;
+}
+
 function render() {
   const tdata = i18n[lang];
   
@@ -316,9 +322,9 @@ function render() {
   grid.innerHTML = providers.map(p => `
     <div class="provider-card ${selectedProvider === p.id ? 'selected' : ''}" 
          onclick="selectProvider('${p.id}')" id="card-${p.id}">
-      <div class="name">${tdata.providerNames[p.id] || p.id}</div>
-      <div class="info">${p.models.slice(0,2).join(' / ') || tdata.customUrl}</div>
-      ${p.tag ? `<span class="tag tag-${p.tag}">${tdata[p.tag] || p.tag}</span>` : ''}
+      <div class="name">${escapeHtml(tdata.providerNames[p.id] || p.id)}</div>
+      <div class="info">${p.models.slice(0,2).join(' / ') || escapeHtml(tdata.customUrl)}</div>
+      ${p.tag ? `<span class="tag tag-${p.tag}">${escapeHtml(tdata[p.tag] || p.tag)}</span>` : ''}
     </div>
   `).join('');
   
@@ -327,7 +333,7 @@ function render() {
   const sel = document.getElementById('modelSelect');
   if (pdata && pdata.models.length > 0) {
     sel.innerHTML = pdata.models.map(m => 
-      `<option value="${m}" ${m === selectedModel ? 'selected' : ''}>${m}</option>`
+      `<option value="${escapeHtml(m)}" ${m === selectedModel ? 'selected' : ''}>${escapeHtml(m)}</option>`
     ).join('');
     document.getElementById('group-model').classList.remove('hidden');
     if (!pdata.models.includes(selectedModel)) {
@@ -364,16 +370,21 @@ function render() {
     </div>
   `).join('');
   
-  // 确认页摘要
+  // 确认页摘要（安全构建DOM）
   const summary = document.getElementById('config-summary');
   if (summary) {
     const provName = tdata.providerNames[selectedProvider] || selectedProvider;
     const charData = characters.find(c => c.id === selectedCharacter);
-    summary.innerHTML = `
-      <div style="margin-bottom:8px;">🔌 <strong>${provName}</strong> · ${selectedModel || '自定义'}</div>
-      <div style="margin-bottom:8px;">🔑 ${apiKey ? '●●●●' + apiKey.slice(-4) : '(未设置)'}</div>
-      <div>${charData?.emoji || ''} <strong>${charData?.name || selectedCharacter}</strong> · ${charData?.desc || ''}</div>
-    `;
+    summary.innerHTML = '';
+    const l1 = document.createElement('div'); l1.style.marginBottom = '8px';
+    l1.textContent = '🔌 ' + provName + ' · ' + (selectedModel || '自定义');
+    summary.appendChild(l1);
+    const l2 = document.createElement('div'); l2.style.marginBottom = '8px';
+    l2.textContent = '🔑 ' + (apiKey ? '●●●●' + apiKey.slice(-4) : '(未设置)');
+    summary.appendChild(l2);
+    const l3 = document.createElement('div');
+    l3.textContent = (charData?.emoji || '') + ' ' + (charData?.name || selectedCharacter) + ' · ' + (charData?.desc || '');
+    summary.appendChild(l3);
   }
   
   updateStepUI();
@@ -437,8 +448,8 @@ function nextStep() {
     
     selectedModel = document.getElementById('modelSelect').value || selectedModel;
     const baseUrl = document.getElementById('baseUrl').value.trim();
-    if (baseUrl && !baseUrl.startsWith('http')) {
-      showStatus('🔗 自定义地址格式不对，需要以 http:// 或 https:// 开头', 'error');
+    if (baseUrl && !baseUrl.startsWith('https://')) {
+      showStatus('🔗 自定义地址必须以 https:// 开头，API Key通过网络发送必须加密传输', 'error');
       return;
     }
     if (baseUrl) {
@@ -503,11 +514,21 @@ async function testConnection() {
   const endpoint = baseUrl.replace(/\/+$/, '') + '/chat/completions';
   
   const steps = [];
+  function addStep(msg) {
+    const div = document.createElement('div');
+    div.style.margin = '4px 0';
+    div.textContent = msg;
+    steps.push(div);
+    // 实时更新
+    resultEl.innerHTML = '';
+    steps.forEach(s => resultEl.appendChild(s.cloneNode(true)));
+  }
   
   try {
     // Step 1: DNS/网络可达性
-    steps.push('🔍 检查网络...');
-    resultEl.innerHTML = steps.map(s => '<div>' + s + '</div>').join('');
+    addStep('🔍 检查网络...');
+    resultEl.innerHTML = '';
+    steps.forEach(s => resultEl.appendChild(s.cloneNode(true)));
     
     const resp = await fetch(endpoint, {
       method: 'POST',
@@ -526,29 +547,28 @@ async function testConnection() {
     const respText = await resp.text();
     
     if (resp.ok) {
-      steps.push('✅ <b style="color:#2ecc71">连接成功！</b> ' + selectedProvider + ' / ' + model + ' 工作正常');
+      addStep('✅ 连接成功！ ' + selectedProvider + ' / ' + model + ' 工作正常');
     } else {
       let errInfo = '';
       try {
         const errJson = JSON.parse(respText);
-        errInfo = errJson.error?.message || respText;
+        errInfo = errJson.error?.message || respText.substring(0, 200);
       } catch(e) { errInfo = respText.substring(0, 200); }
       
       if (resp.status === 401 || resp.status === 403) {
-        steps.push('🔴 <b style="color:#e74c3c">API Key 无效</b> — 请检查 Key 是否正确（状态码 ' + resp.status + '）');
+        addStep('🔴 API Key 无效 — 请检查 Key 是否正确（状态码 ' + resp.status + '）');
       } else if (resp.status === 404) {
-        steps.push('🔴 <b style="color:#e74c3c">模型名错误</b> — "' + model + '" 不存在。请用 <b>deepseek-chat</b>（状态码 404）');
+        addStep('🔴 模型名错误 — "' + model + '" 不存在。请用 deepseek-chat（状态码 404）');
       } else {
-        steps.push('🔴 <b style="color:#e74c3c">API 错误 ' + resp.status + '</b>: ' + errInfo);
+        addStep('🔴 API 错误 ' + resp.status + ': ' + errInfo);
       }
     }
   } catch(err) {
-    steps.push('🔴 <b style="color:#e74c3c">网络不通</b>: ' + err.message);
-    steps.push('💡 可能原因：手机无网络 / API地址被墙 / 防火墙拦截');
-    steps.push('💡 电脑能连不代表手机能连，请确认手机网络正常');
+    addStep('🔴 网络不通: ' + err.message);
+    addStep('💡 可能原因：手机无网络 / API地址被墙 / 防火墙拦截');
+    addStep('💡 电脑能连不代表手机能连，请确认手机网络正常');
   }
   
-  resultEl.innerHTML = steps.map(s => '<div style="margin:4px 0">' + s + '</div>').join('');
   btn.disabled = false;
 }
 

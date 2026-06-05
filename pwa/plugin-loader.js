@@ -143,6 +143,14 @@ const XLR = (function() {
     // ============================================================
     async loadPluginFile(url) {
       try {
+        // 安全校验：只允许同域相对路径或同源绝对路径
+        if (!url || url.startsWith('http://') || url.startsWith('//')) {
+          throw new Error(`不安全的插件URL: ${url}。只允许相对路径或HTTPS`);
+        }
+        if (url.startsWith('https://') && !url.includes(window.location.hostname)) {
+          throw new Error(`跨域插件URL被拒绝: ${url}`);
+        }
+        
         const resp = await fetch(url);
         if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
         const code = await resp.text();

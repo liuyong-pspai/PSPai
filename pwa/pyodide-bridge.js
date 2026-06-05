@@ -40,16 +40,14 @@ async function loadPyodideEngine() {
         const engineCode = await engineResponse.text();
         pyodide.runPython(engineCode);
         
-        // 初始化引擎
+        // 初始化引擎（安全传参：通过globals.set避免注入）
         const cfg = getConfig();
-        const initCode = `
-init_engine(
-    api_key="${cfg.api_key}",
-    provider="${cfg.provider || 'deepseek'}",
-    model="${cfg.model || 'deepseek-chat'}"
-)
-`;
-        pyodide.runPython(initCode);
+        pyodide.globals.set('_js_api_key', cfg.api_key || '');
+        pyodide.globals.set('_js_provider', cfg.provider || 'deepseek');
+        pyodide.globals.set('_js_model', cfg.model || 'deepseek-chat');
+        pyodide.runPython(`
+init_engine(api_key=_js_api_key, provider=_js_provider, model=_js_model)
+`);
         
         engineReady = true;
         console.log('✅ 小龙人引擎v6.0就绪');
@@ -81,14 +79,13 @@ init_engine(
 async function runAgent(userMsg, charSys) {
     try {
         if (engineReady && pyodide && !pyodide.jsFallback) {
-            // Pyodide Python引擎
-            const safeMsg = userMsg.replace(/'/g, "\\'").replace(/\n/g, '\\n');
-            const safeChar = (charSys || '').replace(/'/g, "\\'").replace(/\n/g, '\\n');
-            
+            // Pyodide Python引擎（安全传参：通过globals.set避免注入）
+            pyodide.globals.set('_js_user_msg', userMsg);
+            pyodide.globals.set('_js_char_sys', charSys || '');
             const result = pyodide.runPython(`
 import asyncio
 async def _run():
-    return await run_engine('${safeMsg}', '${safeChar}')
+    return await run_engine(_js_user_msg, _js_char_sys)
 asyncio.ensure_future(_run())
 _result = await _run()
 _result
@@ -220,7 +217,17 @@ globalThis.jsExecTool = async function(name, argsJson) {
         'read_file': () => localStorage.getItem('f_' + args.path) || '{"error":"不存在"}',
         'write_file': () => { localStorage.setItem('f_' + args.path, args.content); return '{"status":"ok"}'; },
         'get_time': () => JSON.stringify({iso: new Date().toISOString(), local: new Date().toLocaleString('zh-CN')}),
-        'calculator': () => { try { return JSON.stringify({result: eval(args.expression)}); } catch(e) { return '{"error":"'+e.message+'"}'; } },
+        'calculator': () => { 
+            try { 
+                // 安全数学表达式计算（只允许数字和运算符）
+                const expr = (args.expression || '').replace(/[^0-9+\-*/.() ]/g, '');
+                if (!expr) throw new Error('非法表达式');
+                const result = Function('"use strict"; return (' + expr + ')')();
+                return JSON.stringify({result: result}); 
+            } catch(e) { 
+                return '{"error":"计算表达式无效"}'; 
+            } 
+        },
         'sql_query': () => JSON.stringify({status:'unavailable', note:'SQLite需Pyodide环境，当前JS降级模式不可用。请等Python引擎加载完成。'}),
         'pdf_extract': () => JSON.stringify({status:'unavailable', note:'PDF提取需Pyodide环境。请等Python引擎加载完成。'}),
         'excel_read': () => JSON.stringify({status:'unavailable', note:'Excel读取需Pyodide环境。请等Python引擎加载完成。'}),
