@@ -44,9 +44,11 @@ jobs:
         run: |
           cp -r pwa/* app-build/www/
           cp app-build/www/mobile.html app-build/www/index.html
-          # Remove desktop-only files (not needed in APK)
+          # APK只需要浏览器前端文件，去掉桌面专用文件
           rm -f app-build/www/launcher.py app-build/www/install.bat app-build/www/install.sh
-          rm -f app-build/www/xiaolongren-engine.py
+          rm -f app-build/www/install_macos.sh app-build/www/uninstall.bat app-build/www/uninstall.sh app-build/www/uninstall_macos.sh
+          # Pyodide引擎源码保留（pyodide-bridge.js在运行时fetch加载）
+          # Pyodide运行时在下面单独下载
           echo "APK www files:"
           du -sh app-build/www/
           ls -la app-build/www/
