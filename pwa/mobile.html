@@ -66,9 +66,10 @@ html,body{width:100%;height:100%;overflow:hidden;font-family:'PingFang SC','Micr
 #text-input{flex:1;padding:10px 14px;border-radius:20px;border:1px solid rgba(255,255,255,0.08);background:rgba(255,255,255,0.04);color:#e0d8c8;font-size:15px;outline:none;resize:none;max-height:80px;font-family:inherit}
 #text-input:focus{border-color:var(--gold-dim)}
 #text-input::placeholder{color:#444}
-#send-btn{width:40px;height:40px;border-radius:50%;border:none;background:var(--gold);color:#000;font-size:16px;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;transition:all 0.15s}
+#send-btn{width:40px;height:40px;border-radius:50%;border:none;background:var(--gold);color:#000;font-size:16px;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;transition:all 0.15s;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
 #send-btn:active{transform:scale(1.15)}
-#send-btn:disabled{opacity:0.3}
+#send-btn:disabled{opacity:0.3;pointer-events:none}
+#send-btn.sending{opacity:0.5;pointer-events:none}
 #mic-btn{width:40px;height:40px;border-radius:50%;border:2px solid var(--gold-dim);background:rgba(200,168,78,0.08);cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;transition:all 0.15s}
 #mic-btn:active,#mic-btn.active{background:var(--gold);border-color:var(--gold);transform:scale(1.1)}
 #mic-btn .icon{width:18px;height:18px;pointer-events:none}
@@ -150,7 +151,7 @@ html,body{width:100%;height:100%;overflow:hidden;font-family:'PingFang SC','Micr
     <button id="mic-btn" ontouchstart="startTalk(event)" ontouchend="stopTalk(event)" onmousedown="startTalk(event)" onmouseup="stopTalk(event)">
       <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg></span>
     </button>
-    <button id="send-btn" onclick="sendText()">➤</button>
+    <button id="send-btn" type="button" ontouchend="sendText();event.preventDefault()" onclick="sendText()">➤</button>
   </div>
 </div>
 
@@ -321,6 +322,7 @@ async function callLLM(userText) {
 
   isLoading = true;
   document.getElementById('send-btn').disabled = true;
+  document.getElementById('send-btn').dataset.loadingSince = Date.now().toString();
 
   try {
     const reply = await runAgent(userText, charData.sys);
@@ -345,12 +347,29 @@ async function callLLM(userText) {
   } finally {
     isLoading = false;
     document.getElementById('send-btn').disabled = false;
+    delete document.getElementById('send-btn').dataset.loadingSince;
   }
 }
 
 // ====== 输入 ======
 function sendText() {
-  if (isLoading) return;
+  // 强制重置：如果isLoading卡死超过3秒，解除锁定
+  if (isLoading) {
+    const btn = document.getElementById('send-btn');
+    if (btn && btn.dataset.loadingSince) {
+      const elapsed = Date.now() - parseInt(btn.dataset.loadingSince);
+      if (elapsed > 8000) {
+        console.warn('⏰ isLoading卡死超过8秒，强制解除');
+        isLoading = false;
+        btn.disabled = false;
+        delete btn.dataset.loadingSince;
+      } else {
+        return;
+      }
+    } else {
+      return;
+    }
+  }
   const inp = document.getElementById('text-input');
   const text = inp.value.trim();
   if (!text) return;
