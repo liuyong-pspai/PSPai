@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="pwa/icon-192.png" width="96" height="96" alt="小龙人">
+  <img src="https://github.com/liuyong-pspai/PSPai/raw/master/frontend/pwa/html/icon-192.png" width="96" height="96" alt="小龙人">
 </p>
 
 <h1 align="center">🐉 小龙人 · 数字生命体</h1>
