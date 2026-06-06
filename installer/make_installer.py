@@ -101,32 +101,50 @@ def build_windows():
     print("\n--- 🪟 Windows 安装包 ---")
     prepare_build()
 
-    # 安装引导bat
+    # 复制已有的 start.bat（启动逻辑已完善）
+    start_bat_src = REPO_ROOT / "start.bat"
+    if start_bat_src.exists():
+        shutil.copy2(start_bat_src, BUILD_DIR / "start.bat")
+
+    # === 桌面快捷方式脚本（独立ps1，避免内联转义地狱） ===
+    ps1 = BUILD_DIR / "create-shortcut.ps1"
+    ps1.write_text(r'''# XiaoLongRen Desktop Shortcut Creator
+$ErrorActionPreference = "Stop"
+$WshShell = New-Object -ComObject WScript.Shell
+$Desktop = [Environment]::GetFolderPath("Desktop")
+$Shortcut = $WshShell.CreateShortcut("$Desktop\XiaoLongRen.lnk")
+$Shortcut.TargetPath = "C:\XiaoLongRen\start.bat"
+$Shortcut.WorkingDirectory = "C:\XiaoLongRen"
+$Shortcut.IconLocation = "C:\XiaoLongRen\frontend\pwa\assets\icons\icon-192.png,0"
+$Shortcut.Description = "AI Digital Companion"
+$Shortcut.Save()
+Write-Host "Desktop shortcut created: $Desktop\XiaoLongRen.lnk"
+''', encoding='utf-8-sig')
+
+    # === 安装引导bat（简洁，无转义问题） ===
     bat = BUILD_DIR / "install.bat"
-    bat.write_bytes(b'@echo off\r\n'
-        b'chcp 65001 >nul\r\n'
-        b'title XiaoLongRen Setup\r\n'
-        b'echo ======================================\r\n'
-        b'echo   XiaoLongRen Setup\r\n'
-        b'echo ======================================\r\n'
-        b'echo.\r\n'
-        b'set "D=C:\\XiaoLongRen"\r\n'
-        b'echo [1/5] Copying files to %D%...\r\n'
-        b'xcopy /E /I /Y /Q "%~dp0*" "%D%" >nul\r\n'
-        b'cd /d "%D%"\r\n'
-        b'echo [2/5] Creating desktop shortcut...\r\n'
-        b'powershell -NoProfile -ExecutionPolicy Bypass -Command "$s=(New-Object -ComObject WScript.Shell).CreateShortcut([Environment]::GetFolderPath(\'Desktop\')+\'\\XiaoLongRen.lnk\');$s.TargetPath=\'pythonw\';$s.Arguments=\'%D%\\launcher.py\';$s.WorkingDirectory=\'%D%\';$s.Save()"\r\n'
-        b'echo [3/5] Checking Python...\r\n'
-        b'python --version >nul 2>&1 || (echo Python not found! Please install Python 3.10+ from python.org && pause && exit /b 1)\r\n'
-        b'echo [4/5] Installing dependencies (this may take a minute)...\r\n'
-        b'python -m pip install -q PyYAML Pillow requests hermes-agent >nul 2>&1\r\n'
-        b'echo [5/5] Launching...\r\n'
-        b'start "" pythonw "%D%\\launcher.py"\r\n'
-        b'echo.\r\n'
-        b'echo   Done! Browser opens for model setup.\r\n'
-        b'echo   Desktop shortcut created.\r\n'
-        b'timeout /t 3 >nul\r\n'
-        b'exit\r\n')
+    bat.write_text('''@echo off
+chcp 65001 >nul
+title XiaoLongRen Setup
+echo ============================================
+echo   XiaoLongRen Setup
+echo ============================================
+echo.
+set "D=C:\\XiaoLongRen"
+echo [1/3] Copying files to %D%...
+if exist "%D%" rmdir /s /q "%D%"
+xcopy /E /I /Y /Q "%~dp0*" "%D%" >nul
+cd /d "%D%"
+echo [2/3] Creating desktop shortcut...
+powershell -NoProfile -ExecutionPolicy Bypass -File "%D%\\create-shortcut.ps1"
+echo [3/3] Done!
+echo.
+echo   Double-click XiaoLongRen on your desktop to start!
+echo   Or run: C:\\XiaoLongRen\\start.bat
+echo.
+timeout /t 5 >nul
+exit
+''', encoding='utf-8')
 
     # 打包zip
     step("创建安装包ZIP")
