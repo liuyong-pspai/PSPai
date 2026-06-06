@@ -32,18 +32,17 @@ jobs:
           set -e
           mkdir -p app-build/www
           cp -r frontend/pwa/html/* app-build/www/
+          # 全功能版：保留Pyodide核心运行时（WASM引擎+Python标准库），只去重包
+          # KEEP: pyodide.asm.wasm(10MB), python_stdlib.zip(2MB), pyodide.js, pyodide.mjs, python
+          # 包(.whl)首次启动时按需通过micropip从CDN加载，不占APK体积
+          cp -r frontend/pwa/pyodide app-build/www/pyodide
+          # 只删包文件，保留核心运行时
+          rm -f app-build/www/pyodide/*.whl app-build/www/pyodide/*.whl.metadata 2>/dev/null || true
+          rm -f app-build/www/pyodide/*.tar app-build/www/pyodide/*.so 2>/dev/null || true
+          rm -f app-build/www/pyodide/pyodide.js.map app-build/www/pyodide/pyodide.mjs.map 2>/dev/null || true
+          rm -f app-build/www/pyodide/package.json 2>/dev/null || true
+          echo "Pyodide核心保留: $(du -sh app-build/www/pyodide/ | cut -f1)"
           cp app-build/www/mobile.html app-build/www/index.html
-          # 清理：CI不下载Pyodide WASM运行时（首次打开APK时后台自动下载）
-          # 保留pyodide.js加载器（14KB），只清理WASM和whl包
-          for f in app-build/www/pyodide/*.whl app-build/www/pyodide/*.whl.metadata \
-                   app-build/www/pyodide/*.wasm app-build/www/pyodide/*.zip \
-                   app-build/www/pyodide/*.tar app-build/www/pyodide/*.so \
-                   app-build/www/pyodide/pyodide.mjs app-build/www/pyodide/pyodide.mjs.map \
-                   app-build/www/pyodide/pyodide.js.map app-build/www/pyodide/python_stdlib.zip \
-                   app-build/www/pyodide/python app-build/www/pyodide/package.json; do
-            rm -f "$f" 2>/dev/null || true
-          done
-          rm -f app-build/www/pyodide-bridge.js 2>/dev/null || true
           rm -f app-build/www/server.py
           cd app-build
           npm init -y > /dev/null 2>&1
