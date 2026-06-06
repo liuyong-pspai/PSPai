@@ -1,90 +1,127 @@
-name: Build APK (原生WebView)
+name: Build APK (Capacitor)
+
 on:
   push:
-    paths: ['frontend/pwa/html/**', 'mobile/**', '.github/workflows/apk-build.yml']
+    paths:
+      - 'frontend/pwa/html/**'
+      - 'mobile/**'
+      - '.github/workflows/apk-build.yml'
     branches: [master]
   workflow_dispatch:
+
 permissions:
   contents: write
   actions: write
+
 jobs:
   build-apk:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
       - uses: actions/setup-java@v4
-        with: { distribution: 'temurin', java-version: '21' }
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
         with:
           packages: 'platforms;android-34 build-tools;34.0.0 platform-tools'
-      - name: Build APK
+
+      - name: Create Capacitor project
         run: |
-          set -e
-          APP=app-build
-          mkdir -p $APP/app/src/main/java/com/pspai/xiaolongren
-          mkdir -p $APP/app/src/main/res/values
-          mkdir -p $APP/app/src/main/assets/public
-          # Copy web files
-          cp -r frontend/pwa/html/* $APP/app/src/main/assets/public/
-          cp $APP/app/src/main/assets/public/mobile.html $APP/app/src/main/assets/public/index.html
-          rm -f $APP/app/src/main/assets/public/server.py
-          # MainActivity.java from base64
-          echo cGFja2FnZSBjb20ucHNwYWkueGlhb2xvbmdyZW47CmltcG9ydCBhbmRyb2lkLm9zLkJ1bmRsZTsKaW1wb3J0IGFuZHJvaWQud2Via2l0LldlYlNldHRpbmdzOwppbXBvcnQgYW5kcm9pZC53ZWJraXQuV2ViVmlldzsKaW1wb3J0IGFuZHJvaWQud2Via2l0LldlYlZpZXdDbGllbnQ7CnB1YmxpYyBjbGFzcyBNYWluQWN0aXZpdHkgZXh0ZW5kcyBhbmRyb2lkLmFwcC5BY3Rpdml0eSB7CiAgICBwcml2YXRlIFdlYlZpZXcgd3Y7CiAgICBAT3ZlcnJpZGUKICAgIHByb3RlY3RlZCB2b2lkIG9uQ3JlYXRlKEJ1bmRsZSBiKSB7CiAgICAgICAgc3VwZXIub25DcmVhdGUoYik7CiAgICAgICAgd3YgPSBuZXcgV2ViVmlldyh0aGlzKTsKICAgICAgICBzZXRDb250ZW50Vmlldyh3dik7CiAgICAgICAgV2ViU2V0dGluZ3MgcyA9IHd2LmdldFNldHRpbmdzKCk7CiAgICAgICAgcy5zZXRKYXZhU2NyaXB0RW5hYmxlZCh0cnVlKTsKICAgICAgICBzLnNldERvbVN0b3JhZ2VFbmFibGVkKHRydWUpOwogICAgICAgIHMuc2V0QWxsb3dGaWxlQWNjZXNzKHRydWUpOwogICAgICAgIHMuc2V0QWxsb3dGaWxlQWNjZXNzRnJvbUZpbGVVUkxzKHRydWUpOwogICAgICAgIHMuc2V0QWxsb3dVbml2ZXJzYWxBY2Nlc3NGcm9tRmlsZVVSTHModHJ1ZSk7CiAgICAgICAgcy5zZXRDYWNoZU1vZGUoV2ViU2V0dGluZ3MuTE9BRF9OT19DQUNIRSk7CiAgICAgICAgd3Yuc2V0V2ViVmlld0NsaWVudChuZXcgV2ViVmlld0NsaWVudCgpKTsKICAgICAgICB3di5sb2FkVXJsKCJmaWxlOi8vL2FuZHJvaWRfYXNzZXQvcHVibGljL2luZGV4Lmh0bWwiKTsKICAgIH0KICAgIEBPdmVycmlkZQogICAgcHVibGljIHZvaWQgb25CYWNrUHJlc3NlZCgpIHsKICAgICAgICBpZiAod3YgIT0gbnVsbCAmJiB3di5jYW5Hb0JhY2soKSkgeyB3di5nb0JhY2soKTsgfQogICAgICAgIGVsc2UgeyBzdXBlci5vbkJhY2tQcmVzc2VkKCk7IH0KICAgIH0KfQo= | base64 -d > $APP/app/src/main/java/com/pspai/xiaolongren/MainActivity.java
-          # AndroidManifest (single line to avoid heredoc issues)
-          echo '<?xml version="1.0" encoding="utf-8"?><manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.pspai.xiaolongren"><uses-permission android:name="android.permission.INTERNET"/><application android:allowBackup="true" android:icon="@mipmap/ic_launcher" android:roundIcon="@mipmap/ic_launcher_round" android:label="@string/app_name" android:usesCleartextTraffic="true" android:theme="@style/AppTheme"><activity android:name=".MainActivity" android:exported="true" android:configChanges="orientation|screenSize"><intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter></activity></application></manifest>' > $APP/app/src/main/AndroidManifest.xml
-          # Resources
-          echo '<?xml version="1.0" encoding="utf-8"?><resources><string name="app_name">小龙人</string></resources>' > $APP/app/src/main/res/values/strings.xml
-          echo '<?xml version="1.0" encoding="utf-8"?><resources><style name="AppTheme" parent="android:Theme.Material.NoActionBar"><item name="android:windowFullscreen">true</item></style></resources>' > $APP/app/src/main/res/values/themes.xml
+          mkdir -p app-build
+          cd app-build
+          npm init -y
+          npm install @capacitor/core @capacitor/cli @capacitor/android
+          npx cap init 小龙人 com.pspai.xiaolongren --web-dir=www
+          mkdir -p www
+
+      - name: Copy web files
+        run: |
+          cp -r frontend/pwa/html/* app-build/www/
+          cp app-build/www/mobile.html app-build/www/index.html
+          rm -f app-build/www/server.py 2>/dev/null || true
+          echo "www files:" && ls -la app-build/www/ && du -sh app-build/www/
+
+      - name: Add Android platform
+        working-directory: app-build
+        run: npx cap add android
+
+      - name: Configure Android
+        run: |
+          # App name
+          sed -i 's|<string name="app_name">.*</string>|<string name="app_name">小龙人</string>|' \
+            app-build/android/app/src/main/res/values/strings.xml
+          # Cleartext traffic
+          sed -i 's|android:usesCleartextTraffic="false"|android:usesCleartextTraffic="true"|' \
+            app-build/android/app/src/main/AndroidManifest.xml 2>/dev/null || true
           # Icons
-          for d in mdpi hdpi xhdpi xxhdpi xxxhdpi; do
-            mkdir -p $APP/app/src/main/res/mipmap-${d}
-            cp ${{ github.workspace }}/mobile/android-app/res/mipmap-${d}/ic_launcher.png $APP/app/src/main/res/mipmap-${d}/ic_launcher.png
-            cp ${{ github.workspace }}/mobile/android-app/res/mipmap-${d}/ic_launcher_round.png $APP/app/src/main/res/mipmap-${d}/ic_launcher_round.png
+          for density in mdpi hdpi xhdpi xxhdpi xxxhdpi; do
+            cp mobile/android-app/res/mipmap-${density}/ic_launcher.png \
+              app-build/android/app/src/main/res/mipmap-${density}/ic_launcher.png
+            cp mobile/android-app/res/mipmap-${density}/ic_launcher_round.png \
+              app-build/android/app/src/main/res/mipmap-${density}/ic_launcher_round.png 2>/dev/null || true
           done
-          # Gradle
-          echo 'buildscript { repositories { google(); mavenCentral() } dependencies { classpath "com.android.tools.build:gradle:8.2.0" } } allprojects { repositories { google(); mavenCentral() } }' > $APP/build.gradle
-          echo 'apply plugin: "com.android.application" android { namespace "com.pspai.xiaolongren" compileSdk 34 defaultConfig { applicationId "com.pspai.xiaolongren" minSdk 23 targetSdk 34 versionCode 1 versionName "PSP3.4" } }' > $APP/app/build.gradle
-          echo 'include ":app"' > $APP/settings.gradle
-          echo 'rootProject.name = "XiaoLongRen"' >> $APP/settings.gradle
-          echo 'org.gradle.jvmargs=-Xmx4g' > $APP/gradle.properties
-          # Build APK
-          cd $APP
-          set -x  # debug
-          # Check SDK
-          echo "ANDROID_HOME=$ANDROID_HOME"
-          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT"
-          ls $ANDROID_HOME/platforms/ 2>/dev/null || echo "No platforms dir"
-          # Use sdkmanager gradle or check
-          if command -v gradle &>/dev/null; then
-            echo "Using system gradle"
-            gradle assembleDebug --no-daemon --stacktrace 2>&1
-          else
-            echo "Gradle not found, downloading..."
-            curl -sL --connect-timeout 30 --max-time 300 "https://services.gradle.org/distributions/gradle-8.5-bin.zip" -o /tmp/gradle.zip
-            ls -lh /tmp/gradle.zip
-            unzip -q -o /tmp/gradle.zip -d /tmp/gradle8
-            /tmp/gradle8/gradle-8.5/bin/gradle assembleDebug --no-daemon --stacktrace 2>&1
+          # Delete adaptive icon XML (Hongmeng compatible)
+          rm -rf app-build/android/app/src/main/res/mipmap-anydpi-v26 2>/dev/null || true
+          rm -f app-build/android/app/src/main/res/drawable-v24/ic_launcher_foreground.* 2>/dev/null || true
+          # Network security
+          if [ -f mobile/android-app/res/xml/network_security_config.xml ]; then
+            mkdir -p app-build/android/app/src/main/res/xml
+            cp mobile/android-app/res/xml/network_security_config.xml app-build/android/app/src/main/res/xml/
+            sed -i 's|<application|<application android:networkSecurityConfig="@xml/network_security_config"|' \
+              app-build/android/app/src/main/AndroidManifest.xml
           fi
-          echo "=== RESULT ==="
-          set +x
-          find . -name "*.apk" -type f 2>/dev/null
-          ls -lh app/build/outputs/apk/debug/app-debug.apk 2>/dev/null || echo "APK NOT FOUND"
+          # Kotlin fix
+          echo '# fix kotlin duplicates' >> app-build/android/app/build.gradle
+          echo 'configurations.all {' >> app-build/android/app/build.gradle
+          echo "    exclude group: 'org.jetbrains.kotlin', module: 'kotlin-stdlib-jdk7'" >> app-build/android/app/build.gradle
+          echo "    exclude group: 'org.jetbrains.kotlin', module: 'kotlin-stdlib-jdk8'" >> app-build/android/app/build.gradle
+          echo '}' >> app-build/android/app/build.gradle
+          echo "Done:" && du -sh app-build/www/
+
+      - name: Build APK
+        working-directory: app-build/android
+        run: ./gradlew assembleDebug
+
+      - name: Check APK
+        run: |
+          APK=$(find app-build -name "*.apk" -type f | head -1)
+          ls -lh $APK
+          echo "=== Icon check ==="
+          unzip -l $APK | grep "ic_launcher" | head -10
+
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: xiaolongren-native-apk
-          path: |
-            app-build/app/build/outputs/apk/debug/app-debug.apk
-            app-build/app/build/outputs/apk/debug/app-*.apk
+          name: xiaolongren-capacitor-apk
+          path: app-build/android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+
+      - name: Tag commit
+        run: |
+          git config user.name "CI Builder"
+          git config user.email "ci@pspai.com"
+          git tag -f PSP3.6
+          git push --tags
+
       - name: Upload to Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: PSP3.6
-          files: app-build/app/build/outputs/apk/debug/app-debug.apk
-          name: 小龙人 PSP3.4 原生WebView版
+          files: |
+            app-build/android/app/build/outputs/apk/debug/app-debug.apk
+          name: 小龙人 PSP3.6 Capacitor版
           body: |
-            🔥 放弃Capacitor框架，原生Android壳+WebView
-            兼容华为鸿蒙系统
+            ✅ 基于Capacitor框架（v2.0.0-mobile原版方案）
+            ✅ 发送按钮鸿蒙触控修复（ontouchend+event.preventDefault）
+            ✅ 纯PNG图标（删除自适应XML，鸿蒙兼容）
+            ✅ 不包含Pyodide（直连云端大模型，APK更轻量）
           prerelease: true
           fail_on_unmatched_files: false
