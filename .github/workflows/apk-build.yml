@@ -3,7 +3,9 @@ name: Build APK
 on:
   push:
     paths:
-      - 'pwa/**'
+      - 'frontend/pwa/html/**'
+      - 'mobile/android-app/**'
+      - '.github/workflows/apk-build.yml'
     branches: [master]
   workflow_dispatch:
 
@@ -42,7 +44,7 @@ jobs:
 
       - name: Copy PWA files
         run: |
-          cp -r pwa/* app-build/www/
+          cp -r frontend/pwa/html/* app-build/www/
           cp app-build/www/mobile.html app-build/www/index.html
           # APK只需要浏览器前端文件，去掉桌面专用文件
           rm -f app-build/www/launcher.py app-build/www/install.bat app-build/www/install.sh
@@ -75,14 +77,14 @@ jobs:
             app-build/android/app/src/main/AndroidManifest.xml 2>/dev/null || true
           # Icons
           for density in mdpi hdpi xhdpi xxhdpi xxxhdpi; do
-            cp android-app/res/mipmap-${density}/ic_launcher.png app-build/android/app/src/main/res/mipmap-${density}/ic_launcher.png
-            cp android-app/res/mipmap-${density}/ic_launcher_round.png app-build/android/app/src/main/res/mipmap-${density}/ic_launcher_round.png 2>/dev/null || true
+            cp mobile/android-app/res/mipmap-${density}/ic_launcher.png app-build/android/app/src/main/res/mipmap-${density}/ic_launcher.png
+            cp mobile/android-app/res/mipmap-${density}/ic_launcher_round.png app-build/android/app/src/main/res/mipmap-${density}/ic_launcher_round.png 2>/dev/null || true
           done
           rm -f app-build/android/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml 2>/dev/null || true
           rm -f app-build/android/app/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml 2>/dev/null || true
           rm -f app-build/android/app/src/main/res/drawable/ic_launcher_foreground.xml 2>/dev/null || true
           # Network security
-          cp android-app/res/xml/network_security_config.xml app-build/android/app/src/main/res/xml/
+          cp mobile/android-app/res/xml/network_security_config.xml app-build/android/app/src/main/res/xml/
           sed -i 's|<application|<application android:networkSecurityConfig="@xml/network_security_config"|' \
             app-build/android/app/src/main/AndroidManifest.xml
           # Kotlin fix
