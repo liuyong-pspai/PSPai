@@ -112,15 +112,15 @@
    112|    </div>
    113|  </div>
    114|
-   115|    <!-- Pyodide懒加载：首次启动后台下载，不阻塞使用 -->
+   115|    <!-- Pyodide预装：APK内已包含完整Python引擎，启动即加载 -->
   <div id="pyodide-loader" style="position:fixed;bottom:60px;left:12px;right:12px;z-index:200;background:rgba(0,0,0,0.85);border:1px solid var(--gold-dim);border-radius:10px;padding:10px 14px;display:none;font-size:12px;color:#888;">
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
-      <span>🐍</span><span id="pyload-text">Python引擎下载中...</span>
+      <span>🐍</span><span id="pyload-text">Python引擎加载中...</span>
     </div>
     <div style="height:3px;background:rgba(255,255,255,0.08);border-radius:2px;overflow:hidden">
       <div id="pyload-bar" style="height:100%;width:0%;background:var(--gold);border-radius:2px;transition:width 0.3s"></div>
     </div>
-    <div style="font-size:10px;color:#555;margin-top:4px">下载完成自动激活，不影响聊天</div>
+    <div style="font-size:10px;color:#555;margin-top:4px">首次加载需解压WASM包，稍等几秒</div>
   </div>
    116|
    117|  <div id="input-bar">
@@ -155,9 +155,13 @@
     window._bootTime = Date.now();
     const report = await initKernel();
     console.log('🚀 小龙人启动完成:', report);
-    // 后台自动下载Pyodide（如果尚未缓存）
-    if (typeof downloadPyodide === 'function') {
-      downloadPyodide().catch(function(e){ console.warn('[pyodide] 后台下载失败，下次启动重试:', e.message); });
+    // 全功能版：Pyodide已预装入APK，直接加载
+    if (typeof loadPyodideEngine === 'function') {
+      loadPyodideEngine().then(function(eng){
+        console.log('🐍 Python引擎就绪');
+      }).catch(function(e){
+        console.warn('[pyodide] 加载失败:', e.message);
+      });
     }
   } catch(e) {
     console.error('启动失败:', e);

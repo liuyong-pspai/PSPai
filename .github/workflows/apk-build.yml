@@ -1,4 +1,4 @@
-name: Build APK (Full)
+name: Build Full APK
 
 on:
   push:
@@ -27,42 +27,37 @@ jobs:
         with:
           packages: 'platforms;android-34 build-tools;34.0.0 platform-tools'
 
-      - name: Download Pyodide runtime
-        run: |
-          echo "Downloading Pyodide full runtime..."
-          mkdir -p frontend/pwa/pyodide
-          # 从官方Pyodide Release下载（约350MB压缩包，解压后~700MB）
-          curl -L --max-time 900 --retry 2 --retry-delay 10 \
-            -o /tmp/pyodide.tar.bz2 \
-            "https://github.com/pyodide/pyodide/releases/download/0.27.5/pyodide-0.27.5.tar.bz2" || {
-            echo "⚠️ GitHub超时，尝试jsDelivr CDN..."
-            curl -L --max-time 900 --retry 2 \
-              -o /tmp/pyodide.tar.bz2 \
-              "https://cdn.jsdelivr.net/gh/pyodide/pyodide@0.27.5/dist/pyodide-0.27.5.tar.bz2"
-          }
-          if [ -f /tmp/pyodide.tar.bz2 ] && [ -s /tmp/pyodide.tar.bz2 ]; then
-            tar -xjf /tmp/pyodide.tar.bz2 -C frontend/pwa/
-            rm /tmp/pyodide.tar.bz2
-            echo "Pyodide ready:"
-            du -sh frontend/pwa/pyodide/
-          else
-            echo "❌ Pyodide下载失败，构建轻量版（首次启动后台下载）"
-            mkdir -p frontend/pwa/pyodide
-            cp frontend/pwa/html/pyodide/pyodide.js frontend/pwa/pyodide/
-          fi
+      - name: Cache Pyodide
+        id: cache-pyodide
+        uses: actions/cache@v4
+        with:
+          path: pyodide-full
+          key: pyodide-v0.27.5-full-${{ runner.os }}
 
-      - name: Build APK (Full)
+      - name: Download Pyodide (cached)
+        if: steps.cache-pyodide.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p pyodide-full
+          echo "⬇️ 下载Pyodide 0.27.5（首次运行，后续直接命中缓存）..."
+          curl -L --max-time 300 -o pyodide-full/pyodide.tar.bz2 \
+            "https://github.com/pyodide/pyodide/releases/download/0.27.5/pyodide-0.27.5.tar.bz2"
+          echo "✅ 下载完成，解压中..."
+          cd pyodide-full
+          tar -xjf pyodide.tar.bz2
+          rm pyodide.tar.bz2
+          du -sh .
+          echo "✅ Pyodide就绪"
+
+      - name: Build APK (全功能版)
         run: |
           set -e
           mkdir -p app-build/www
           cp -r frontend/pwa/html/* app-build/www/
-          # 全功能版：复制完整Pyodide运行时
-          cp -r frontend/pwa/pyodide app-build/www/pyodide
-          cp frontend/pwa/html/pyodide-bridge.js app-build/www/pyodide-bridge.js 2>/dev/null || true
+          # 全功能版：将完整Pyodide运行时复制进www
+          cp -r pyodide-full/* app-build/www/pyodide/
           cp app-build/www/mobile.html app-build/www/index.html
+          # 清理桌面专用文件
           rm -f app-build/www/server.py
-          echo "www files: $(find app-build/www -type f | wc -l)"
-          du -sh app-build/www/
           cd app-build
           npm init -y > /dev/null 2>&1
           npm install @capacitor/core @capacitor/cli @capacitor/android
@@ -113,7 +108,8 @@ jobs:
           SDK=$(echo $ANDROID_HOME $ANDROID_SDK_ROOT | tr ' ' '\n' | head -1)
           echo "sdk.dir=$SDK" > android/local.properties
           cd android
-          ./gradlew assembleDebug --no-daemon --stacktrace 2>&1 | tail -30
+          echo "🔨 开始构建APK..."
+          ./gradlew assembleDebug --no-daemon --stacktrace 2>&1 | tail -20
           echo "--- APK size ---"
           ls -lh app/build/outputs/apk/debug/app-debug.apk || echo "APK NOT FOUND"
 
@@ -127,14 +123,12 @@ jobs:
         with:
           tag_name: PSP3.0
           files: app-build/android/app/build/outputs/apk/debug/app-debug.apk
-          name: 小龙人 PSP3.0 全功能手机版
+          name: 小龙人 PSP3.0 全功能版
           body: |
             🐉 小龙人 PSP3.0 全功能手机APK
-            - 完整Pyodide Python引擎（开箱即用）
+            - 完整Python引擎（Pyodide 0.27.5）
             - 6大数字生命体角色
-            - 多模型支持（DeepSeek/OpenAI/通义千问/智谱GLM/Anthropic）
-            - 语音对话 + 文字聊天 + 文件上传
-            - 修复发送按钮鸿蒙兼容性
-            - config.html加返回按钮
+            - 语音对话 + 文字聊天 + 文件分析
+            - 多模型支持（DeepSeek / OpenAI / 通义千问 / 智谱GLM / Anthropic）
           prerelease: true
           fail_on_unmatched_files: false
