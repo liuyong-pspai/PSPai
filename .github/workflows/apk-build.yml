@@ -48,26 +48,26 @@ jobs:
           echo 'include ":app"' > $APP/settings.gradle
           echo 'rootProject.name = "XiaoLongRen"' >> $APP/settings.gradle
           echo 'org.gradle.jvmargs=-Xmx4g' > $APP/gradle.properties
-          # Build with gradle wrapper
+          # Build APK
           cd $APP
-          # Generate gradlew wrapper
-          gradle wrapper --gradle-version 8.5 2>/dev/null || true
-          if [ ! -f gradlew ]; then
-            # Manual gradlew stub
-            mkdir -p gradle/wrapper
-            echo 'distributionBase=GRADLE_USER_HOME' > gradle/wrapper/gradle-wrapper.properties
-            echo 'distributionPath=wrapper/dists' >> gradle/wrapper/gradle-wrapper.properties
-            echo 'distributionUrl=https\://services.gradle.org/distributions/gradle-8.5-bin.zip' >> gradle/wrapper/gradle-wrapper.properties
-            echo 'zipStoreBase=GRADLE_USER_HOME' >> gradle/wrapper/gradle-wrapper.properties
-            echo 'zipStorePath=wrapper/dists' >> gradle/wrapper/gradle-wrapper.properties
-            curl -sL "https://services.gradle.org/distributions/gradle-8.5-bin.zip" -o /tmp/gradle.zip
-            unzip -q -o /tmp/gradle.zip -d /tmp/gradle-8.5
-            /tmp/gradle-8.5/gradle-8.5/bin/gradle assembleDebug --no-daemon --stacktrace 2>&1 | tail -25
+          set -x  # debug
+          # Check SDK
+          echo "ANDROID_HOME=$ANDROID_HOME"
+          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT"
+          ls $ANDROID_HOME/platforms/ 2>/dev/null || echo "No platforms dir"
+          # Use sdkmanager gradle or check
+          if command -v gradle &>/dev/null; then
+            echo "Using system gradle"
+            gradle assembleDebug --no-daemon --stacktrace 2>&1
           else
-            chmod +x gradlew
-            ./gradlew assembleDebug --no-daemon --stacktrace 2>&1 | tail -25
+            echo "Gradle not found, downloading..."
+            curl -sL --connect-timeout 30 --max-time 300 "https://services.gradle.org/distributions/gradle-8.5-bin.zip" -o /tmp/gradle.zip
+            ls -lh /tmp/gradle.zip
+            unzip -q -o /tmp/gradle.zip -d /tmp/gradle8
+            /tmp/gradle8/gradle-8.5/bin/gradle assembleDebug --no-daemon --stacktrace 2>&1
           fi
-          echo "--- APK ---"
+          echo "=== RESULT ==="
+          set +x
           find . -name "*.apk" -type f 2>/dev/null
           ls -lh app/build/outputs/apk/debug/app-debug.apk 2>/dev/null || echo "APK NOT FOUND"
       - name: Upload APK
@@ -80,7 +80,7 @@ jobs:
       - name: Upload to Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: PSP3.5
+          tag_name: PSP3.6
           files: app-build/app/build/outputs/apk/debug/app-debug.apk
           name: 小龙人 PSP3.4 原生WebView版
           body: |
