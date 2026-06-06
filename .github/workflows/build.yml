@@ -7,12 +7,25 @@ on:
 
 jobs:
   # ============================================================
-  # Linux
+  # Linux x86_64 — PyInstaller全功能引擎 + 安装包
   # ============================================================
   linux:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install dependencies
+        run: pip install pyinstaller hermes-agent PyYAML Pillow requests
+      - name: Build engine (PyInstaller)
+        run: |
+          cd engine
+          pyinstaller --clean xiaolongren-engine-linux-arm64.spec 2>/dev/null || \
+          pyinstaller --onefile --add-data "config.yaml:." --add-data "SOUL.md:." \
+            --add-data "MEMORY.md:." --add-data "skills:skills" \
+            --add-data "pspai_search.py:." --name xiaolongren-engine-linux-x86_64 \
+            --hidden-import yaml --hidden-import run_agent pspai_server.py
       - name: Build Linux Installer
         run: python3 installer/make_installer.py
       - name: Upload Linux Artifact
@@ -22,12 +35,24 @@ jobs:
           path: dist/xiaolongren-installer.run
 
   # ============================================================
-  # Windows
+  # Windows — PyInstaller全功能引擎 + 安装包
   # ============================================================
   windows:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install dependencies
+        run: pip install pyinstaller hermes-agent PyYAML Pillow requests
+      - name: Build engine (PyInstaller)
+        run: |
+          cd engine
+          pyinstaller --onefile --add-data "config.yaml;." --add-data "SOUL.md;." `
+            --add-data "MEMORY.md;." --add-data "skills;skills" `
+            --add-data "pspai_search.py;." --name xiaolongren-engine-windows `
+            --hidden-import yaml --hidden-import run_agent pspai_server.py
       - name: Build Windows Installer
         run: python installer/make_installer.py
       - name: Upload Windows Artifact
@@ -37,20 +62,32 @@ jobs:
           path: dist/xiaolongren-setup.zip
 
   # ============================================================
-  # macOS
+  # macOS — PyInstaller全功能引擎 + 安装包
   # ============================================================
   macos:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install dependencies
+        run: pip install pyinstaller hermes-agent PyYAML Pillow requests
+      - name: Build engine (PyInstaller)
+        run: |
+          cd engine
+          pyinstaller --onefile --add-data "config.yaml:." --add-data "SOUL.md:." \
+            --add-data "MEMORY.md:." --add-data "skills:skills" \
+            --add-data "pspai_search.py:." --name xiaolongren-engine-macos \
+            --hidden-import yaml --hidden-import run_agent pspai_server.py
       - name: Build macOS Installer
         run: python3 installer/make_installer.py
-      - name: Upload macOS Artifact (DMG)
+      - name: Upload macOS DMG
         uses: actions/upload-artifact@v4
         with:
           name: xiaolongren-macos
           path: dist/xiaolongren-installer.dmg
-      - name: Upload macOS Artifact (ZIP fallback)
+      - name: Upload macOS ZIP (fallback)
         if: failure()
         uses: actions/upload-artifact@v4
         with:
