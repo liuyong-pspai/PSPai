@@ -99,9 +99,12 @@ jobs:
           echo "Total www before APK build:"
           du -sh app-build/www/
 
-      - name: Build APK
+      - name: Build APK (lightweight)
         working-directory: app-build/android
-        run: ./gradlew assembleDebug
+        run: |
+          # Create local.properties with SDK path
+          echo "sdk.dir=${ANDROID_HOME}" > local.properties
+          ./gradlew assembleDebug --no-daemon
 
       - name: Check APK size
         run: |
