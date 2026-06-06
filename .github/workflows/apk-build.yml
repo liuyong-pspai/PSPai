@@ -35,35 +35,21 @@ jobs:
 
       - name: Create Capacitor project
         run: |
-          mkdir -p app-build
-          cd app-build
+          mkdir -p app-build/www
+          cp -r frontend/pwa/html/* app-build/www/
+          cp app-build/www/mobile.html app-build/www/index.html
+          # 清理不需要的文件
+          rm -f app-build/www/server.py
+          rm -f app-build/www/prompts.html config.html download.html 2>/dev/null
+          echo "www files: $(find app-build/www -type f | wc -l)"
+          du -sh app-build/www/
+
+      - name: Init Capacitor
+        working-directory: app-build
+        run: |
           npm init -y
           npm install @capacitor/core @capacitor/cli @capacitor/android
           npx cap init 小龙人 com.pspai.xiaolongren --web-dir=www
-          mkdir -p www
-
-      - name: Copy PWA files
-        run: |
-          cp -r frontend/pwa/html/* app-build/www/
-          cp app-build/www/mobile.html app-build/www/index.html
-          # APK只需要浏览器前端文件，去掉桌面专用文件
-          rm -f app-build/www/launcher.py app-build/www/install.bat app-build/www/install.sh
-          rm -f app-build/www/install_macos.sh app-build/www/uninstall.bat app-build/www/uninstall.sh app-build/www/uninstall_macos.sh
-          # Pyodide引擎源码保留（pyodide-bridge.js在运行时fetch加载）
-          # Pyodide运行时在下面单独下载
-          echo "APK www files:"
-          du -sh app-build/www/
-          ls -la app-build/www/
-
-      - name: Download Pyodide (WASM Python)
-        run: |
-          echo "Downloading Pyodide v0.27.5..."
-          cd app-build/www
-          curl -L --max-time 120 -o pyodide.tar.bz2 "https://github.com/pyodide/pyodide/releases/download/0.27.5/pyodide-0.27.5.tar.bz2"
-          tar -xjf pyodide.tar.bz2
-          rm pyodide.tar.bz2
-          echo "Pyodide size:"
-          du -sh pyodide/
 
       - name: Add Android platform
         working-directory: app-build
@@ -87,7 +73,7 @@ jobs:
           cp mobile/android-app/res/xml/network_security_config.xml app-build/android/app/src/main/res/xml/
           sed -i 's|<application|<application android:networkSecurityConfig="@xml/network_security_config"|' \
             app-build/android/app/src/main/AndroidManifest.xml
-          # Kotlin fix
+          # Kotlin stdlib fix
           cat >> app-build/android/app/build.gradle << 'GRADLEEOF'
 
           configurations.all {
@@ -95,48 +81,15 @@ jobs:
               exclude group: 'org.jetbrains.kotlin', module: 'kotlin-stdlib-jdk8'
           }
           GRADLEEOF
-          # Check total www size before build
-          echo "Total www before APK build:"
-          du -sh app-build/www/
 
-      - name: Build APK (lightweight)
+      - name: Build APK
         working-directory: app-build/android
         run: |
-          # Create local.properties with SDK path
           echo "sdk.dir=${ANDROID_HOME}" > local.properties
           ./gradlew assembleDebug --no-daemon
 
-      - name: Check APK size
-        run: |
-          APK="app-build/android/app/build/outputs/apk/debug/app-debug.apk"
-          ls -lh $APK
-          echo "APK size: $(du -sh $APK | cut -f1)"
-
-      - name: Upload APK
+      - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: xiaolongren-apk
           path: app-build/android/app/build/outputs/apk/debug/app-debug.apk
-
-      - name: Upload to Release
-        if: success()
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          APK="app-build/android/app/build/outputs/apk/debug/app-debug.apk"
-          echo "Uploading APK to Release..."
-          # 用gh CLI上传到已存在的Release（如果是在tag push或手动触发时）
-          if [ -n "${{ github.event.release.tag_name }}" ] || [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            # 获取Release ID - 用v2.0.0-mobile
-            REL_ID=$(curl -s -H "Authorization: token $GH_TOKEN" \
-              "https://api.github.com/repos/${{ github.repository }}/releases/tags/v2.0.0-mobile" | \
-              python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('id',''))" 2>/dev/null || echo "")
-            if [ -n "$REL_ID" ]; then
-              curl -s -X POST \
-                -H "Authorization: token $GH_TOKEN" \
-                -H "Content-Type: application/vnd.android.package-archive" \
-                --data-binary @"$APK" \
-                "https://uploads.github.com/repos/${{ github.repository }}/releases/$REL_ID/assets?name=xiaolongren-mobile-v2.0.0.apk"
-              echo "✅ APK上传到Release完成"
-            fi
-          fi
