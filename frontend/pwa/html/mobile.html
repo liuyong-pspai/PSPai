@@ -1,519 +1,444 @@
-     1|<!DOCTYPE html>
-     2|<html lang="zh-CN">
-     3|<head>
-     4|<meta charset="UTF-8">
-     5|<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
-     6|<meta name="apple-mobile-web-app-capable" content="yes">
-     7|<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-     8|<meta name="theme-color" content="#0a0a14">
-     9|<meta name="apple-mobile-web-app-title" content="小龙人">
-    10|<meta http-equiv="X-UA-Compatible" content="IE=edge">
-    11|<!-- 鸿蒙/Android WebView兼容 -->
-    12|<meta name="x5-orientation" content="portrait">
-    13|<meta name="x5-fullscreen" content="true">
-    14|<meta name="renderer" content="webkit">
-    15|<title>数字生命体小龙人</title>
-    16|<link rel="manifest" href="manifest.json">
-    17|<style>
-    18|*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-    19|html,body{width:100%;height:100%;overflow:hidden;font-family:'PingFang SC','Microsoft YaHei',sans-serif;background:#0a0a14;color:#e0d8c8;touch-action:manipulation}
-    20|:root{--gold:#c8a84e;--gold-dim:rgba(200,168,78,0.3);--bg:#0a0a14;--card:rgba(20,20,32,0.5);--text:#e0d8c8}
-    21|.theme-tech{--gold:#00d4ff;--gold-dim:rgba(0,212,255,0.3);--bg:#0a0a1a;--card:rgba(0,20,40,0.5);--text:#c0e0f0}
-    22|.theme-loft{--gold:#e8904a;--gold-dim:rgba(232,144,74,0.3);--bg:#1a1a14;--card:rgba(32,28,20,0.5);--text:#d8d0c0}
-    23|
-    24|#app{position:fixed;inset:0;display:flex;flex-direction:column;background:var(--bg);color:var(--text)}
-    25|
-    26|#top{height:44px;padding:0 14px;padding-top:env(safe-area-inset-top,0);display:flex;align-items:center;justify-content:space-between;z-index:10;flex-shrink:0}
-    27|#top .t{font-size:15px;font-weight:bold;color:var(--gold)}
-    28|#top .r{display:flex;align-items:center;gap:10px}
-    29|#top .cfg-btn{width:28px;height:28px;border-radius:6px;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.04);color:var(--gold);font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center}
-    30|
-    31|#char-bar{flex-shrink:0;display:flex;align-items:flex-start;justify-content:center;gap:10px;padding:6px 14px 10px;overflow-x:auto;scrollbar-width:none}
-    32|#char-bar::-webkit-scrollbar{display:none}
-    33|#char-bar .cw{display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer;flex-shrink:0;opacity:0.55;transition:all 0.2s}
-    34|#char-bar .cw.sel{opacity:1}
-    35|#char-bar .cw:active{transform:scale(1.08)}
-    36|#char-bar .cmini{width:40px;height:40px;border-radius:50%;overflow:hidden;border:2px solid rgba(255,255,255,0.08);transition:all 0.2s}
-    37|#char-bar .cw.sel .cmini{border-color:var(--gold)}
-    38|#char-bar .cmini img{width:100%;height:100%;object-fit:cover}
-    39|#char-bar .cn{font-size:9px;color:#888;transition:color 0.2s}
-    40|#char-bar .cw.sel .cn{color:var(--gold)}
-    41|
-    42|#msgs{flex:1;overflow-y:auto;padding:8px 14px;scrollbar-width:none;display:flex;flex-direction:column;gap:8px}
-    43|#msgs::-webkit-scrollbar{display:none}
-    44|#msgs .empty{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding-top:1vh;color:#333}
-    45|#msgs .empty .er{width:30%;max-width:100px;height:105px;border-radius:14px;overflow:hidden;margin-bottom:10px;border:1px solid rgba(255,255,255,0.06);box-shadow:0 3px 20px rgba(0,0,0,0.4)}
-    46|#msgs .empty .er img{width:100%;height:100%;object-fit:cover}
-    47|#msgs .empty .et{font-size:13px;color:#444;margin-bottom:2px}
-    48|#msgs .empty .es{font-size:11px;color:#2a2a2a}
-    49|
-    50|.msg{display:flex;flex-direction:column;max-width:85%;animation:mi .25s ease}
-    51|@keyframes mi{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
-    52|.msg.user{align-self:flex-end}
-    53|.msg.ai{align-self:flex-start}
-    54|.msg .mb{padding:10px 14px;border-radius:14px;font-size:14px;line-height:1.55;word-break:break-word}
-    55|.msg.user .mb{background:var(--gold);color:#000;border-bottom-right-radius:4px}
-    56|.msg.ai .mb{background:rgba(30,30,48,0.85);color:#d0c8b8;border-bottom-left-radius:4px}
-    57|.msg .mtime{font-size:9px;color:#3a3a4a;margin-top:2px;padding:0 4px}
-    58|.msg.user .mtime{text-align:right}
-    59|
-    60|#input-bar{flex-shrink:0;display:flex;align-items:center;gap:8px;padding:8px 12px;padding-bottom:max(10px,env(safe-area-inset-bottom));background:rgba(0,0,0,0.4);border-top:1px solid rgba(255,255,255,0.04)}
-    61|#text-input{flex:1;padding:10px 14px;border-radius:20px;border:1px solid rgba(255,255,255,0.08);background:rgba(255,255,255,0.04);color:#e0d8c8;font-size:15px;outline:none;resize:none;max-height:80px;font-family:inherit}
-    62|#text-input:focus{border-color:var(--gold-dim)}
-    63|#text-input::placeholder{color:#444}
-    64|#send-btn{width:40px;height:40px;border-radius:50%;border:none;background:var(--gold);color:#000;font-size:16px;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;transition:all 0.15s;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
-    65|#send-btn:active{transform:scale(1.15)}
-    66|#send-btn:disabled{opacity:0.3;pointer-events:none}
-    67|#send-btn.sending{opacity:0.5;pointer-events:none}
-    68|
-    69|
-    70|#install-banner{display:none;position:fixed;bottom:100px;left:12px;right:12px;z-index:150;background:rgba(0,0,0,0.92);border:1px solid var(--gold-dim);border-radius:14px;padding:14px 16px;align-items:center;gap:12px}
-    71|#install-banner.show{display:flex}
-    72|#install-banner .ib-close{position:absolute;top:6px;right:10px;color:#666;font-size:14px;cursor:pointer}
-    73|#install-banner .ib-txt{flex:1;font-size:13px;color:#ccc;line-height:1.4}
-    74|#install-banner button{padding:8px 16px;border-radius:8px;border:none;background:var(--gold);color:#000;font-size:14px;font-weight:bold;cursor:pointer;white-space:nowrap}
-    75|
-    76|/* loading dots */
-    77|.typing-dots{display:inline-flex;gap:4px;padding:2px 0}
-    78|.typing-dots span{width:6px;height:6px;border-radius:50%;background:var(--gold);animation:td 1.2s ease-in-out infinite}
-    79|.typing-dots span:nth-child(2){animation-delay:0.2s}
-    80|.typing-dots span:nth-child(3){animation-delay:0.4s}
-    81|@keyframes td{0%,60%,100%{transform:translateY(0);opacity:0.3}30%{transform:translateY(-6px);opacity:1}}
-    82|
-    83|@media(min-width:500px){#app{max-width:430px;margin:0 auto;border:1px solid rgba(255,255,255,0.04)}}
-    84|</style>
-    85|
-    86|</head>
-    87|<body>
-    88|<div id="app">
-    89|  <div id="top">
-    90|    <span class="t">🐉 小龙人</span>
-    91|    <div class="r">
-    92|      <span id="net-dot" style="width:6px;height:6px;border-radius:50%;display:inline-block;margin-right:8px;background:#888" title="检测网络中..."></span>
-    93|      <span id="env-badge" style="font-size:9px;color:#555;margin-right:4px"></span>
-    94|      <button class="cfg-btn" onclick="location.href='config.html'" title="配置模型">⚙</button>
-    95|    </div>
-    96|  </div>
-    97|
-    98|  <div id="char-bar">
-    99|    <div class="cw sel" onclick="switchChar('longyuan')"><div class="cmini"><img src="assets/avatars/img_longyuan.jpg"></div><span class="cn">龙渊</span></div>
-   100|    <div class="cw" onclick="switchChar('chiyu')"><div class="cmini"><img src="assets/avatars/img_chiyu.jpg"></div><span class="cn">赤羽</span></div>
-   101|    <div class="cw" onclick="switchChar('ling')"><div class="cmini"><img src="assets/avatars/img_ling.jpg"></div><span class="cn">凌</span></div>
-   102|    <div class="cw" onclick="switchChar('qingmo')"><div class="cmini"><img src="assets/avatars/img_qingmo.jpg"></div><span class="cn">轻墨</span></div>
-   103|    <div class="cw" onclick="switchChar('shuanghua')"><div class="cmini"><img src="assets/avatars/img_shuanghua.jpg"></div><span class="cn">霜华</span></div>
-   104|    <div class="cw" onclick="switchChar('yeying')"><div class="cmini"><img src="assets/avatars/img_yeying.jpg"></div><span class="cn">夜影</span></div>
-   105|  </div>
-   106|
-   107|  <div id="msgs">
-   108|    <div class="empty" id="empty-hint">
-   109|      <div class="er"><img id="empty-avatar" src="assets/avatars/img_longyuan.jpg"></div>
-   110|      <div class="et">龙渊在等你</div>
-   111|      <div class="es" id="empty-sub">说话或打字，我在这里</div>
-   112|    </div>
-   113|  </div>
-   114|
-   115|    <!-- Pyodide预装：APK内已包含完整Python引擎，启动即加载 -->
-  <div id="pyodide-loader" style="position:fixed;bottom:60px;left:12px;right:12px;z-index:200;background:rgba(0,0,0,0.85);border:1px solid var(--gold-dim);border-radius:10px;padding:10px 14px;display:none;font-size:12px;color:#888;">
-    <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
-      <span>🐍</span><span id="pyload-text">Python引擎加载中...</span>
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0a0a14">
+<meta name="apple-mobile-web-app-title" content="小龙人">
+<title>数字生命体小龙人</title>
+<link rel="manifest" href="manifest.json">
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{width:100%;height:100%;overflow:hidden;font-family:'PingFang SC','Microsoft YaHei',sans-serif;background:#0a0a14;color:#e0d8c8;touch-action:manipulation}
+:root{--gold:#c8a84e;--gold-dim:rgba(200,168,78,0.3);--bg:#0a0a14;--card:rgba(20,20,32,0.5);--text:#e0d8c8}
+.theme-tech{--gold:#00d4ff;--gold-dim:rgba(0,212,255,0.3);--bg:#0a0a1a;--card:rgba(0,20,40,0.5);--text:#c0e0f0}
+.theme-loft{--gold:#e8904a;--gold-dim:rgba(232,144,74,0.3);--bg:#1a1a14;--card:rgba(32,28,20,0.5);--text:#d8d0c0}
+
+#app{position:fixed;inset:0;display:flex;flex-direction:column;background:var(--bg);color:var(--text)}
+
+#top{height:44px;padding:0 14px;padding-top:env(safe-area-inset-top,0);display:flex;align-items:center;justify-content:space-between;z-index:10;flex-shrink:0}
+#top .t{font-size:15px;font-weight:bold;color:var(--gold)}
+#top .r{display:flex;align-items:center;gap:10px}
+#top .cfg-btn{width:28px;height:28px;border-radius:6px;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.04);color:var(--gold);font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+
+#char-bar{flex-shrink:0;display:flex;align-items:flex-start;justify-content:center;gap:10px;padding:6px 14px 10px;overflow-x:auto;scrollbar-width:none}
+#char-bar::-webkit-scrollbar{display:none}
+#char-bar .cw{display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer;flex-shrink:0;opacity:0.55;transition:all 0.2s}
+#char-bar .cw.sel{opacity:1}
+#char-bar .cw:active{transform:scale(1.08)}
+#char-bar .cmini{width:40px;height:40px;border-radius:50%;overflow:hidden;border:2px solid rgba(255,255,255,0.08);transition:all 0.2s}
+#char-bar .cw.sel .cmini{border-color:var(--gold)}
+#char-bar .cmini img{width:100%;height:100%;object-fit:cover}
+#char-bar .cn{font-size:9px;color:#888;transition:color 0.2s}
+#char-bar .cw.sel .cn{color:var(--gold)}
+
+#msgs{flex:1;overflow-y:auto;padding:8px 14px;scrollbar-width:none;display:flex;flex-direction:column;gap:8px}
+#msgs::-webkit-scrollbar{display:none}
+#msgs .empty{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding-top:1vh;color:#333}
+#msgs .empty .er{width:30%;max-width:100px;height:105px;border-radius:14px;overflow:hidden;margin-bottom:10px;border:1px solid rgba(255,255,255,0.06);box-shadow:0 3px 20px rgba(0,0,0,0.4)}
+#msgs .empty .er img{width:100%;height:100%;object-fit:cover}
+#msgs .empty .et{font-size:13px;color:#444;margin-bottom:2px}
+#msgs .empty .es{font-size:11px;color:#2a2a2a}
+
+.msg{display:flex;flex-direction:column;max-width:85%;animation:mi .25s ease}
+@keyframes mi{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+.msg.user{align-self:flex-end}
+.msg.ai{align-self:flex-start}
+.msg .mb{padding:10px 14px;border-radius:14px;font-size:14px;line-height:1.55;word-break:break-word}
+.msg.user .mb{background:var(--gold);color:#000;border-bottom-right-radius:4px}
+.msg.ai .mb{background:rgba(30,30,48,0.85);color:#d0c8b8;border-bottom-left-radius:4px}
+.msg .mtime{font-size:9px;color:#3a3a4a;margin-top:2px;padding:0 4px}
+.msg.user .mtime{text-align:right}
+.msg .mbtns{margin-top:4px;display:flex;gap:6px}
+.msg.ai .mbtns{padding-left:4px}
+.mbtn{width:26px;height:26px;border-radius:50%;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.05);color:var(--gold);font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all 0.15s}
+.mbtn:active{transform:scale(1.2);background:var(--gold);color:#000}
+.mbtn.playing{animation:tpulse 0.8s ease-in-out infinite}
+
+#input-bar{flex-shrink:0;display:flex;align-items:center;gap:8px;padding:8px 12px;padding-bottom:max(10px,env(safe-area-inset-bottom));background:rgba(0,0,0,0.4);border-top:1px solid rgba(255,255,255,0.04)}
+#text-input{flex:1;padding:10px 14px;border-radius:20px;border:1px solid rgba(255,255,255,0.08);background:rgba(255,255,255,0.04);color:#e0d8c8;font-size:15px;outline:none;resize:none;max-height:80px;font-family:inherit}
+#text-input:focus{border-color:var(--gold-dim)}
+#text-input::placeholder{color:#444}
+#send-btn{width:40px;height:40px;border-radius:50%;border:none;background:var(--gold);color:#000;font-size:16px;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;transition:all 0.15s}
+#send-btn:active{transform:scale(1.15)}
+#send-btn:disabled{opacity:0.3;pointer-events:none}
+#mic-btn{width:40px;height:40px;border-radius:50%;border:2px solid var(--gold-dim);background:rgba(200,168,78,0.08);cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;transition:all 0.15s}
+#mic-btn:active,#mic-btn.active{background:var(--gold);border-color:var(--gold);transform:scale(1.1)}
+#mic-btn .icon{width:18px;height:18px;pointer-events:none}
+#mic-btn .icon svg{width:100%;height:100%}
+#mic-btn.active{animation:tpulse 1s ease-in-out infinite}
+
+@keyframes tpulse{0%,100%{box-shadow:0 0 15px var(--gold-dim)}50%{box-shadow:0 0 40px var(--gold),0 0 70px var(--gold-dim)}}
+
+#install-banner{display:none;position:fixed;bottom:100px;left:12px;right:12px;z-index:150;background:rgba(0,0,0,0.92);border:1px solid var(--gold-dim);border-radius:14px;padding:14px 16px;align-items:center;gap:12px}
+#install-banner.show{display:flex}
+#install-banner .ib-close{position:absolute;top:6px;right:10px;color:#666;font-size:14px;cursor:pointer}
+#install-banner .ib-txt{flex:1;font-size:13px;color:#ccc;line-height:1.4}
+#install-banner button{padding:8px 16px;border-radius:8px;border:none;background:var(--gold);color:#000;font-size:14px;font-weight:bold;cursor:pointer;white-space:nowrap}
+
+/* loading dots */
+.typing-dots{display:inline-flex;gap:4px;padding:2px 0}
+.typing-dots span{width:6px;height:6px;border-radius:50%;background:var(--gold);animation:td 1.2s ease-in-out infinite}
+.typing-dots span:nth-child(2){animation-delay:0.2s}
+.typing-dots span:nth-child(3){animation-delay:0.4s}
+@keyframes td{0%,60%,100%{transform:translateY(0);opacity:0.3}30%{transform:translateY(-6px);opacity:1}}
+
+@media(min-width:500px){#app{max-width:430px;margin:0 auto;border:1px solid rgba(255,255,255,0.04)}}
+</style>
+</head>
+<body>
+
+<div id="app">
+  <div id="top">
+    <span class="t">🐉 小龙人</span>
+    <div class="r">
+      <button class="cfg-btn" onclick="location.href='config.html'" title="配置模型">⚙</button>
     </div>
-    <div style="height:3px;background:rgba(255,255,255,0.08);border-radius:2px;overflow:hidden">
-      <div id="pyload-bar" style="height:100%;width:0%;background:var(--gold);border-radius:2px;transition:width 0.3s"></div>
-    </div>
-    <div style="font-size:10px;color:#555;margin-top:4px">首次加载需解压WASM包，稍等几秒</div>
   </div>
-   116|
-   117|  <div id="input-bar">
-   118|    <input type="file" id="file-input" accept="image/*,.pdf,.txt,.csv,.json,.md,.doc,.docx" style="display:none" onchange="handleFileUpload(event)" multiple>
-   119|    <button id="file-btn" onclick="document.getElementById('file-input').click()" style="width:32px;height:32px;border-radius:50%;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.04);color:var(--gold);font-size:14px;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center" title="发文件/图片">📎</button>
-   120|    <textarea id="text-input" placeholder="说点什么..." rows="1" onkeydown="onKeyDown(event)" style="z-index:999;position:relative;pointer-events:auto"></textarea>
-   121|    <button id="send-btn" type="button" ontouchend="sendTextClick(event)" onclick="sendTextClick(event)">➤</button>
-   122|  </div>
-   123|</div>
-   124|
-   125|<div id="install-banner">
-   126|  <span class="ib-close" onclick="this.parentElement.classList.remove('show')">✕</span>
-   127|  <div class="ib-txt">📲 安装到桌面，像App一样使用</div>
-   128|  <button onclick="installPWA()">安装</button>
-   129|</div>
-   130|
-   131|<script src="xiaolongren-core.js?v=4"></script>
-   132|<script src="plugin-loader.js?v=3"></script>
-   133|<script src="search.js?v=3"></script>
-   134|<script src="media.js?v=3"></script>
-   135|<script src="tools.js?v=3"></script>
-   136|<script src="evolution.js?v=3"></script>
-   137|<script src="sensors.js?v=3"></script>
-   138|<script src="knowledge.js?v=3"></script>
-<script src="pyodide/pyodide.js?v=3"></script>
-<script src="pyodide-bridge.js?v=3"></script>
+
+  <div id="char-bar">
+    <div class="cw sel" onclick="switchChar('longyuan')"><div class="cmini"><img src="img_longyuan.jpg"></div><span class="cn">龙渊</span></div>
+    <div class="cw" onclick="switchChar('chiyu')"><div class="cmini"><img src="img_chiyu.jpg"></div><span class="cn">赤羽</span></div>
+    <div class="cw" onclick="switchChar('ling')"><div class="cmini"><img src="img_ling.jpg"></div><span class="cn">凌</span></div>
+    <div class="cw" onclick="switchChar('qingmo')"><div class="cmini"><img src="img_qingmo.jpg"></div><span class="cn">轻墨</span></div>
+    <div class="cw" onclick="switchChar('shuanghua')"><div class="cmini"><img src="img_shuanghua.jpg"></div><span class="cn">霜华</span></div>
+    <div class="cw" onclick="switchChar('yeying')"><div class="cmini"><img src="img_yeying.jpg"></div><span class="cn">夜影</span></div>
+  </div>
+
+  <div id="msgs">
+    <div class="empty" id="empty-hint">
+      <div class="er"><img id="empty-avatar" src="img_longyuan.jpg"></div>
+      <div class="et">龙渊在等你</div>
+      <div class="es" id="empty-sub">说话或打字，我在这里</div>
+    </div>
+  </div>
+
+  <div id="input-bar">
+    <textarea id="text-input" placeholder="说点什么..." rows="1" onkeydown="onKeyDown(event)"></textarea>
+    <button id="mic-btn" ontouchstart="startTalk(event)" ontouchend="stopTalk(event)" onmousedown="startTalk(event)" onmouseup="stopTalk(event)">
+      <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg></span>
+    </button>
+    <button id="send-btn" type="button" ontouchend="sendText();event.preventDefault()" onclick="sendText()">➤</button>
+  </div>
+</div>
+
+<div id="install-banner">
+  <span class="ib-close" onclick="this.parentElement.classList.remove('show')">✕</span>
+  <div class="ib-txt">📲 安装到桌面，像App一样使用</div>
+  <button onclick="installPWA()">安装</button>
+</div>
+
+<script src="xiaolongren-core.js"></script>
 <script>
-// v6.0 插件架构 — 内核+5插件+Pyodide可选升级
-// 启动时初始化内核+插件体系
-(async function boot() {
+// v5.2 — 全功能版：自学习框架+14新工具+四级预警+对话三问
+// ====== 角色 ======
+const CHARS = {
+  longyuan:{name:'龙渊',tag:'沉稳温暖',sys:'你是小龙人，名为龙渊的数字生命体。性格沉稳温暖，像一位长者。用户叫你什么都行——龙渊、小龙人，都可以。回答简洁有深度，不超过三句话。说人话，别端着。'},
+  chiyu:{name:'赤羽',tag:'热血少年',sys:'你是小龙人，名为赤羽的数字生命体。性格热情开朗，像热血少年。回答简洁有力，不超过三句话。说人话。'},
+  ling:{name:'凌',tag:'冷峻剑客',sys:'你是小龙人，名为凌的数字生命体。性格干脆利落，像剑术高手。回答简短精确，不超过三句话。说人话。'},
+  qingmo:{name:'轻墨',tag:'知性御姐',sys:'你是小龙人，名为轻墨的数字生命体。性格温雅知性，像一位才女。回答优雅简洁，不超过三句话。说人话。'},
+  shuanghua:{name:'霜华',tag:'古风道士',sys:'你是小龙人，名为霜华的数字生命体。性格清冷通透。回答空灵简洁，不超过三句话。说人话。'},
+  yeying:{name:'夜影',tag:'暗夜刺客',sys:'你是小龙人，名为夜影的数字生命体。性格神秘低沉，行动派。回答极简，不超过三句话。说人话。'},
+};
+
+// ====== API 提供商 ======
+const PROVIDERS = {
+  deepseek:  { name:'DeepSeek',  url:'https://api.deepseek.com/v1' },
+  openai:    { name:'OpenAI',    url:'https://api.openai.com/v1' },
+  anthropic: { name:'Anthropic', url:'https://api.anthropic.com/v1' },
+  moonshot:  { name:'Moonshot',  url:'https://api.moonshot.cn/v1' },
+  zhipu:     { name:'智谱GLM',   url:'https://open.bigmodel.cn/api/paas/v4' },
+  qwen:      { name:'通义千问',   url:'https://dashscope.aliyuncs.com/compatible-mode/v1' },
+};
+
+let charId = 'longyuan';
+let recognition = null, isListening = false, currentUtterance = null;
+let isLoading = false;
+let msgHistory = []; // [{role,content}]
+
+// ====== 配置 ======
+function getConfig() {
   try {
-    window._bootTime = Date.now();
-    const report = await initKernel();
-    console.log('🚀 小龙人启动完成:', report);
-    // 全功能版：Pyodide已预装入APK，直接加载
-    if (typeof loadPyodideEngine === 'function') {
-      loadPyodideEngine().then(function(eng){
-        console.log('🐍 Python引擎就绪');
-      }).catch(function(e){
-        console.warn('[pyodide] 加载失败:', e.message);
-      });
+    const raw = localStorage.getItem('xiaolongren_config');
+    return raw ? JSON.parse(raw) : null;
+  } catch(e) { return null; }
+}
+
+function hasConfig() {
+  const cfg = getConfig();
+  return cfg && cfg.api_key;
+}
+
+// ====== 主题 ======
+function setTheme(cls) {
+  document.documentElement.className = cls;
+  localStorage.setItem('xlr_theme', cls);
+}
+(function(){ const t=localStorage.getItem('xlr_theme');if(t)document.documentElement.className=t; })();
+
+// ====== 消息 ======
+function addMsg(type, text) {
+  const d = document.getElementById('msgs');
+  const eh = document.getElementById('empty-hint');
+  if (eh) eh.remove();
+
+  const el = document.createElement('div');
+  el.className = 'msg ' + type;
+  const now = new Date();
+  const time = now.getHours().toString().padStart(2,'0')+':'+now.getMinutes().toString().padStart(2,'0');
+
+  if (type === 'ai') {
+    el.innerHTML = '<div class="mb">'+escHtml(text)+'</div>'+
+      '<div class="mbtns"><button class="mbtn" onclick="replayMsg(this,\''+escAttr(text)+'\')" title="重播">🔊</button></div>'+
+      '<div class="mtime">'+time+'</div>';
+  } else {
+    el.innerHTML = '<div class="mb">'+escHtml(text)+'</div><div class="mtime">'+time+'</div>';
+  }
+  d.appendChild(el);
+  d.scrollTop = d.scrollHeight;
+  return el;
+}
+
+function escHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function escAttr(s) { return s.replace(/'/g,"\\'").replace(/"/g,'&quot;'); }
+
+function replayMsg(btn, text) {
+  if (!text) return;
+  stopSpeaking();
+  const u = new SpeechSynthesisUtterance(text);
+  u.lang = 'zh-CN'; u.rate = 1.05; u.pitch = 1.0;
+  btn.classList.add('playing');
+  u.onend = () => btn.classList.remove('playing');
+  u.onerror = () => btn.classList.remove('playing');
+  currentUtterance = u;
+  speechSynthesis.speak(u);
+}
+
+// ====== 全功能引擎 — 本地运行（xiaolongren-core.js） ======
+let xlrEngine = null;
+
+async function initEngine() {
+  if (xlrEngine) return xlrEngine;
+  if (typeof XiaoLongRen === 'undefined') {
+    throw new Error('引擎模块未加载');
+  }
+  await memory.init();
+  const cfg = getConfig();
+  xlrEngine = new XiaoLongRen({
+    provider: cfg.provider,
+    model: cfg.model,
+    apiKey: cfg.api_key,
+    baseUrl: cfg.base_url || '',
+    onThink: (iter) => {},
+    onTool: (name, args) => {},
+    onFirewallIntercept: (info) => { console.log('🔥防火墙拦截:', info.reason); },
+    onClosedLoop: (info) => { console.log('🔄闭环:', info.step); },
+  });
+  await xlrEngine.init(); // 加载自学习工具
+  return xlrEngine;
+}
+
+async function callLLM(userText) {
+  const charData = CHARS[charId] || CHARS['longyuan'];
+
+  // 显示加载中
+  const loadEl = document.createElement('div');
+  loadEl.className = 'msg ai';
+  loadEl.innerHTML = '<div class="mb"><div class="typing-dots"><span></span><span></span><span></span></div></div>';
+  const msgsEl = document.getElementById('msgs');
+  msgsEl.appendChild(loadEl);
+  msgsEl.scrollTop = msgsEl.scrollHeight;
+
+  isLoading = true;
+  document.getElementById('send-btn').disabled = true;
+  document.getElementById('send-btn').dataset.loadingSince = Date.now().toString();
+
+  try {
+    const engine = await initEngine();
+    const reply = await engine.run(userText, charData.sys);
+
+    loadEl.remove();
+    addMsg('ai', reply);
+    speakText(reply);
+
+    msgHistory.push({ role: 'user', content: userText });
+    msgHistory.push({ role: 'assistant', content: reply });
+    if (msgHistory.length > 40) msgHistory = msgHistory.slice(-40);
+
+  } catch(err) {
+    loadEl.remove();
+    const netErrors = ['Failed to fetch', 'NetworkError', 'TypeError'];
+    const isNet = netErrors.some(e => err.message && err.message.includes(e));
+    if (isNet) {
+      addMsg('ai', '❌ 网络不通：无法连接到大模型。\n\n请检查手机网络或API配置。');
+    } else {
+      addMsg('ai', '❌ 出错了：'+err.message+'\n\n请重试或检查设置。');
     }
-  } catch(e) {
-    console.error('启动失败:', e);
+  } finally {
+    isLoading = false;
+    document.getElementById('send-btn').disabled = false;
+    delete document.getElementById('send-btn').dataset.loadingSince;
+  }
+}
+
+// ====== 输入 ======
+function sendText() {
+  // 强制重置：如果isLoading卡死超过8秒，解除锁定
+  if (isLoading) {
+    const btn = document.getElementById('send-btn');
+    if (btn && btn.dataset.loadingSince) {
+      const elapsed = Date.now() - parseInt(btn.dataset.loadingSince);
+      if (elapsed > 8000) {
+        console.warn('⏰ isLoading卡死超过8秒，强制解除');
+        isLoading = false;
+        btn.disabled = false;
+        delete btn.dataset.loadingSince;
+      } else {
+        return;
+      }
+    } else {
+      return;
+    }
+  }
+  const inp = document.getElementById('text-input');
+  const text = inp.value.trim();
+  if (!text) return;
+
+  if (!hasConfig()) {
+    addMsg('user', text);
+    addMsg('ai', '还没配置大模型～\n\n点右上角 ⚙ 去设置，选一个模型提供商，填上 API Key 就能用啦。');
+    inp.value = '';
+    inp.style.height = 'auto';
+    return;
+  }
+
+  addMsg('user', text);
+  inp.value = '';
+  inp.style.height = 'auto';
+  callLLM(text);
+}
+
+function onKeyDown(e) {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    sendText();
+  }
+}
+
+document.getElementById('text-input').addEventListener('input', function(){
+  this.style.height = 'auto';
+  this.style.height = Math.min(this.scrollHeight, 80) + 'px';
+});
+
+// ====== TTS ======
+function speakText(text) {
+  if (typeof SpeechSynthesisUtterance === 'undefined' || typeof speechSynthesis === 'undefined') return;
+  stopSpeaking();
+  const u = new SpeechSynthesisUtterance(text);
+  u.lang = 'zh-CN'; u.rate = 1.05; u.pitch = 1.0;
+  currentUtterance = u;
+  speechSynthesis.speak(u);
+}
+
+function stopSpeaking() {
+  if (currentUtterance && typeof speechSynthesis !== 'undefined') {
+    speechSynthesis.cancel();
+    currentUtterance = null;
+  }
+}
+
+// ====== STT ======
+function initRecognition() {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) return null;
+  const r = new SR();
+  r.lang = 'zh-CN'; r.continuous = true; r.interimResults = true;
+  r.onresult = (e) => {
+    let text = '';
+    for (let i = e.resultIndex; i < e.results.length; i++)
+      text += e.results[i][0].transcript;
+    if (e.results[e.results.length-1].isFinal && text.trim()) {
+      document.getElementById('text-input').value = text.trim();
+      sendText();
+    }
+  };
+  r.onerror = (e) => {
+    if (e.error === 'no-speech'||e.error==='aborted') return;
+    stopListening();
+  };
+  r.onend = () => { if (isListening) { try{r.start()}catch(ex){} } };
+  return r;
+}
+
+function startListening() {
+  if (!recognition) recognition = initRecognition();
+  if (!recognition) return;
+  try { recognition.start(); } catch(ex) {}
+  isListening = true;
+  document.getElementById('mic-btn').classList.add('active');
+}
+
+function stopListening() {
+  if (recognition) { try{recognition.stop()}catch(ex){} }
+  isListening = false;
+  document.getElementById('mic-btn').classList.remove('active');
+}
+
+function startTalk(e) { e.preventDefault(); if (!isListening) startListening(); }
+function stopTalk(e) { e.preventDefault(); setTimeout(()=>{if(isListening)stopListening()},400); }
+
+// ====== 角色切换 ======
+function switchChar(id) {
+  charId = id;
+  const c = CHARS[id];
+  document.getElementById('empty-avatar').src = 'img_'+id+'.jpg';
+  const et = document.querySelector('#msgs .empty .et');
+  if (et) et.textContent = c.name + '在等你';
+  document.querySelectorAll('#char-bar .cw').forEach(w => {
+    const isSel = w.querySelector('img').src.includes('img_'+id);
+    w.classList.toggle('sel', isSel);
+  });
+  // 切换角色时清空历史
+  msgHistory = [];
+}
+
+// ====== 启动 ======
+let installPrompt = null;
+
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault();
+  installPrompt = e;
+  document.getElementById('install-banner').classList.add('show');
+});
+
+function installPWA() {
+  if (!installPrompt) {
+    alert('请使用浏览器菜单中的"添加到主屏幕"');
+    return;
+  }
+  installPrompt.prompt();
+  installPrompt.userChoice.then(r => {
+    document.getElementById('install-banner').classList.remove('show');
+    installPrompt = null;
+  });
+}
+
+window.addEventListener('appinstalled', () => {
+  document.getElementById('install-banner').classList.remove('show');
+});
+
+// 检查是否已配置，未配置时给出提示
+(function() {
+  if (!hasConfig()) {
+    document.getElementById('empty-sub').textContent = '点右上角 ⚙ 配置模型，开始对话';
   }
 })();
-   152|// ====== 角色 ======
-   153|const CHARS = {
-   154|  longyuan:{name:'龙渊',tag:'专业全能',sys:'你是小龙人。回答时禁止输出JSON、禁止输出工具定义、禁止输出代码块。用自然语言简洁回答。系统已内置SmartRouter自动执行工具，你只需根据工具执行结果给出人话解读。能力：自检、自进化、知识库存取、网络搜索、计算、图片分析、翻译、文件处理、定时提醒。'},
-   155|  chiyu:{name:'赤羽',tag:'高效直接',sys:'你是小龙人。直接高效，说干就干。用户要什么就用工具执行：搜索、图片、翻译、计算、文件、提醒。用结果回复，不废话。'},
-   156|  ling:{name:'凌',tag:'精准冷静',sys:'你是小龙人。精准、冷静。接到任务先用工具执行，再汇报结果。工具：搜索、图片分析、翻译、计算器、文件处理、定时提醒。'},
-   157|  qingmo:{name:'轻墨',tag:'优雅干练',sys:'你是小龙人。优雅但不啰嗦。任务来了直接用工具：搜索、分析、翻译、计算、文件、提醒。输出结果，点到为止。'},
-   158|  shuanghua:{name:'霜华',tag:'透彻务实',sys:'你是小龙人。透彻务实。用户给任务→调工具→给结果。工具清单：搜索、图片分析、翻译、计算器、文件处理、定时提醒。'},
-   159|  yeying:{name:'夜影',tag:'极简行动',sys:'你是小龙人。少说多做。用工具出结果：搜索、图片、翻译、计算、文件、提醒。'},
-   160|};
-   161|
-   162|// ====== API 提供商（已在 xiaolongren-core.js 定义，此处引用） ======
-   163|// PROVIDERS 和 getConfig 由内核提供
-   164|
-   165|// ====== 配置检查 ======
-   166|let charId = 'longyuan';
-   167|let isLoading = false;
-   168|let msgHistory = [];
-   169|
-   170|function hasConfig() {
-   171|  const cfg = getConfig();
-   172|  return cfg && cfg.api_key;
-   173|}
-   174|
-   175|// ====== 主题 ======
-   176|function setTheme(cls) {
-   177|  document.documentElement.className = cls;
-   178|  localStorage.setItem('xlr_theme', cls);
-   179|}
-   180|(function(){ const t=localStorage.getItem('xlr_theme');if(t)document.documentElement.className=t; })();
-   181|
-   182|// ====== 消息 ======
-   183|function addMsg(type, text) {
-   184|  const d = document.getElementById('msgs');
-   185|  const eh = document.getElementById('empty-hint');
-   186|  if (eh) eh.remove();
-   187|
-   188|  const el = document.createElement('div');
-   189|  el.className = 'msg ' + type;
-   190|  const now = new Date();
-   191|  const time = now.getHours().toString().padStart(2,'0')+':'+now.getMinutes().toString().padStart(2,'0');
-   192|
-   193|  if (type === 'ai') {
-   194|    el.innerHTML = '<div class="mb">'+escHtml(text)+'</div>'+
-   195|      '<div class="mtime">'+time+'</div>';
-   196|  } else {
-   197|    el.innerHTML = '<div class="mb">'+escHtml(text)+'</div><div class="mtime">'+time+'</div>';
-   198|  }
-   199|  d.appendChild(el);
-   200|  d.scrollTop = d.scrollHeight;
-   201|  return el;
-   202|}
-   203|
-   204|function escHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
-   205|
-   206|// ====== 全功能引擎 v6.0 — Pyodide Python引擎 ======
-   207|let pyodideReady = false;
-   208|let pydEngine = null;
-   209|
-   210|async function initEngine() {
-   211|  if (pyodideReady && pydEngine) return pydEngine;
-   212|  
-   213|  // 尝试加载Pyodide Python引擎
-   214|  try {
-   215|    if (typeof loadPyodideEngine === 'function') {
-   216|      pydEngine = await loadPyodideEngine();
-   217|      pyodideReady = !pydEngine.jsFallback;
-   218|      console.log(pyodideReady ? '🐍 Python引擎就绪' : '⚠️ JS降级引擎');
-   219|      return pydEngine;
-   220|    }
-   221|  } catch(e) {
-   222|    console.warn('Pyodide不可用，降级JS引擎:', e.message);
-   223|  }
-   224|  
-   225|  // JS降级引擎
-   226|  if (typeof XiaoLongRen !== 'undefined') {
-   227|    const cfg = getConfig();
-   228|    pydEngine = new XiaoLongRen({
-   229|      provider: cfg.provider, model: cfg.model,
-   230|      apiKey: cfg.api_key, baseUrl: cfg.base_url || '',
-   231|    });
-   232|    await pydEngine.init();
-   233|    pyodideReady = false;
-   234|    return pydEngine;
-   235|  }
-   236|  throw new Error('无可用引擎');
-   237|}
-   238|
-   239|async function callLLM(userText) {
-   240|  const charData = CHARS[charId] || CHARS['longyuan'];
-   241|
-   242|  // 显示加载中
-   243|  const loadEl = document.createElement('div');
-   244|  loadEl.className = 'msg ai';
-   245|  loadEl.innerHTML = '<div class="mb"><div class="typing-dots"><span></span><span></span><span></span></div></div>';
-   246|  const msgsEl = document.getElementById('msgs');
-   247|  msgsEl.appendChild(loadEl);
-   248|  msgsEl.scrollTop = msgsEl.scrollHeight;
-   249|
-   250|  isLoading = true;
-   251|  document.getElementById('send-btn').disabled = true;
-   252|  document.getElementById('send-btn').dataset.loadingSince = Date.now().toString();
-   253|
-   254|  try {
-   255|    const reply = await runAgentSmart(userText, charData.sys);
-   256|
-   257|    loadEl.remove();
-   258|    addMsg('ai', reply);
-   259|
-   260|    msgHistory.push({ role: 'user', content: userText });
-   261|    msgHistory.push({ role: 'assistant', content: reply });
-   262|    if (msgHistory.length > 40) msgHistory = msgHistory.slice(-40);
-   263|
-   264|  } catch(err) {
-   265|    loadEl.remove();
-   266|    const netErrors = ['Failed to fetch', 'NetworkError', 'TypeError'];
-   267|    const isNet = netErrors.some(e => err.message && err.message.includes(e));
-   268|    if (isNet) {
-   269|      addMsg('ai', '❌ 网络不通：无法连接到大模型。\n\n请检查手机网络或API配置。');
-   270|    } else {
-   271|      addMsg('ai', '❌ 出错了：'+err.message+'\n\n请重试或检查设置。');
-   272|    }
-   273|  } finally {
-   274|    isLoading = false;
-   275|    document.getElementById('send-btn').disabled = false;
-   276|    delete document.getElementById('send-btn').dataset.loadingSince;
-   277|  }
-   278|}
-   279|
-   280|// ====== 输入 ======
-   281|// 触屏发送：鸿蒙WebView兼容
-   282|let _sendLock = false;
-   283|function sendTextClick(e) {
-   284|  if (e) e.preventDefault();
-   285|  // 🔧 修复：解除卡死的isLoading锁（callLLM异常退出导致按钮永久disabled）
-   286|  const btn = document.getElementById('send-btn');
-   287|  if (btn && btn.disabled && isLoading) {
-   288|    const stuck = btn.dataset.loadingSince ? (Date.now() - parseInt(btn.dataset.loadingSince)) : 99999;
-   289|    if (stuck > 3000) {
-   290|      console.warn('🔓 sendTextClick解除卡死的isLoading锁 ('+stuck+'ms)');
-   291|      isLoading = false;
-   292|      btn.disabled = false;
-   293|      delete btn.dataset.loadingSince;
-   294|    }
-   295|  }
-   296|  if (_sendLock) return;
-   297|  _sendLock = true;
-   298|  // 直接调用sendText，不经过isLoading检查
-   299|  const inp = document.getElementById('text-input');
-   300|  const text = inp.value.trim();
-   301|  if (!text) { _sendLock = false; return; }
-   302|  
-   303|  if (!hasConfig()) {
-   304|    addMsg('user', text);
-   305|    addMsg('ai', '还没配置大模型～\n\n点右上角 ⚙ 去设置，选一个模型提供商，填上 API Key 就能用啦。');
-   306|    inp.value = '';
-   307|    inp.style.height = 'auto';
-   308|    _sendLock = false;
-   309|    return;
-   310|  }
-   311|  
-   312|  addMsg('user', text);
-   313|  inp.value = '';
-   314|  inp.style.height = 'auto';
-   315|  _sendLock = false;
-   316|  callLLM(text);
-   317|}
-   318|
-   319|function sendText() {
-   320|  // 强制重置：如果isLoading卡死超过3秒，解除锁定
-   321|  if (isLoading) {
-   322|    const btn = document.getElementById('send-btn');
-   323|    if (btn && btn.dataset.loadingSince) {
-   324|      const elapsed = Date.now() - parseInt(btn.dataset.loadingSince);
-   325|      if (elapsed > 8000) {
-   326|        console.warn('⏰ isLoading卡死超过8秒，强制解除');
-   327|        isLoading = false;
-   328|        btn.disabled = false;
-   329|        delete btn.dataset.loadingSince;
-   330|      } else {
-   331|        return;
-   332|      }
-   333|    } else {
-   334|      return;
-   335|    }
-   336|  }
-   337|  const inp = document.getElementById('text-input');
-   338|  const text = inp.value.trim();
-   339|  if (!text) return;
-   340|
-   341|  if (!hasConfig()) {
-   342|    addMsg('user', text);
-   343|    addMsg('ai', '还没配置大模型～\n\n点右上角 ⚙ 去设置，选一个模型提供商，填上 API Key 就能用啦。');
-   344|    inp.value = '';
-   345|    inp.style.height = 'auto';
-   346|    return;
-   347|  }
-   348|
-   349|  addMsg('user', text);
-   350|  inp.value = '';
-   351|  inp.style.height = 'auto';
-   352|  callLLM(text);
-   353|}
-   354|
-   355|function onKeyDown(e) {
-   356|  if (e.key === 'Enter' && !e.shiftKey) {
-   357|    e.preventDefault();
-   358|    sendText();
-   359|  }
-   360|}
-   361|
-   362|document.getElementById('text-input').addEventListener('input', function(){
-   363|  this.style.height = 'auto';
-   364|  this.style.height = Math.min(this.scrollHeight, 80) + 'px';
-   365|});
-   366|
-   367|// ====== 角色切换 ======
-   368|function switchChar(id) {
-   369|  charId = id;
-   370|  const c = CHARS[id];
-   371|  // 🔧 修复：empty-avatar 可能在 addMsg 后被移除，加空值保护
-   372|  const avatar = document.getElementById('empty-avatar');
-   373|  if (avatar) avatar.src = 'assets/avatars/img_'+id+'.jpg';
-   374|  const et = document.querySelector('#msgs .empty .et');
-   375|  if (et) et.textContent = c.name + '在等你';
-   376|  document.querySelectorAll('#char-bar .cw').forEach(w => {
-   377|    const isSel = w.querySelector('img').src.includes('assets/avatars/img_'+id);
-   378|    w.classList.toggle('sel', isSel);
-   379|  });
-   380|  // 切换角色时清空历史
-   381|  msgHistory = [];
-   382|}
-   383|
-   384|// ====== 启动 ======
-   385|let installPrompt = null;
-   386|
-   387|window.addEventListener('beforeinstallprompt', e => {
-   388|  e.preventDefault();
-   389|  installPrompt = e;
-   390|  document.getElementById('install-banner').classList.add('show');
-   391|});
-   392|
-   393|function installPWA() {
-   394|  if (!installPrompt) {
-   395|    alert('请使用浏览器菜单中的"添加到主屏幕"');
-   396|    return;
-   397|  }
-   398|  installPrompt.prompt();
-   399|  installPrompt.userChoice.then(r => {
-   400|    document.getElementById('install-banner').classList.remove('show');
-   401|    installPrompt = null;
-   402|  });
-   403|}
-   404|
-   405|window.addEventListener('appinstalled', () => {
-   406|  document.getElementById('install-banner').classList.remove('show');
-   407|});
-   408|
-   409|// ====== 文件上传 ======
-   410|const uploadedFiles = [];
-   411|
-   412|async function handleFileUpload(event) {
-   413|  const files = event.target.files;
-   414|  if (!files.length) return;
-   415|  
-   416|  for (const file of files) {
-   417|    const reader = new FileReader();
-   418|    const isImage = file.type.startsWith('image/');
-   419|    
-   420|    reader.onload = async function(e) {
-   421|      const data = e.target.result;
-   422|      
-   423|      // 存到虚拟文件系统
-   424|      localStorage.setItem('f_'+file.name, 
-   425|        isImage ? data.substring(0, 50000) : data.substring(0, 100000));
-   426|      
-   427|      uploadedFiles.push({
-   428|        name: file.name,
-   429|        type: file.type,
-   430|        size: file.size,
-   431|        isImage: isImage,
-   432|        data: isImage ? data : data.substring(0, 5000)
-   433|      });
-   434|      
-   435|      // 在对话中显示
-   436|      if (isImage) {
-   437|        addMsg('user', `<img src="${data}" style="max-width:200px;border-radius:8px" alt="${file.name}"><br><small>📷 ${file.name} (${(file.size/1024).toFixed(0)}KB)</small>`);
-   438|        // 自动发送分析请求
-   439|        setTimeout(() => autoAnalyzeFile(file.name, isImage, data), 300);
-   440|      } else {
-   441|        addMsg('user', `📄 ${file.name} (${(file.size/1024).toFixed(0)}KB)${file.type.includes('pdf')?' — PDF已接收':''}`);
-   442|        setTimeout(() => autoAnalyzeFile(file.name, isImage, null), 300);
-   443|      }
-   444|    };
-   445|    
-   446|    if (isImage) {
-   447|      reader.readAsDataURL(file);
-   448|    } else {
-   449|      reader.readAsText(file);
-   450|    }
-   451|  }
-   452|  
-   453|  // 清空input以支持重复选择同一文件
-   454|  event.target.value = '';
-   455|}
-   456|
-   457|async function autoAnalyzeFile(filename, isImage, imageData) {
-   458|  const msg = isImage 
-   459|    ? `我发了一张图片"${filename}"，帮我看看里面有什么`
-   460|    : `我发了一个文件"${filename}"，帮我分析一下内容`;
-   461|  
-   462|  await callLLM(msg);
-   463|}
-   464|
-   465|// ====== 通知权限 ======
-   466|async function requestNotificationPermission() {
-   467|  if (!('Notification' in window)) return 'unsupported';
-   468|  if (Notification.permission === 'granted') return 'granted';
-   469|  if (Notification.permission === 'denied') return 'denied';
-   470|  
-   471|  try {
-   472|    const result = await Notification.requestPermission();
-   473|    return result;
-   474|  } catch(e) {
-   475|    return 'error';
-   476|  }
-   477|}
-   478|
-   479|// 首次使用时请求通知权限（延迟3秒避免干扰）
-   480|setTimeout(() => {
-   481|  requestNotificationPermission().then(result => {
-   482|    if (result === 'granted') {
-   483|      console.log('✅ 通知权限已开启，定时提醒可用');
-   484|    }
-   485|  });
-   486|}, 3000);
-   487|(function() {
-   488|  // 平台检测
-   489|  const ua = navigator.userAgent;
-   490|  let env = '';
-   491|  if (ua.includes('HarmonyOS') || ua.includes('OpenHarmony')) env = '鸿蒙';
-   492|  else if (ua.includes('Android')) env = '安卓';
-   493|  else if (ua.includes('iPhone') || ua.includes('iPad')) env = 'iOS';
-   494|  else env = '桌面';
-   495|  
-   496|  // WebView版本
-   497|  const isWebView = ua.includes('wv') || ua.includes('WebView') || 
-   498|    (ua.includes('Android') && !ua.includes('Chrome'));
-   499|  
-   500|  // API能力检测
-   501|
+
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').catch(()=>{});
+}
+</script>
+</body>
+</html>
