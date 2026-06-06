@@ -55,22 +55,9 @@ REM 5. Start engine
 echo 🚀 启动 PSPAI 引擎 (8089)...
 start "PSPAI Engine" "%ENGINE%"
 
-REM 6. Start frontend
-echo 🚀 启动前端界面 (8088)...
-REM 自适应前端目录
-set "FRONTEND="
-if exist "frontend\pwa\html" set "FRONTEND=frontend\pwa\html"
-if exist "UI原型" set "FRONTEND=UI原型"
-if exist "frontend" set "FRONTEND=frontend"
-if exist "pwa" set "FRONTEND=pwa"
-if "%FRONTEND%"=="" (
-    echo ⚠️ 未找到前端目录，引擎自带静态文件服务
-    echo    直接访问: http://localhost:8089
-) else (
-    cd "%FRONTEND%"
-    start "XiaoLongRen UI" /B python server.py
-    cd ..
-)
+REM 6. 启动 launcher（内置HTTP服务器+引擎管理）
+echo 🚀 启动小龙人 (内置HTTP服务器:8088)...
+start "XiaoLongRen UI" /B python launcher.py
 
 REM 7. Wait and open browser
 timeout /t 3 /nobreak >nul

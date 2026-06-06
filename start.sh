@@ -76,12 +76,10 @@ echo "🚀 启动 PSPAI 引擎 (8089)..."
 ./"$ENGINE" &
 ENGINE_PID=$!
 
-# 7. 启动前端
-echo "🚀 启动前端界面 (8088)..."
-cd UI原型
-$PYTHON server.py &
+# 7. 启动 launcher（内置HTTP服务器+引擎管理）
+echo "🚀 启动小龙人 (内置HTTP服务器:8088)..."
+$PYTHON launcher.py &
 UI_PID=$!
-cd "$DIR"
 
 sleep 2
 
