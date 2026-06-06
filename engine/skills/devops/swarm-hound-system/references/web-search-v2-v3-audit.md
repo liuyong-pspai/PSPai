@@ -2,7 +2,7 @@
 
 > 日期: 2026-05-31 | 审计者: Agent | 基准: code-writing-methodology + unified-audit-8fold
 
-## v2 问题（旺福原版）
+## v2 问题（早期版本）
 
 ### 致命缺陷
 1. **硬编码污染** `en_query = query + " crypto blockchain finance"` — 所有英文搜索被污染

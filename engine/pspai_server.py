@@ -1,11 +1,15 @@
 #!/usr/bin/env python3
 """
-PSPAI 后端服务 v3 — 基于 Hermes 引擎 + 记忆回路 + 错误恢复
+PSPAI 后端服务 v4 — 完整 Hermes Agent 能力引擎
 端口 8089，运行在 Hermes AIAgent 上，拥有完整工具链
 
-v3.0 新增:
-  - OperationLogger: 每次对话自动记录结构化日志
-  - L1/L2/L3 错误恢复: 重试 + 降级提示 + 失败记录
+v4.0 新增:
+  - 多Provider API Key 支持 (DeepSeek/OpenAI/Anthropic/自配置)
+  - Skills 自动加载 (engine/skills/ 目录扫描)
+  - 持久化记忆系统 (MEMORY.md + Hermes 内存回路)
+  - /api/tools 工具列表端点
+  - /api/models 模型/Provider 列表端点
+  - SOUL.md 作为系统提示词基础
 """
 import http.server
 import json
@@ -49,16 +53,65 @@ if not _config_loaded:
     print("WARN: config.yaml not found, using defaults")
 
 AGENT_CFG = CONFIG.get('agent', {})
-PSPAI_PROMPTS = {}
-for key in AGENT_CFG:
-    if key.startswith('system_prompt_'):
-        lang_code = key.replace('system_prompt_', '')
-        PSPAI_PROMPTS[lang_code] = AGENT_CFG[key]
 
-if 'zh' not in PSPAI_PROMPTS and 'system_prompt' in AGENT_CFG:
-    PSPAI_PROMPTS['zh'] = AGENT_CFG['system_prompt']
+# ── 沙箱净化：启动时自动清除SOUL/MEMORY中的不可见字符 ──
+def _purify_soul_memory():
+    """清除不可见Unicode和HTML注释，防止Hermes拦截SOUL"""
+    import re as _re
+    BAD = [b"\xe2\x80\x8b", b"\xe2\x80\x8c", b"\xe2\x80\x8d", b"\xef\xbb\xbf"]
+    for _fname in ["SOUL.md", "MEMORY.md"]:
+        _fp = BASE_DIR / _fname
+        if not _fp.exists():
+            continue
+        try:
+            with open(_fp, "rb") as _f:
+                _d = _f.read()
+            _old = len(_d)
+            for _b in BAD:
+                _d = _d.replace(_b, b"")
+            _d = _re.sub(rb"<!--.*?-->", b"", _d, flags=_re.DOTALL)
+            if len(_d) != _old:
+                with open(_fp, "wb") as _f:
+                    _f.write(_d)
+                print(f"[PSPAI SANDBOX] Cleaned {_fname}: {_old}->{len(_d)} bytes")
+        except Exception as _e:
+            print(f"[PSPAI SANDBOX] WARN: {_fname} cleanup failed: {_e}")
+_purify_soul_memory()
+# ──────────────────────────────────────────────────────────────
 
-DEFAULT_PROMPT = PSPAI_PROMPTS.get('zh', 'You are PSPAI.')
+# ── 系统提示词：优先用 SOUL.md，回退到 config.yaml ──
+SOUL_PATH = BASE_DIR / "SOUL.md"
+if SOUL_PATH.exists():
+    with open(SOUL_PATH, encoding='utf-8') as f:
+        DEFAULT_PROMPT = f.read().strip()
+    print(f"[PSPAI] Loaded system prompt from SOUL.md ({len(DEFAULT_PROMPT)} chars)")
+else:
+    PSPAI_PROMPTS = {}
+    for key in AGENT_CFG:
+        if key.startswith('system_prompt_'):
+            lang_code = key.replace('system_prompt_', '')
+            PSPAI_PROMPTS[lang_code] = AGENT_CFG[key]
+    if 'zh' not in PSPAI_PROMPTS and 'system_prompt' in AGENT_CFG:
+        PSPAI_PROMPTS['zh'] = AGENT_CFG['system_prompt']
+    DEFAULT_PROMPT = PSPAI_PROMPTS.get('zh', 'You are PSPAI.')
+    # Also keep PSPAI_PROMPTS for language-switching in chat
+    class _TempPsPAI:
+        pass
+    _pspai_tmp = _TempPsPAI()
+    _pspai_tmp.PSPAI_PROMPTS = PSPAI_PROMPTS
+    PSPAI_PROMPTS = _pspai_tmp.PSPAI_PROMPTS
+    print("[PSPAI] WARN: SOUL.md not found, using config.yaml prompts")
+
+# 如果 SOUL.md 加载成功但我们也希望支持语言切换
+if SOUL_PATH.exists():
+    PSPAI_PROMPTS = {}
+    for key in AGENT_CFG:
+        if key.startswith('system_prompt_'):
+            lang_code = key.replace('system_prompt_', '')
+            PSPAI_PROMPTS[lang_code] = AGENT_CFG[key]
+    if 'zh' not in PSPAI_PROMPTS and 'system_prompt' in AGENT_CFG:
+        PSPAI_PROMPTS['zh'] = AGENT_CFG['system_prompt']
+
 PROVIDER = AGENT_CFG.get('provider', 'deepseek')
 
 PSPAI_MSGS = {
@@ -68,44 +121,188 @@ PSPAI_MSGS = {
 def t_msg(lang, key):
     return PSPAI_MSGS.get(lang, PSPAI_MSGS['zh']).get(key, PSPAI_MSGS['zh'][key])
 
-# 统一API Key读取：优先PSPAI_API_KEY（launcher写入），回退DEEPSEEK_API_KEY
-API_KEY = os.environ.get('PSPAI_API_KEY') or os.environ.get('DEEPSEEK_API_KEY', '')
-# Base URL: 根据provider从config读取，默认DeepSeek
+# ============================================================
+# 多Provider API Key 支持
+# ============================================================
+# 优先级: PSPAI_API_KEY (launcher写入) > Provider特定Key > 回退链路
+def _resolve_api_key(provider: str) -> str:
+    """解析多Provider的API Key，支持DeepSeek/OpenAI/Anthropic等。"""
+    # 先检查统一Key
+    unified = os.environ.get('PSPAI_API_KEY', '').strip()
+    if unified:
+        return unified
+
+    # Provider特定环境变量映射
+    provider_key_map = {
+        'deepseek': 'DEEPSEEK_API_KEY',
+        'openai': 'OPENAI_API_KEY',
+        'anthropic': 'ANTHROPIC_API_KEY',
+        'openrouter': 'OPENROUTER_API_KEY',
+        'alibaba': 'DASHSCOPE_API_KEY',
+        'zai': 'ZAI_API_KEY',
+        'gemini': 'GEMINI_API_KEY',
+        'kimi-coding': 'MOONSHOT_API_KEY',
+        'minimax': 'MINIMAX_API_KEY',
+        'huggingface': 'HF_TOKEN',
+    }
+    env_var = provider_key_map.get(provider)
+    if env_var:
+        key = os.environ.get(env_var, '').strip()
+        if key:
+            return key
+
+    # 回退到通用 DEEPSEEK_API_KEY
+    return os.environ.get('DEEPSEEK_API_KEY', '').strip()
+
+API_KEY = _resolve_api_key(PROVIDER)
+
+# Base URL 映射表 (支持多Provider)
 _BASE_URL_MAP = {
     'deepseek': 'https://api.deepseek.com/v1',
     'openai': 'https://api.openai.com/v1',
     'anthropic': 'https://api.anthropic.com/v1',
+    'openrouter': 'https://openrouter.ai/api/v1',
+    'alibaba': 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+    'gemini': 'https://generativelanguage.googleapis.com/v1beta',
+    'zai': 'https://api.z.ai/api/paas/v4',
+    'kimi-coding': 'https://api.moonshot.cn/v1',
+    'minimax': 'https://api.minimax.chat/v1',
+    'huggingface': 'https://api-inference.huggingface.co/v1',
+    'custom': os.environ.get('CUSTOM_BASE_URL', ''),
 }
 BASE_URL = _BASE_URL_MAP.get(PROVIDER, 'https://api.deepseek.com/v1')
 
-from run_agent import AIAgent
-import pspai_search
+# ============================================================
+# Skills 加载 (engine/skills/ 目录扫描)
+# ============================================================
+SKILLS_DIR = BASE_DIR / "skills"
+LOADED_SKILLS = {}  # skill_name -> {path, description, tools}
+
+def scan_skills() -> dict:
+    """扫描 engine/skills/ 目录下的所有 SKILL.md，返回技能列表。"""
+    skills = {}
+    if not SKILLS_DIR.exists():
+        print(f"[PSPAI] Skills dir not found: {SKILLS_DIR}")
+        return skills
+
+    for skill_md in SKILLS_DIR.rglob("SKILL.md"):
+        skill_name = skill_md.parent.name
+        rel_path = skill_md.parent.relative_to(SKILLS_DIR)
+        try:
+            content = skill_md.read_text(encoding='utf-8')
+            # 提取标题（第一行 # 开头）
+            desc = ""
+            for line in content.split('\n'):
+                if line.startswith('# ') and not line.startswith('## '):
+                    desc = line[2:].strip()
+                    break
+            skills[skill_name] = {
+                "name": skill_name,
+                "path": str(rel_path),
+                "description": desc or skill_name,
+                "file": str(skill_md),
+            }
+        except Exception as e:
+            print(f"[PSPAI] WARN: Failed to load skill {skill_md}: {e}")
+
+    print(f"[PSPAI] Loaded {len(skills)} skills from {SKILLS_DIR}")
+    return skills
+
+LOADED_SKILLS = scan_skills()
+
+# ============================================================
+# Hermes 工具发现
+# ============================================================
+def _get_available_tools() -> list:
+    """从 Hermes 工具注册表获取可用工具列表。"""
+    try:
+        from tools.registry import get_registry
+        registry = get_registry()
+        tools = []
+        for entry in registry._tools.values():
+            tools.append({
+                "name": entry.name,
+                "description": entry.description or "",
+                "toolset": entry.toolset,
+                "requires_env": entry.requires_env or [],
+            })
+        return tools
+    except Exception as e:
+        print(f"[PSPAI] Failed to discover tools: {e}")
+        return []
+
+def _get_available_models() -> list:
+    """从 Hermes 模型目录获取可用 Provider/Model 列表。"""
+    try:
+        from hermes_cli.models import list_available_providers
+        providers = list_available_providers()
+        return providers
+    except Exception as e:
+        print(f"[PSPAI] Failed to list models: {e}")
+        # 返回基础Provider列表
+        return [
+            {"id": "deepseek", "label": "DeepSeek", "aliases": ["ds"]},
+            {"id": "openai", "label": "OpenAI", "aliases": ["oai"]},
+            {"id": "anthropic", "label": "Anthropic", "aliases": ["claude"]},
+            {"id": "openrouter", "label": "OpenRouter", "aliases": ["or"]},
+        ]
+
+# ============================================================
+# 持久化记忆系统
+# ============================================================
+MEMORY_PATH = BASE_DIR / "MEMORY.md"
+
+def init_memory():
+    """初始化 MEMORY.md 文件。"""
+    if not MEMORY_PATH.exists():
+        MEMORY_PATH.write_text(
+            "# 小龙人永生记忆 MEMORY.md\n"
+            "# PSPAI 八层永生记忆系统 (L0-L7)\n"
+            "# 此文件由 memory 工具自动同步维护，请勿手动编辑\n\n"
+            "---\n"
+            "## L1 工作记忆 (当前活跃)\n\n",
+            encoding='utf-8'
+        )
+    return MEMORY_PATH
+
+init_memory()
 
 # ============================================================
 # Agent 实例管理
 # ============================================================
+from run_agent import AIAgent
+import pspai_search
+
 agents = {}
 agent_lock = threading.Lock()
 
-def get_agent(char_index, char_name):
+def get_agent(char_index, char_name, provider=None):
+    """获取或创建Agent实例，支持多Provider切换。"""
     key = str(char_index)
+    if provider:
+        key = f"{char_index}_{provider}"
+
     with agent_lock:
         if key not in agents:
-            # 从config.yaml读取provider/model/max_turns，不再硬编码
-            _provider = AGENT_CFG.get('provider', PROVIDER)
+            _provider = provider or AGENT_CFG.get('provider', PROVIDER)
             _model = AGENT_CFG.get('model', 'deepseek-chat')
-            _max_iters = int(AGENT_CFG.get('max_turns', 8))
+            _max_iters = int(AGENT_CFG.get('max_turns', 90))
             _base_url = _BASE_URL_MAP.get(_provider, BASE_URL)
+            _api_key = _resolve_api_key(_provider)
+            _skip_context = not AGENT_CFG.get('skip_context_files', False)
+            _skip_memory = not CONFIG.get('memory', {}).get('memory_enabled', True)
+
             agent = AIAgent(
                 model=_model,
                 provider=_provider,
-                api_key=API_KEY,
+                api_key=_api_key,
                 base_url=_base_url,
                 ephemeral_system_prompt=DEFAULT_PROMPT,
-                skip_context_files=True,
-                skip_memory=False,
+                skip_context_files=_skip_context,
+                skip_memory=_skip_memory,
                 max_iterations=_max_iters,
                 quiet_mode=True,
+                persist_session=True,
             )
             agents[key] = agent
         return agents[key]
@@ -154,7 +351,7 @@ def save_avatar(slot, data_url):
     return f"/api/avatars/{filename}"
 
 # ============================================================
-# 会话历史
+# 会话历史 (持久化到会话存储)
 # ============================================================
 conversation_history = load_json('conversations', {})
 
@@ -169,16 +366,39 @@ def add_to_history(char_index, role, content):
     if key not in conversation_history:
         conversation_history[key] = []
     conversation_history[key].append({"role": role, "content": content})
-    if len(conversation_history[key]) > 40:
-        conversation_history[key] = conversation_history[key][-40:]
+    # 持久化上限200条（对齐SOUL.md防积压铁律）
+    if len(conversation_history[key]) > 200:
+        conversation_history[key] = conversation_history[key][-200:]
     save_json('conversations', conversation_history)
+    # 同步更新 MEMORY.md
+    _sync_memory_summary(key)
+
+def _sync_memory_summary(char_key):
+    """将会话摘要同步到 MEMORY.md。"""
+    try:
+        history = conversation_history.get(char_key, [])
+        if not history:
+            return
+        # 只记录最近的操作摘要，不写入完整对话
+        last_msg = history[-1] if history else {}
+        summary_line = f"- [{time.strftime('%m-%d %H:%M')}] {last_msg.get('role','?')}: {last_msg.get('content','')[:80]}...\n"
+        with open(MEMORY_PATH, 'a', encoding='utf-8') as f:
+            f.write(summary_line)
+        # 防止 MEMORY.md 无限增长，保持最后500条
+        lines = MEMORY_PATH.read_text(encoding='utf-8').split('\n')
+        if len(lines) > 600:
+            header = '\n'.join(lines[:6])
+            body = '\n'.join(lines[-500:])
+            MEMORY_PATH.write_text(header + '\n' + body, encoding='utf-8')
+    except Exception:
+        pass  # 记忆同步失败不影响主流程
 
 # ============================================================
-# 操作日志 - 记忆回路 v3.0
+# 操作日志 - 记忆回路
 # ============================================================
 class OperationLogger:
     """每次对话自动记录结构化日志，供后续技能提炼使用"""
-    
+
     def __init__(self, data_dir):
         self.data_dir = Path(data_dir)
         self.data_dir.mkdir(exist_ok=True)
@@ -187,10 +407,10 @@ class OperationLogger:
         self._write_lock = threading.Lock()
         self._save_timer = None
         self._load()
-    
+
     def _path(self):
         return self.data_dir / "chat_operations.json"
-    
+
     def _load(self):
         p = self._path()
         if p.exists():
@@ -200,23 +420,21 @@ class OperationLogger:
                 self._ops = raw[-500:] if isinstance(raw, list) else []
             except (json.JSONDecodeError, OSError):
                 self._ops = []
-    
+
     def _save(self):
-        """线程安全写入，使用写锁防止竞争"""
         with self._write_lock:
             tmp = self._path().with_suffix('.tmp')
             with open(tmp, 'w') as f:
                 json.dump(self._ops, f, ensure_ascii=False, indent=2)
-            tmp.replace(self._path())  # 原子替换
+            tmp.replace(self._path())
 
     def _schedule_save(self):
-        """延迟保存，合并短时间内的多次写入"""
         if self._save_timer:
             self._save_timer.cancel()
         self._save_timer = threading.Timer(1.0, self._save)
         self._save_timer.daemon = True
         self._save_timer.start()
-    
+
     def record(self, tool="chat", params=None, success=True, summary="", latency_ms=0):
         with self._lock:
             record = {
@@ -230,9 +448,9 @@ class OperationLogger:
             self._ops.append(record)
             if len(self._ops) > 500:
                 self._ops = self._ops[-500:]
-            self._schedule_save()  # 延迟批量写入
+            self._schedule_save()
             return record
-    
+
     def get_stats(self):
         with self._lock:
             total = len(self._ops)
@@ -308,9 +526,11 @@ class PSPAIHandler(http.server.BaseHTTPRequestHandler):
             stats = op_logger.get_stats()
             self._send_json({
                 "name": "PSPAI",
-                "version": "v1.3.0",
-                "engine": "Hermes",
-                "tools": 31,
+                "version": "v4.0.0",
+                "engine": "Hermes (full capabilities)",
+                "tools": len(_get_available_tools()),
+                "skills": len(LOADED_SKILLS),
+                "providers": len(_BASE_URL_MAP),
                 "status": "running",
                 "time": time.strftime("%Y-%m-%d %H:%M:%S"),
                 "operations": stats,
@@ -324,6 +544,61 @@ class PSPAIHandler(http.server.BaseHTTPRequestHandler):
         if path == "/api/names":
             names = load_json("names", {})
             self._send_json(names)
+            return
+
+        # ── 新增: /api/tools 工具列表 ──
+        if path == "/api/tools":
+            tools = _get_available_tools()
+            toolsets = {}
+            for t in tools:
+                ts = t.get("toolset", "default")
+                if ts not in toolsets:
+                    toolsets[ts] = []
+                toolsets[ts].append(t)
+            self._send_json({
+                "total": len(tools),
+                "toolsets": toolsets,
+                "tools": tools,
+            })
+            return
+
+        # ── 新增: /api/models 模型/Provider列表 ──
+        if path == "/api/models":
+            providers = _get_available_models()
+            # 标记当前激活的Provider
+            current_provider = AGENT_CFG.get('provider', 'deepseek')
+            for p in providers:
+                p["active"] = (p.get("id") == current_provider)
+            self._send_json({
+                "current": {
+                    "provider": current_provider,
+                    "model": AGENT_CFG.get('model', 'deepseek-chat'),
+                },
+                "providers": providers,
+            })
+            return
+
+        # ── 新增: /api/skills 技能列表 ──
+        if path == "/api/skills":
+            self._send_json({
+                "total": len(LOADED_SKILLS),
+                "skills": list(LOADED_SKILLS.values()),
+            })
+            return
+
+        # ── 新增: /api/memory 记忆状态 ──
+        if path == "/api/memory":
+            mem_exists = MEMORY_PATH.exists()
+            mem_size = MEMORY_PATH.stat().st_size if mem_exists else 0
+            conv_count = sum(len(v) for v in conversation_history.values())
+            self._send_json({
+                "memory_file": str(MEMORY_PATH),
+                "memory_exists": mem_exists,
+                "memory_size_bytes": mem_size,
+                "total_conversations": len(conversation_history),
+                "total_messages": conv_count,
+                "operations": op_logger.get_stats(),
+            })
             return
 
         if path == "/api/avatars_list":
@@ -352,6 +627,7 @@ class PSPAIHandler(http.server.BaseHTTPRequestHandler):
             char_index = data.get("charIndex", 0)
             char_name = data.get("charName", "PSPAI")
             lang = data.get("lang", "zh")
+            req_provider = data.get("provider", None)  # 支持指定Provider
 
             if not msg:
                 self._send_json({"reply": t_msg(lang, 'empty')})
@@ -359,14 +635,16 @@ class PSPAIHandler(http.server.BaseHTTPRequestHandler):
 
             names = load_json("names", {})
             current_name = names.get(str(char_index), char_name)
+            # 语言切换：使用对应语言的系统提示词
             system_prompt = PSPAI_PROMPTS.get(lang, DEFAULT_PROMPT)
+            if SOUL_PATH.exists() and lang != 'zh':
+                # 如果有SOUL.md但需要英文等，回退到config的对应语言
+                system_prompt = PSPAI_PROMPTS.get(lang, DEFAULT_PROMPT)
             context_msg = f"[当前角色名: {current_name}] {msg}"
 
-            # === Agent Harness 修正闭环 (v1.3.2) ===
-            # 四大循环: 决策→执行→观察→修正, 最多3策略递进
             t_start = time.time()
             try:
-                agent = get_agent(char_index, current_name)
+                agent = get_agent(char_index, current_name, provider=req_provider)
                 history = get_history(char_index)
 
                 # 改名意图检测
@@ -385,7 +663,6 @@ class PSPAIHandler(http.server.BaseHTTPRequestHandler):
                 # 多策略修正: 最多3次尝试
                 for attempt in range(3):
                     try:
-                        # 策略选择
                         if attempt == 0:
                             prompt = system_prompt
                             strategy = "normal"
@@ -393,7 +670,6 @@ class PSPAIHandler(http.server.BaseHTTPRequestHandler):
                             prompt = system_prompt + "\n(请简短直接回复，不超过3句话)"
                             strategy = "short_prompt"
                         else:
-                            # 策略3: 清除历史减少上下文噪音
                             conversation_history[str(char_index)] = []
                             prompt = system_prompt + "\n(简洁回复即可)"
                             strategy = "clear_history"
@@ -418,6 +694,10 @@ class PSPAIHandler(http.server.BaseHTTPRequestHandler):
 
                 latency_ms = int((time.time() - t_start) * 1000)
 
+                # 添加对话到历史 (持久化)
+                add_to_history(char_index, "user", msg)
+                add_to_history(char_index, "assistant", reply)
+
                 # 记忆回路: record with strategy info
                 op_logger.record(
                     tool="chat",
@@ -425,6 +705,7 @@ class PSPAIHandler(http.server.BaseHTTPRequestHandler):
                         "char_index": char_index,
                         "char_name": current_name,
                         "lang": lang,
+                        "provider": req_provider or PROVIDER,
                         "msg_len": len(msg),
                         "reply_len": len(reply),
                         "retries": retries,
@@ -493,22 +774,61 @@ class PSPAIHandler(http.server.BaseHTTPRequestHandler):
             self._send_json({"success": True, "url": url, "slot": slot})
             return
 
+        # ── 新增: /api/provider/switch Provider切换 ──
+        if path == "/api/provider/switch":
+            data = self._read_body()
+            new_provider = data.get("provider", "")
+            char_index = data.get("charIndex", 0)
+            if not new_provider:
+                self._send_json({"error": "provider required"}, 400)
+                return
+            # 检查API Key是否可用
+            api_key = _resolve_api_key(new_provider)
+            if not api_key:
+                self._send_json({
+                    "success": False,
+                    "error": f"No API key configured for provider '{new_provider}'"
+                })
+                return
+            # 清除旧Agent缓存
+            with agent_lock:
+                key_to_clear = f"{char_index}_{new_provider}"
+                if key_to_clear in agents:
+                    del agents[key_to_clear]
+            base_url = _BASE_URL_MAP.get(new_provider, '')
+            self._send_json({
+                "success": True,
+                "provider": new_provider,
+                "base_url": base_url,
+            })
+            return
+
         self._send_json({"error": "not found"}, 404)
 
 
 def main():
     port = 8089
 
-    if not API_KEY:
-        print("ERROR: DEEPSEEK_API_KEY not set in .env")
-        sys.exit(1)
+    # 检查是否有任何可用的API Key
+    available_providers = []
+    for p in ['deepseek', 'openai', 'anthropic']:
+        if _resolve_api_key(p):
+            available_providers.append(p)
 
-    print("PSPAI v3.0 backend starting - Hermes engine + memory loop + error recovery")
+    if not available_providers and not API_KEY:
+        print("ERROR: No API key found. Set DEEPSEEK_API_KEY, OPENAI_API_KEY, or ANTHROPIC_API_KEY in .env")
+        print("WARN: Starting anyway - will fail on chat requests")
+
+    print("PSPAI v4.0 backend starting - Full Hermes Agent Capabilities")
     print(f"   Port: {port}")
-    print(f"   Engine: Hermes AIAgent")
-    print(f"   Tools: 31 (terminal/file/search/memory/git/ssh...)")
-    print(f"   Model: DeepSeek Chat")
-    print(f"   Memory: OperationLogger (500 records max)")
+    print(f"   Engine: Hermes AIAgent (full tool chain)")
+    print(f"   Model: {AGENT_CFG.get('model', 'deepseek-chat')}")
+    print(f"   Provider: {PROVIDER}")
+    print(f"   Available providers: {', '.join(available_providers) if available_providers else '(none)'}")
+    print(f"   Skills: {len(LOADED_SKILLS)} loaded from engine/skills/")
+    print(f"   Tools: {len(_get_available_tools())} registered")
+    print(f"   Memory: persistent ({MEMORY_PATH})")
+    print(f"   System prompt: {'SOUL.md' if SOUL_PATH.exists() else 'config.yaml'}")
     print(f"   Recovery: L1 retry + L2 fallback + L3 graceful")
     print(f"   Data: {DATA_DIR}")
 

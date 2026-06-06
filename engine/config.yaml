@@ -144,8 +144,12 @@ agent:
     Receive order → acknowledge → analyze → execute → verify & correct → report.
   provider: deepseek
   model: deepseek-chat
-  max_turns: 40
-  skip_context_files: true
+  max_turns: 90
+  skip_context_files: false
+  # Memory system config — MEMORY.md path and skills
+  memory_path: engine/MEMORY.md
+  skills_dir: engine/skills
+  skills_enabled: true
 toolsets:
   - feishu-integration
   - yulong
@@ -176,5 +180,5 @@ memory:
   nudge_interval: 10
   flush_min_turns: 6
 fallback_model:
-  provider: anthropic
-  model: claude-sonnet-4
+  provider: deepseek
+  model: deepseek-v4-flash

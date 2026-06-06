@@ -4,3 +4,13 @@ pwa/__pycache__/
 pwa/pyodide/
 pwa/pyodide.tar.bz2
 # secrets
+dist/\nrelease/\nengine/build/\nengine/dist/\nengine/data/\nengine/logs/\nengine/sessions/\n*.bak_*\nbackups/\n__pycache__/\n*.pyc\n.env\n*.run\n*.zip\n*.dmg\n
+.venv-mobile/
+.venv/
+mobile/.venv/
+env/
+venv/
+node_modules/
+frontend/pwa/pyodide/pyodide.tar.bz2
+engine/build/
+engine/dist/

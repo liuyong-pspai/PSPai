@@ -25,28 +25,38 @@ from urllib.parse import urlparse
 APP_DIR = Path(__file__).parent.resolve()
 CONFIG_FILE = APP_DIR / "config.json"
 ENV_FILE = APP_DIR / ".env"
-FRONTEND_DIR = APP_DIR / "frontend"
+FRONTEND_DIR = APP_DIR / "frontend" / "pwa" / "html"
 if not FRONTEND_DIR.exists():
-    # 开发模式：UI原型在当前目录
+    FRONTEND_DIR = APP_DIR / "frontend"
+if not FRONTEND_DIR.exists():
     FRONTEND_DIR = APP_DIR / "UI原型"
 if not FRONTEND_DIR.exists():
-    # 安装模式：frontend目录
-    FRONTEND_DIR = APP_DIR / "UI原型" if (APP_DIR / "UI原型").exists() else APP_DIR
+    FRONTEND_DIR = APP_DIR / "pwa"
+if not FRONTEND_DIR.exists():
+    FRONTEND_DIR = APP_DIR / "hongmeng"
+if not FRONTEND_DIR.exists():
+    FRONTEND_DIR = APP_DIR
 
 FRONTEND_PORT = 8088
 ENGINE_PORT = 8089
+VOICE_PORT = 8765
 CONFIG_PORT = 8090  # 配置向导专用端口
 
 ENGINE_CANDIDATES = [
+    # === 生产模式：PyInstaller 二进制 ===
     # Windows
     "xiaolongren-engine-windows.exe",
-    "xiaolongren-engine.exe",
-    "engine.exe",
-    # macOS / Linux
-    "xiaolongren-engine",
+    "engine/dist/xiaolongren-engine-windows.exe",
+    # macOS
     "xiaolongren-engine-macos",
+    "engine/dist/xiaolongren-engine-macos",
+    # Linux
     "xiaolongren-engine-linux-x86_64",
-    # 开发模式
+    "engine/dist/xiaolongren-engine-linux-x86_64",
+    # ARM
+    "xiaolongren-engine-linux-arm64",
+    "engine/dist/xiaolongren-engine-linux-arm64",
+    # === 开发模式：Python 源码 ===
     "engine/pspai_server.py",
 ]
 
@@ -294,6 +304,35 @@ def start_engine():
     return proc
 
 
+def start_voice():
+    """启动语音引擎（可选——需要websockets库）"""
+    voice_path = APP_DIR / "voice_server.py"
+    if not voice_path.exists():
+        return None
+    if port_in_use(VOICE_PORT):
+        print(f"🎤 语音端口 {VOICE_PORT} 已在使用")
+        return None
+    # 检查websockets是否可用
+    python = find_python()
+    if not python:
+        return None
+    try:
+        r = subprocess.run([python, "-c", "import websockets"], capture_output=True, timeout=5)
+        if r.returncode != 0:
+            print("🎤 语音引擎未启用 (需 pip install websockets)")
+            return None
+    except Exception:
+        return None
+    proc = subprocess.Popen(
+        [python, str(voice_path)],
+        cwd=str(APP_DIR),
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    print(f"🎤 语音引擎已启动 (PID: {proc.pid}, 端口 {VOICE_PORT})")
+    return proc
+
+
 # ============================================================
 # 桌面快捷方式（Windows）
 # ============================================================
@@ -414,6 +453,9 @@ def main():
             print("⚠️ 引擎启动较慢，请稍候...")
             wait_for_port(ENGINE_PORT, timeout=30)
 
+    # 启动语音引擎（可选）
+    voice_proc = start_voice()
+
     # 打开聊天界面
     chat_url = f"http://127.0.0.1:{FRONTEND_PORT}/"
     print(f"\n🌐 聊天界面: {chat_url}")
@@ -471,6 +513,12 @@ def main():
             engine_proc.wait(timeout=5)
         except subprocess.TimeoutExpired:
             engine_proc.kill()
+    if voice_proc and voice_proc.poll() is None:
+        voice_proc.terminate()
+        try:
+            voice_proc.wait(timeout=3)
+        except subprocess.TimeoutExpired:
+            voice_proc.kill()
 
     print("👋 再见！")
     return 0

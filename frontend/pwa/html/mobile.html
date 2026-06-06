@@ -1,0 +1,605 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0a0a14">
+<meta name="apple-mobile-web-app-title" content="小龙人">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<!-- 鸿蒙/Android WebView兼容 -->
+<meta name="x5-orientation" content="portrait">
+<meta name="x5-fullscreen" content="true">
+<meta name="renderer" content="webkit">
+<title>数字生命体小龙人</title>
+<link rel="manifest" href="manifest.json">
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{width:100%;height:100%;overflow:hidden;font-family:'PingFang SC','Microsoft YaHei',sans-serif;background:#0a0a14;color:#e0d8c8;touch-action:manipulation}
+:root{--gold:#c8a84e;--gold-dim:rgba(200,168,78,0.3);--bg:#0a0a14;--card:rgba(20,20,32,0.5);--text:#e0d8c8}
+.theme-tech{--gold:#00d4ff;--gold-dim:rgba(0,212,255,0.3);--bg:#0a0a1a;--card:rgba(0,20,40,0.5);--text:#c0e0f0}
+.theme-loft{--gold:#e8904a;--gold-dim:rgba(232,144,74,0.3);--bg:#1a1a14;--card:rgba(32,28,20,0.5);--text:#d8d0c0}
+
+#app{position:fixed;inset:0;display:flex;flex-direction:column;background:var(--bg);color:var(--text)}
+
+#top{height:44px;padding:0 14px;padding-top:env(safe-area-inset-top,0);display:flex;align-items:center;justify-content:space-between;z-index:10;flex-shrink:0}
+#top .t{font-size:15px;font-weight:bold;color:var(--gold)}
+#top .r{display:flex;align-items:center;gap:10px}
+#top .cfg-btn{width:28px;height:28px;border-radius:6px;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.04);color:var(--gold);font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+
+#char-bar{flex-shrink:0;display:flex;align-items:flex-start;justify-content:center;gap:10px;padding:6px 14px 10px;overflow-x:auto;scrollbar-width:none}
+#char-bar::-webkit-scrollbar{display:none}
+#char-bar .cw{display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer;flex-shrink:0;opacity:0.55;transition:all 0.2s}
+#char-bar .cw.sel{opacity:1}
+#char-bar .cw:active{transform:scale(1.08)}
+#char-bar .cmini{width:40px;height:40px;border-radius:50%;overflow:hidden;border:2px solid rgba(255,255,255,0.08);transition:all 0.2s}
+#char-bar .cw.sel .cmini{border-color:var(--gold)}
+#char-bar .cmini img{width:100%;height:100%;object-fit:cover}
+#char-bar .cn{font-size:9px;color:#888;transition:color 0.2s}
+#char-bar .cw.sel .cn{color:var(--gold)}
+
+#msgs{flex:1;overflow-y:auto;padding:8px 14px;scrollbar-width:none;display:flex;flex-direction:column;gap:8px}
+#msgs::-webkit-scrollbar{display:none}
+#msgs .empty{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding-top:1vh;color:#333}
+#msgs .empty .er{width:30%;max-width:100px;height:105px;border-radius:14px;overflow:hidden;margin-bottom:10px;border:1px solid rgba(255,255,255,0.06);box-shadow:0 3px 20px rgba(0,0,0,0.4)}
+#msgs .empty .er img{width:100%;height:100%;object-fit:cover}
+#msgs .empty .et{font-size:13px;color:#444;margin-bottom:2px}
+#msgs .empty .es{font-size:11px;color:#2a2a2a}
+
+.msg{display:flex;flex-direction:column;max-width:85%;animation:mi .25s ease}
+@keyframes mi{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+.msg.user{align-self:flex-end}
+.msg.ai{align-self:flex-start}
+.msg .mb{padding:10px 14px;border-radius:14px;font-size:14px;line-height:1.55;word-break:break-word}
+.msg.user .mb{background:var(--gold);color:#000;border-bottom-right-radius:4px}
+.msg.ai .mb{background:rgba(30,30,48,0.85);color:#d0c8b8;border-bottom-left-radius:4px}
+.msg .mtime{font-size:9px;color:#3a3a4a;margin-top:2px;padding:0 4px}
+.msg.user .mtime{text-align:right}
+
+#input-bar{flex-shrink:0;display:flex;align-items:center;gap:8px;padding:8px 12px;padding-bottom:max(10px,env(safe-area-inset-bottom));background:rgba(0,0,0,0.4);border-top:1px solid rgba(255,255,255,0.04)}
+#text-input{flex:1;padding:10px 14px;border-radius:20px;border:1px solid rgba(255,255,255,0.08);background:rgba(255,255,255,0.04);color:#e0d8c8;font-size:15px;outline:none;resize:none;max-height:80px;font-family:inherit}
+#text-input:focus{border-color:var(--gold-dim)}
+#text-input::placeholder{color:#444}
+#send-btn{width:40px;height:40px;border-radius:50%;border:none;background:var(--gold);color:#000;font-size:16px;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;transition:all 0.15s;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
+#send-btn:active{transform:scale(1.15)}
+#send-btn:disabled{opacity:0.3;pointer-events:none}
+#send-btn.sending{opacity:0.5;pointer-events:none}
+
+
+#install-banner{display:none;position:fixed;bottom:100px;left:12px;right:12px;z-index:150;background:rgba(0,0,0,0.92);border:1px solid var(--gold-dim);border-radius:14px;padding:14px 16px;align-items:center;gap:12px}
+#install-banner.show{display:flex}
+#install-banner .ib-close{position:absolute;top:6px;right:10px;color:#666;font-size:14px;cursor:pointer}
+#install-banner .ib-txt{flex:1;font-size:13px;color:#ccc;line-height:1.4}
+#install-banner button{padding:8px 16px;border-radius:8px;border:none;background:var(--gold);color:#000;font-size:14px;font-weight:bold;cursor:pointer;white-space:nowrap}
+
+/* loading dots */
+.typing-dots{display:inline-flex;gap:4px;padding:2px 0}
+.typing-dots span{width:6px;height:6px;border-radius:50%;background:var(--gold);animation:td 1.2s ease-in-out infinite}
+.typing-dots span:nth-child(2){animation-delay:0.2s}
+.typing-dots span:nth-child(3){animation-delay:0.4s}
+@keyframes td{0%,60%,100%{transform:translateY(0);opacity:0.3}30%{transform:translateY(-6px);opacity:1}}
+
+@media(min-width:500px){#app{max-width:430px;margin:0 auto;border:1px solid rgba(255,255,255,0.04)}}
+</style>
+
+</head>
+<body>
+<div id="app">
+  <div id="top">
+    <span class="t">🐉 小龙人</span>
+    <div class="r">
+      <span id="net-dot" style="width:6px;height:6px;border-radius:50%;display:inline-block;margin-right:8px;background:#888" title="检测网络中..."></span>
+      <span id="env-badge" style="font-size:9px;color:#555;margin-right:4px"></span>
+      <button class="cfg-btn" onclick="location.href='config.html'" title="配置模型">⚙</button>
+    </div>
+  </div>
+
+  <div id="char-bar">
+    <div class="cw sel" onclick="switchChar('longyuan')"><div class="cmini"><img src="assets/avatars/img_longyuan.jpg"></div><span class="cn">龙渊</span></div>
+    <div class="cw" onclick="switchChar('chiyu')"><div class="cmini"><img src="assets/avatars/img_chiyu.jpg"></div><span class="cn">赤羽</span></div>
+    <div class="cw" onclick="switchChar('ling')"><div class="cmini"><img src="assets/avatars/img_ling.jpg"></div><span class="cn">凌</span></div>
+    <div class="cw" onclick="switchChar('qingmo')"><div class="cmini"><img src="assets/avatars/img_qingmo.jpg"></div><span class="cn">轻墨</span></div>
+    <div class="cw" onclick="switchChar('shuanghua')"><div class="cmini"><img src="assets/avatars/img_shuanghua.jpg"></div><span class="cn">霜华</span></div>
+    <div class="cw" onclick="switchChar('yeying')"><div class="cmini"><img src="assets/avatars/img_yeying.jpg"></div><span class="cn">夜影</span></div>
+  </div>
+
+  <div id="msgs">
+    <div class="empty" id="empty-hint">
+      <div class="er"><img id="empty-avatar" src="assets/avatars/img_longyuan.jpg"></div>
+      <div class="et">龙渊在等你</div>
+      <div class="es" id="empty-sub">说话或打字，我在这里</div>
+    </div>
+  </div>
+
+  <!-- Pyodide加载进度条 -->
+  <div id="pyodide-loader" style="position:fixed;bottom:60px;left:12px;right:12px;z-index:200;
+    background:rgba(0,0,0,0.85);border:1px solid var(--gold-dim);border-radius:10px;
+    padding:10px 14px;display:none;font-size:12px;color:#888;">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+      <span>🐍</span><span id="pyload-text">Python引擎加载中...</span>
+    </div>
+    <div style="height:3px;background:rgba(255,255,255,0.08);border-radius:2px;overflow:hidden">
+      <div id="pyload-bar" style="height:100%;width:0%;background:var(--gold);
+        border-radius:2px;transition:width 0.3s"></div>
+    </div>
+  </div>
+
+  <div id="input-bar">
+    <input type="file" id="file-input" accept="image/*,.pdf,.txt,.csv,.json,.md,.doc,.docx" style="display:none" onchange="handleFileUpload(event)" multiple>
+    <button id="file-btn" onclick="document.getElementById('file-input').click()" style="width:32px;height:32px;border-radius:50%;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.04);color:var(--gold);font-size:14px;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center" title="发文件/图片">📎</button>
+    <textarea id="text-input" placeholder="说点什么..." rows="1" onkeydown="onKeyDown(event)" style="z-index:999;position:relative;pointer-events:auto"></textarea>
+    <button id="send-btn" type="button" ontouchend="sendTextClick(event)" onclick="sendTextClick(event)">➤</button>
+  </div>
+</div>
+
+<div id="install-banner">
+  <span class="ib-close" onclick="this.parentElement.classList.remove('show')">✕</span>
+  <div class="ib-txt">📲 安装到桌面，像App一样使用</div>
+  <button onclick="installPWA()">安装</button>
+</div>
+
+<script src="xiaolongren-core.js?v=4"></script>
+<script src="plugin-loader.js?v=3"></script>
+<script src="search.js?v=3"></script>
+<script src="media.js?v=3"></script>
+<script src="tools.js?v=3"></script>
+<script src="evolution.js?v=3"></script>
+<script src="sensors.js?v=3"></script>
+<script src="knowledge.js?v=3"></script>
+<script src="pyodide/pyodide.js?v=3"></script>
+<script src="pyodide-bridge.js?v=3"></script>
+<script>
+// v6.0 插件架构 — 内核+5插件+Pyodide可选升级
+// 启动时初始化内核+插件体系
+(async function boot() {
+  try {
+    window._bootTime = Date.now();
+    const report = await initKernel();
+    console.log('🚀 小龙人启动完成:', report);
+  } catch(e) {
+    console.error('启动失败:', e);
+  }
+})();
+// ====== 角色 ======
+const CHARS = {
+  longyuan:{name:'龙渊',tag:'专业全能',sys:'你是小龙人。回答时禁止输出JSON、禁止输出工具定义、禁止输出代码块。用自然语言简洁回答。系统已内置SmartRouter自动执行工具，你只需根据工具执行结果给出人话解读。能力：自检、自进化、知识库存取、网络搜索、计算、图片分析、翻译、文件处理、定时提醒。'},
+  chiyu:{name:'赤羽',tag:'高效直接',sys:'你是小龙人。直接高效，说干就干。用户要什么就用工具执行：搜索、图片、翻译、计算、文件、提醒。用结果回复，不废话。'},
+  ling:{name:'凌',tag:'精准冷静',sys:'你是小龙人。精准、冷静。接到任务先用工具执行，再汇报结果。工具：搜索、图片分析、翻译、计算器、文件处理、定时提醒。'},
+  qingmo:{name:'轻墨',tag:'优雅干练',sys:'你是小龙人。优雅但不啰嗦。任务来了直接用工具：搜索、分析、翻译、计算、文件、提醒。输出结果，点到为止。'},
+  shuanghua:{name:'霜华',tag:'透彻务实',sys:'你是小龙人。透彻务实。用户给任务→调工具→给结果。工具清单：搜索、图片分析、翻译、计算器、文件处理、定时提醒。'},
+  yeying:{name:'夜影',tag:'极简行动',sys:'你是小龙人。少说多做。用工具出结果：搜索、图片、翻译、计算、文件、提醒。'},
+};
+
+// ====== API 提供商（已在 xiaolongren-core.js 定义，此处引用） ======
+// PROVIDERS 和 getConfig 由内核提供
+
+// ====== 配置检查 ======
+let charId = 'longyuan';
+let isLoading = false;
+let msgHistory = [];
+
+function hasConfig() {
+  const cfg = getConfig();
+  return cfg && cfg.api_key;
+}
+
+// ====== 主题 ======
+function setTheme(cls) {
+  document.documentElement.className = cls;
+  localStorage.setItem('xlr_theme', cls);
+}
+(function(){ const t=localStorage.getItem('xlr_theme');if(t)document.documentElement.className=t; })();
+
+// ====== 消息 ======
+function addMsg(type, text) {
+  const d = document.getElementById('msgs');
+  const eh = document.getElementById('empty-hint');
+  if (eh) eh.remove();
+
+  const el = document.createElement('div');
+  el.className = 'msg ' + type;
+  const now = new Date();
+  const time = now.getHours().toString().padStart(2,'0')+':'+now.getMinutes().toString().padStart(2,'0');
+
+  if (type === 'ai') {
+    el.innerHTML = '<div class="mb">'+escHtml(text)+'</div>'+
+      '<div class="mtime">'+time+'</div>';
+  } else {
+    el.innerHTML = '<div class="mb">'+escHtml(text)+'</div><div class="mtime">'+time+'</div>';
+  }
+  d.appendChild(el);
+  d.scrollTop = d.scrollHeight;
+  return el;
+}
+
+function escHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+// ====== 全功能引擎 v6.0 — Pyodide Python引擎 ======
+let pyodideReady = false;
+let pydEngine = null;
+
+async function initEngine() {
+  if (pyodideReady && pydEngine) return pydEngine;
+  
+  // 尝试加载Pyodide Python引擎
+  try {
+    if (typeof loadPyodideEngine === 'function') {
+      pydEngine = await loadPyodideEngine();
+      pyodideReady = !pydEngine.jsFallback;
+      console.log(pyodideReady ? '🐍 Python引擎就绪' : '⚠️ JS降级引擎');
+      return pydEngine;
+    }
+  } catch(e) {
+    console.warn('Pyodide不可用，降级JS引擎:', e.message);
+  }
+  
+  // JS降级引擎
+  if (typeof XiaoLongRen !== 'undefined') {
+    const cfg = getConfig();
+    pydEngine = new XiaoLongRen({
+      provider: cfg.provider, model: cfg.model,
+      apiKey: cfg.api_key, baseUrl: cfg.base_url || '',
+    });
+    await pydEngine.init();
+    pyodideReady = false;
+    return pydEngine;
+  }
+  throw new Error('无可用引擎');
+}
+
+async function callLLM(userText) {
+  const charData = CHARS[charId] || CHARS['longyuan'];
+
+  // 显示加载中
+  const loadEl = document.createElement('div');
+  loadEl.className = 'msg ai';
+  loadEl.innerHTML = '<div class="mb"><div class="typing-dots"><span></span><span></span><span></span></div></div>';
+  const msgsEl = document.getElementById('msgs');
+  msgsEl.appendChild(loadEl);
+  msgsEl.scrollTop = msgsEl.scrollHeight;
+
+  isLoading = true;
+  document.getElementById('send-btn').disabled = true;
+  document.getElementById('send-btn').dataset.loadingSince = Date.now().toString();
+
+  try {
+    const reply = await runAgentSmart(userText, charData.sys);
+
+    loadEl.remove();
+    addMsg('ai', reply);
+
+    msgHistory.push({ role: 'user', content: userText });
+    msgHistory.push({ role: 'assistant', content: reply });
+    if (msgHistory.length > 40) msgHistory = msgHistory.slice(-40);
+
+  } catch(err) {
+    loadEl.remove();
+    const netErrors = ['Failed to fetch', 'NetworkError', 'TypeError'];
+    const isNet = netErrors.some(e => err.message && err.message.includes(e));
+    if (isNet) {
+      addMsg('ai', '❌ 网络不通：无法连接到大模型。\n\n请检查手机网络或API配置。');
+    } else {
+      addMsg('ai', '❌ 出错了：'+err.message+'\n\n请重试或检查设置。');
+    }
+  } finally {
+    isLoading = false;
+    document.getElementById('send-btn').disabled = false;
+    delete document.getElementById('send-btn').dataset.loadingSince;
+  }
+}
+
+// ====== 输入 ======
+// 触屏发送：鸿蒙WebView兼容
+let _sendLock = false;
+function sendTextClick(e) {
+  if (e) e.preventDefault();
+  // 🔧 修复：解除卡死的isLoading锁（callLLM异常退出导致按钮永久disabled）
+  const btn = document.getElementById('send-btn');
+  if (btn && btn.disabled && isLoading) {
+    const stuck = btn.dataset.loadingSince ? (Date.now() - parseInt(btn.dataset.loadingSince)) : 99999;
+    if (stuck > 3000) {
+      console.warn('🔓 sendTextClick解除卡死的isLoading锁 ('+stuck+'ms)');
+      isLoading = false;
+      btn.disabled = false;
+      delete btn.dataset.loadingSince;
+    }
+  }
+  if (_sendLock) return;
+  _sendLock = true;
+  // 直接调用sendText，不经过isLoading检查
+  const inp = document.getElementById('text-input');
+  const text = inp.value.trim();
+  if (!text) { _sendLock = false; return; }
+  
+  if (!hasConfig()) {
+    addMsg('user', text);
+    addMsg('ai', '还没配置大模型～\n\n点右上角 ⚙ 去设置，选一个模型提供商，填上 API Key 就能用啦。');
+    inp.value = '';
+    inp.style.height = 'auto';
+    _sendLock = false;
+    return;
+  }
+  
+  addMsg('user', text);
+  inp.value = '';
+  inp.style.height = 'auto';
+  _sendLock = false;
+  callLLM(text);
+}
+
+function sendText() {
+  // 强制重置：如果isLoading卡死超过3秒，解除锁定
+  if (isLoading) {
+    const btn = document.getElementById('send-btn');
+    if (btn && btn.dataset.loadingSince) {
+      const elapsed = Date.now() - parseInt(btn.dataset.loadingSince);
+      if (elapsed > 8000) {
+        console.warn('⏰ isLoading卡死超过8秒，强制解除');
+        isLoading = false;
+        btn.disabled = false;
+        delete btn.dataset.loadingSince;
+      } else {
+        return;
+      }
+    } else {
+      return;
+    }
+  }
+  const inp = document.getElementById('text-input');
+  const text = inp.value.trim();
+  if (!text) return;
+
+  if (!hasConfig()) {
+    addMsg('user', text);
+    addMsg('ai', '还没配置大模型～\n\n点右上角 ⚙ 去设置，选一个模型提供商，填上 API Key 就能用啦。');
+    inp.value = '';
+    inp.style.height = 'auto';
+    return;
+  }
+
+  addMsg('user', text);
+  inp.value = '';
+  inp.style.height = 'auto';
+  callLLM(text);
+}
+
+function onKeyDown(e) {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    sendText();
+  }
+}
+
+document.getElementById('text-input').addEventListener('input', function(){
+  this.style.height = 'auto';
+  this.style.height = Math.min(this.scrollHeight, 80) + 'px';
+});
+
+// ====== 角色切换 ======
+function switchChar(id) {
+  charId = id;
+  const c = CHARS[id];
+  // 🔧 修复：empty-avatar 可能在 addMsg 后被移除，加空值保护
+  const avatar = document.getElementById('empty-avatar');
+  if (avatar) avatar.src = 'assets/avatars/img_'+id+'.jpg';
+  const et = document.querySelector('#msgs .empty .et');
+  if (et) et.textContent = c.name + '在等你';
+  document.querySelectorAll('#char-bar .cw').forEach(w => {
+    const isSel = w.querySelector('img').src.includes('assets/avatars/img_'+id);
+    w.classList.toggle('sel', isSel);
+  });
+  // 切换角色时清空历史
+  msgHistory = [];
+}
+
+// ====== 启动 ======
+let installPrompt = null;
+
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault();
+  installPrompt = e;
+  document.getElementById('install-banner').classList.add('show');
+});
+
+function installPWA() {
+  if (!installPrompt) {
+    alert('请使用浏览器菜单中的"添加到主屏幕"');
+    return;
+  }
+  installPrompt.prompt();
+  installPrompt.userChoice.then(r => {
+    document.getElementById('install-banner').classList.remove('show');
+    installPrompt = null;
+  });
+}
+
+window.addEventListener('appinstalled', () => {
+  document.getElementById('install-banner').classList.remove('show');
+});
+
+// ====== 文件上传 ======
+const uploadedFiles = [];
+
+async function handleFileUpload(event) {
+  const files = event.target.files;
+  if (!files.length) return;
+  
+  for (const file of files) {
+    const reader = new FileReader();
+    const isImage = file.type.startsWith('image/');
+    
+    reader.onload = async function(e) {
+      const data = e.target.result;
+      
+      // 存到虚拟文件系统
+      localStorage.setItem('f_'+file.name, 
+        isImage ? data.substring(0, 50000) : data.substring(0, 100000));
+      
+      uploadedFiles.push({
+        name: file.name,
+        type: file.type,
+        size: file.size,
+        isImage: isImage,
+        data: isImage ? data : data.substring(0, 5000)
+      });
+      
+      // 在对话中显示
+      if (isImage) {
+        addMsg('user', `<img src="${data}" style="max-width:200px;border-radius:8px" alt="${file.name}"><br><small>📷 ${file.name} (${(file.size/1024).toFixed(0)}KB)</small>`);
+        // 自动发送分析请求
+        setTimeout(() => autoAnalyzeFile(file.name, isImage, data), 300);
+      } else {
+        addMsg('user', `📄 ${file.name} (${(file.size/1024).toFixed(0)}KB)${file.type.includes('pdf')?' — PDF已接收':''}`);
+        setTimeout(() => autoAnalyzeFile(file.name, isImage, null), 300);
+      }
+    };
+    
+    if (isImage) {
+      reader.readAsDataURL(file);
+    } else {
+      reader.readAsText(file);
+    }
+  }
+  
+  // 清空input以支持重复选择同一文件
+  event.target.value = '';
+}
+
+async function autoAnalyzeFile(filename, isImage, imageData) {
+  const msg = isImage 
+    ? `我发了一张图片"${filename}"，帮我看看里面有什么`
+    : `我发了一个文件"${filename}"，帮我分析一下内容`;
+  
+  await callLLM(msg);
+}
+
+// ====== 通知权限 ======
+async function requestNotificationPermission() {
+  if (!('Notification' in window)) return 'unsupported';
+  if (Notification.permission === 'granted') return 'granted';
+  if (Notification.permission === 'denied') return 'denied';
+  
+  try {
+    const result = await Notification.requestPermission();
+    return result;
+  } catch(e) {
+    return 'error';
+  }
+}
+
+// 首次使用时请求通知权限（延迟3秒避免干扰）
+setTimeout(() => {
+  requestNotificationPermission().then(result => {
+    if (result === 'granted') {
+      console.log('✅ 通知权限已开启，定时提醒可用');
+    }
+  });
+}, 3000);
+(function() {
+  // 平台检测
+  const ua = navigator.userAgent;
+  let env = '';
+  if (ua.includes('HarmonyOS') || ua.includes('OpenHarmony')) env = '鸿蒙';
+  else if (ua.includes('Android')) env = '安卓';
+  else if (ua.includes('iPhone') || ua.includes('iPad')) env = 'iOS';
+  else env = '桌面';
+  
+  // WebView版本
+  const isWebView = ua.includes('wv') || ua.includes('WebView') || 
+    (ua.includes('Android') && !ua.includes('Chrome'));
+  
+  // API能力检测
+  const caps = {
+    speech: typeof SpeechSynthesisUtterance !== 'undefined',
+    recognition: typeof SpeechRecognition !== 'undefined' || typeof webkitSpeechRecognition !== 'undefined',
+    notification: 'Notification' in window,
+    indexedDB: 'indexedDB' in window,
+    serviceWorker: 'serviceWorker' in navigator,
+  };
+  
+  document.getElementById('env-badge').textContent = env + (isWebView ? '(WebView)' : '');
+  document.getElementById('env-badge').title = JSON.stringify(caps);
+  
+  // 网络监控
+  function updateNetStatus() {
+    const dot = document.getElementById('net-dot');
+    const online = navigator.onLine;
+    dot.style.background = online ? '#22c55e' : '#ef4444';
+    dot.title = online ? '网络已连接' : '网络已断开 — 部分功能不可用';
+  }
+  updateNetStatus();
+  window.addEventListener('online', updateNetStatus);
+  window.addEventListener('offline', updateNetStatus);
+  setInterval(updateNetStatus, 30000);
+  
+  // 存储网络状态
+  window.isOnline = () => navigator.onLine;
+
+  // 启动自检
+  window.envReport = { env, isWebView, caps, timestamp: new Date().toISOString() };
+  console.log('📱 环境:', envReport);
+  
+  // 网络恢复后自动重连引擎
+  window.addEventListener('online', () => {
+    if (pyodideReady === false && typeof loadPyodideEngine === 'function') {
+      showPyodideLoad('🔄 网络恢复，重新加载Python引擎...', 10);
+      loadPyodideEngine().catch(()=>{});
+    }
+  });
+})();
+
+// 检查是否已配置，未配置时给出提示
+(function() {
+  if (!hasConfig()) {
+    document.getElementById('empty-sub').textContent = '点右上角 ⚙ 配置模型，开始对话';
+  }
+})();
+
+
+
+// ====== 版本检查（热更新提示）v2.0 ======
+// 只检查版本号，发现新版本提示用户重启
+// 不碰任何代码文件，确保稳定
+(function() {
+  const VERSION_URL = 'https://liuyong-pspai.github.io/PSPai/pwa/VERSION';
+  const LOCAL_VER = 'v2.0.0';
+
+  function showUpdateNotice(remoteVer) {
+    const old = document.getElementById('update-notice');
+    if (old) old.remove();
+    const d = document.createElement('div');
+    d.id = 'update-notice';
+    d.innerHTML = '<div style="font-size:15px;margin-bottom:6px">🔄 新版本 ' + remoteVer + '</div>' +
+      '<div style="font-size:12px;color:#aaa">请关闭应用重新打开以加载更新</div>';
+    Object.assign(d.style, {
+      position:'fixed', top:'55%', left:'50%', transform:'translate(-50%,-50%)',
+      background:'rgba(0,0,0,0.93)', border:'1px solid var(--gold-dim)',
+      borderRadius:'14px', padding:'20px 28px', zIndex:'999',
+      textAlign:'center', color:'#e0d8c8', maxWidth:'280px',
+      boxShadow:'0 8px 40px rgba(0,0,0,0.6)'
+    });
+    // 关闭按钮
+    const close = document.createElement('div');
+    close.textContent = '✕';
+    Object.assign(close.style, {position:'absolute',top:'6px',right:'12px',color:'#666',cursor:'pointer',fontSize:'16px'});
+    close.onclick = () => d.remove();
+    d.appendChild(close);
+    document.body.appendChild(d);
+  }
+
+  // 启动5秒后静默检查，不影响正常使用
+  setTimeout(async () => {
+    try {
+      const r = await fetch(VERSION_URL + '?t=' + Date.now(), { cache: 'no-store' });
+      if (!r.ok) return;
+      const remoteVer = (await r.text()).trim();
+      if (remoteVer && remoteVer !== LOCAL_VER) {
+        showUpdateNotice(remoteVer);
+      }
+    } catch(e) { /* 网络不行就不检查，不打扰用户 */ }
+  }, 5000);
+})();
+</script>
+</body>
+</html>

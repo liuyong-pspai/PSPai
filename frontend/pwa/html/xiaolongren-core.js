@@ -1,0 +1,646 @@
+/**
+ * 小龙人内核 v6.0 — 插件架构
+ * 
+ * 核心职责：Agent循环 + 记忆系统 + 配置管理
+ * 工具系统：全部由插件提供（通过XLR plugin-loader动态加载）
+ * 
+ * 加载顺序：
+ *   1. plugin-loader.js  → XLR全局对象
+ *   2. plugins/*.js      → 注册工具+处理器
+ *   3. xiaolongren-core.js（本文件） → 内核初始化
+ */
+
+// ============================================================
+// 八层永生记忆 (IndexedDB + 内存降级)
+// ============================================================
+const memory = (function() {
+  let db = null;
+  let fallbackMode = false;
+  const fallbackStore = new Map();  // IndexedDB不可用时的内存降级
+  const DB_NAME = 'xiaolongren_memory';
+  const DB_VER = 6;
+
+  async function open() {
+    // 检测IndexedDB可用性
+    if (typeof indexedDB === 'undefined') {
+      console.warn('[记忆] IndexedDB不可用，降级为内存存储（刷新后丢失）');
+      fallbackMode = true;
+      return 'fallback';
+    }
+    return new Promise((resolve, reject) => {
+      const req = indexedDB.open(DB_NAME, DB_VER);
+      req.onupgradeneeded = (e) => {
+        const d = e.target.result;
+        if (!d.objectStoreNames.contains('l1')) d.createObjectStore('l1', {keyPath:'key'});
+        if (!d.objectStoreNames.contains('l4')) d.createObjectStore('l4', {keyPath:'id',autoIncrement:true});
+        if (!d.objectStoreNames.contains('l5')) d.createObjectStore('l5', {keyPath:'name'});
+        if (!d.objectStoreNames.contains('conversations')) d.createObjectStore('conversations', {keyPath:'id',autoIncrement:true});
+      };
+      req.onsuccess = (e) => { db = e.target.result; resolve(db); };
+      req.onerror = (e) => {
+        console.warn('[记忆] IndexedDB打开失败，降级为内存存储:', e.target.error?.message);
+        fallbackMode = true;
+        resolve('fallback');
+      };
+    });
+  }
+
+  function tx(store, mode='readwrite') {
+    if (fallbackMode) return null;
+    if (!db || typeof db === 'string') return null;
+    return db.transaction(store, mode).objectStore(store);
+  }
+
+  async function getL1(key) {
+    if (fallbackMode) return fallbackStore.get('l1_' + key) || null;
+    if (!db || typeof db === 'string') return null;
+    return new Promise(r => { const req = tx('l1','readonly').get(key); req.onsuccess=()=>r(req.result?.value); req.onerror=()=>r(null); });
+  }
+  async function setL1(key, value) {
+    if (fallbackMode) { fallbackStore.set('l1_' + key, value); return true; }
+    if (!db || typeof db === 'string') { fallbackStore.set('l1_' + key, value); return true; }
+    return new Promise(r => { tx('l1').put({key,value,time:Date.now()}).onsuccess=()=>r(true); });
+  }
+  async function addL4(patterns) {
+    if (fallbackMode) { const k = 'l4_' + Date.now(); fallbackStore.set(k, {patterns,time:Date.now()}); return true; }
+    if (!db || typeof db === 'string') return true;
+    return new Promise(r => { tx('l4').add({patterns,time:Date.now()}).onsuccess=()=>r(true); });
+  }
+  async function saveSkill(name, desc, rule) {
+    if (fallbackMode) { fallbackStore.set('l5_' + name, {name,description:desc,rule,time:Date.now()}); return true; }
+    if (!db || typeof db === 'string') { fallbackStore.set('l5_' + name, {name,description:desc,rule,time:Date.now()}); return true; }
+    return new Promise(r => { tx('l5').put({name,description:desc,rule,time:Date.now()}).onsuccess=()=>r(true); });
+  }
+  async function getSkills() {
+    if (fallbackMode) { const r=[]; fallbackStore.forEach((v,k)=>{if(k.startsWith('l5_'))r.push(v);}); return r; }
+    if (!db || typeof db === 'string') return [];
+    return new Promise(r => { const req=tx('l5','readonly').getAll(); req.onsuccess=()=>r(req.result||[]); });
+  }
+  async function saveConversation(messages) {
+    if (fallbackMode || !db || typeof db === 'string') {
+      const arr = fallbackStore.get('conversations') || [];
+      if (arr.length > 5) arr.shift();
+      arr.push({messages, time: Date.now()});
+      fallbackStore.set('conversations', arr);
+      return true;
+    }
+    return new Promise(r => {
+      const store = tx('conversations');
+      const countReq = store.count();
+      countReq.onsuccess = async () => {
+        if (countReq.result > 5) {
+          const allReq = store.getAllKeys();
+          allReq.onsuccess = () => {
+            for (let i = 0; i < allReq.result.length - 5; i++) store.delete(allReq.result[i]);
+          };
+        }
+      };
+      store.add({messages,time:Date.now()}).onsuccess=()=>r(true);
+    });
+  }
+  async function loadConversation() {
+    if (fallbackMode || !db || typeof db === 'string') {
+      const arr = fallbackStore.get('conversations') || [];
+      return arr.length ? arr[arr.length - 1].messages : [];
+    }
+    return new Promise(r => {
+      const req = tx('conversations','readonly').getAll();
+      req.onsuccess = () => { const all = req.result||[]; r(all.length?all[all.length-1].messages:[]); };
+    });
+  }
+
+  return {
+    init: open,
+    isFallback: () => fallbackMode,
+    l1: { get: getL1, set: setL1 },
+    l4: { add: addL4 },
+    l5: { save: saveSkill, getAll: getSkills },
+    conversations: { save: saveConversation, load: loadConversation },
+    l5_skills: {},  // 内存缓存
+    consecutiveErrors: 0,
+    async getStatus() {
+      await open();
+      const convCount = await new Promise(r => { tx('conversations','readonly').count().onsuccess=e=>r(e.target.result); });
+      const skillCount = await new Promise(r => { tx('l5','readonly').count().onsuccess=e=>r(e.target.result); });
+      return { l1: 'ok', l4: 'ok', l5: skillCount, conversations: convCount };
+    },
+    async autoHealIfNeeded() {
+      if (this.consecutiveErrors >= 3) {
+        this.consecutiveErrors = 0;
+        return { healed: true, message: '连续错误计数已清零' };
+      }
+      return { healed: false, message: '无需自愈' };
+    },
+    async skillify(name, description, rule) {
+      await saveSkill(name, description, rule);
+      this.l5_skills[name] = { description, rule };
+      return true;
+    },
+    async refine() {
+      // L4→L5 check
+      const skills = await getSkills();
+      for (const s of skills) this.l5_skills[s.name] = { description: s.description, rule: s.rule };
+      return { l5_count: skills.length };
+    },
+    enlighten() {
+      return this.consecutiveErrors >= 3 ? '⚠️ 连续错误≥3，建议自愈' : null;
+    },
+  };
+})();
+
+
+// ============================================================
+// 配置管理
+// ============================================================
+const PROVIDERS = {
+  deepseek:   { name:'DeepSeek',    url:'https://api.deepseek.com/v1' },
+  openai:     { name:'OpenAI',      url:'https://api.openai.com/v1' },
+  anthropic:  { name:'Anthropic',   url:'https://api.anthropic.com/v1' },
+  openrouter: { name:'OpenRouter',  url:'https://openrouter.ai/api/v1' },
+  gemini:     { name:'Gemini',      url:'https://generativelanguage.googleapis.com/v1beta' },
+  alibaba:    { name:'通义千问',     url:'https://dashscope.aliyuncs.com/compatible-mode/v1' },
+  zhipu:      { name:'智谱GLM',     url:'https://open.bigmodel.cn/api/paas/v4' },
+  moonshot:   { name:'Moonshot',    url:'https://api.moonshot.cn/v1' },
+  zai:        { name:'智谱Z.ai',    url:'https://api.z.ai/api/paas/v4' },
+  minimax:    { name:'MiniMax',     url:'https://api.minimax.chat/v1' },
+  huggingface:{ name:'HuggingFace', url:'https://api-inference.huggingface.co/v1' },
+  custom:     { name:'自定义',       url:'' },
+};
+
+function getConfig() {
+  try {
+    const raw = localStorage.getItem('xiaolongren_config');
+    return raw ? JSON.parse(raw) : null;
+  } catch(e) { return null; }
+}
+
+function getEndpoint(provider) {
+  const cfg = getConfig();
+  if (cfg?.base_url) return cfg.base_url;
+  return (PROVIDERS[provider] || PROVIDERS.deepseek).url;
+}
+
+
+// ============================================================
+// Agent 核心循环
+// ============================================================
+class XiaoLongRen {
+  constructor(cfg = {}) {
+    this.provider = cfg.provider || 'deepseek';
+    this.model = cfg.model || 'deepseek-chat';
+    this.apiKey = cfg.apiKey || '';
+    this.baseUrl = cfg.baseUrl || '';
+    this.maxIter = cfg.maxIter || 15;
+    this.temp = cfg.temp || 0.7;
+    this.messages = [];
+    this.onThink = cfg.onThink || (()=>{});
+    this.onTool = cfg.onTool || (()=>{});
+    this.onReply = cfg.onReply || (()=>{});
+    this.onErr = cfg.onErr || (()=>{});
+  }
+
+  async init() {
+    await memory.init();
+    await memory.refine();
+    // 加载会话历史
+    try {
+      const hist = await memory.conversations.load();
+      if (hist && hist.length) this.messages = hist.slice(-40);
+    } catch(e) {}
+    return true;
+  }
+
+  async chat(userMessage, systemPrompt) {
+    this.messages.push({ role: 'user', content: userMessage });
+    if (this.messages.length > 40) this.messages = this.messages.slice(-40);
+
+    const apiMessages = [
+      { role: 'system', content: systemPrompt || '你是小龙人，一个能干的AI助手。' },
+      ...this.messages,
+    ];
+
+    const allToolDefs = XLR.getAllTools();
+    const ep = this.baseUrl || getEndpoint(this.provider);
+    const url = ep + '/chat/completions';
+    const headers = {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer ' + this.apiKey,
+    };
+
+    for (let iter = 0; iter < this.maxIter; iter++) {
+      const body = JSON.stringify({
+        model: this.model,
+        messages: apiMessages,
+        tools: allToolDefs.length ? allToolDefs : undefined,
+        temperature: this.temp,
+        max_tokens: 1024,
+      });
+
+      let resp;
+      try {
+        resp = await fetch(url, { method: 'POST', headers, body, signal: AbortSignal.timeout(30000) });
+      } catch(e) {
+        memory.consecutiveErrors++;
+        return '网络不通：' + e.message;
+      }
+
+      if (!resp.ok) {
+        const errText = await resp.text().catch(()=>'');
+        memory.consecutiveErrors++;
+        if (resp.status === 401) return 'API Key无效，请检查配置';
+        if (resp.status === 429) return '请求太频繁，稍后再试';
+        return 'API错误('+resp.status+'): ' + errText.substring(0,200);
+      }
+
+      const data = await resp.json();
+      memory.consecutiveErrors = 0;
+      const choice = data.choices?.[0];
+      if (!choice) return '模型返回为空';
+
+      const msg = choice.message;
+      apiMessages.push(msg);
+
+      // 如果有工具调用
+      if (msg.tool_calls?.length) {
+        for (const tc of msg.tool_calls) {
+          const toolName = tc.function.name;
+          let args = {};
+          try { args = JSON.parse(tc.function.arguments); } catch(e) {}
+
+          this.onTool(toolName, args);
+          var t0 = Date.now();
+
+          // 优先走插件体系
+          let result;
+          if (XLR.hasTool(toolName)) {
+            result = await XLR.execute(toolName, args);
+          } else {
+            result = JSON.stringify({ error: '未知工具: ' + toolName });
+          }
+          
+          OpLog.record(toolName, args, true, '', Date.now() - t0);
+
+          apiMessages.push({
+            role: 'tool',
+            tool_call_id: tc.id,
+            content: typeof result === 'string' ? result : JSON.stringify(result),
+          });
+        }
+        continue; // 继续循环，让LLM处理工具结果
+      }
+
+      // 纯文本回复
+      const reply = msg.content || '';
+      this.messages.push({ role: 'assistant', content: reply });
+      await memory.conversations.save(this.messages);
+      this.onReply(reply);
+      return reply;
+    }
+
+    return '思考轮次已达上限，请简化问题重试。';
+  }
+}
+
+// ============================================================
+// 操作追踪（对标PSPAI OperationLogger）
+// ============================================================
+const OpLog = {
+  _ops: [],
+  _maxOps: 200,
+  
+  record: function(tool, params, success, summary, latencyMs) {
+    var op = {
+      tool: tool,
+      params: params || null,
+      success: success !== false,
+      summary: summary || '',
+      latency_ms: latencyMs || 0,
+      time: new Date().toISOString()
+    };
+    this._ops.push(op);
+    if (this._ops.length > this._maxOps) this._ops = this._ops.slice(-this._maxOps);
+    // 持久化
+    try { localStorage.setItem('xlr_ops', JSON.stringify(this._ops.slice(-50))); } catch(e) {}
+    return op;
+  },
+  
+  load: function() {
+    try {
+      var raw = localStorage.getItem('xlr_ops');
+      if (raw) this._ops = JSON.parse(raw);
+    } catch(e) {}
+    return this._ops;
+  },
+  
+  stats: function() {
+    var ops = this._ops;
+    var total = ops.length;
+    var success = ops.filter(function(o){return o.success;}).length;
+    var fail = total - success;
+    var tools = {};
+    ops.forEach(function(o){ tools[o.tool] = (tools[o.tool]||0) + 1; });
+    var avgLatency = total ? Math.round(ops.reduce(function(s,o){return s+o.latency_ms;},0)/total) : 0;
+    return {
+      total: total,
+      success: success,
+      fail: fail,
+      success_rate: total ? Math.round(success/total*100) + '%' : 'N/A',
+      avg_latency_ms: avgLatency,
+      top_tools: Object.entries(tools).sort(function(a,b){return b[1]-a[1];}).slice(0,5).map(function(e){return {tool:e[0],count:e[1]};})
+    };
+  }
+};
+OpLog.load();
+
+// ============================================================
+// 内核初始化（由mobile.html调用）
+// ============================================================
+// ============================================================
+// 兼容性能力检测
+// ============================================================
+function detectCapabilities() {
+  const caps = {
+    indexedDB: false,
+    localStorage: false,
+    webSocket: false,
+    speechInput: false,
+    speechOutput: false,
+    serviceWorker: false,
+    issues: [],
+    tips: [],
+  };
+
+  // IndexedDB (记忆持久化)
+  caps.indexedDB = typeof indexedDB !== 'undefined';
+  if (!caps.indexedDB) {
+    caps.issues.push('記憶');
+    caps.tips.push('换用普通模式（非隐私/无痕）记忆可永久保存');
+  }
+
+  // localStorage (配置持久化)
+  try {
+    localStorage.setItem('_xlr_test', '1');
+    localStorage.removeItem('_xlr_test');
+    caps.localStorage = true;
+  } catch(e) {
+    caps.issues.push('配置');
+  }
+
+  // WebSocket
+  caps.webSocket = typeof WebSocket !== 'undefined';
+
+  // 语音输入
+  caps.speechInput = !!(window.SpeechRecognition || window.webkitSpeechRecognition);
+  if (!caps.speechInput) {
+    caps.tips.push('换Chrome/Edge浏览器可使用语音输入');
+  }
+
+  // 语音输出 (TTS)
+  caps.speechOutput = typeof SpeechSynthesisUtterance !== 'undefined' && typeof speechSynthesis !== 'undefined';
+  if (!caps.speechOutput) {
+    caps.tips.push('当前浏览器不支持语音播报，可换Chrome/Edge');
+  }
+
+  // Service Worker
+  caps.serviceWorker = 'serviceWorker' in navigator;
+
+  // 环境标识
+  const ua = navigator.userAgent || '';
+  caps.isMobile = /Mobi|Android|iPhone/i.test(ua);
+  caps.isAndroid = /Android/i.test(ua);
+  caps.isIOS = /iPhone|iPad/i.test(ua);
+  caps.isHarmonyOS = /HarmonyOS|OpenHarmony/i.test(ua);
+  caps.isWebView = /wv|WebView/i.test(ua) || (caps.isAndroid && !/Chrome/i.test(ua));
+  caps.browser = ua.includes('Firefox') ? 'Firefox' :
+                 ua.includes('Edg') ? 'Edge' :
+                 ua.includes('Chrome') ? 'Chrome' :
+                 ua.includes('Safari') ? 'Safari' : '其他';
+
+  return caps;
+}
+
+// 全局能力报告（启动时填充）
+let systemCapabilities = null;
+
+async function initKernel() {
+  console.log('[内核] 初始化...');
+
+  // 0. 能力检测
+  systemCapabilities = detectCapabilities();
+  console.log('[内核] 环境:', 
+    (systemCapabilities.isMobile ? '📱' : '🖥️') +
+    (systemCapabilities.isAndroid ? 'Android' : systemCapabilities.isIOS ? 'iOS' : systemCapabilities.isHarmonyOS ? '鸿蒙' : 'Desktop') +
+    '/' + systemCapabilities.browser,
+    systemCapabilities.issues.length ? '⚠️' + systemCapabilities.issues.join(',') + '受限' : '✅全部正常'
+  );
+  if (systemCapabilities.tips.length) {
+    console.log('[内核] 💡 建议:', systemCapabilities.tips.join('; '));
+  }
+
+  // 1. 初始化记忆
+  await memory.init();
+
+  // 2. 初始化插件体系
+  const pluginResults = await XLR.initAll({ memory, getConfig });
+  console.log('[内核] 插件加载完成:', pluginResults.map(p=>p.name+'='+p.status).join(', '));
+
+  // 3. 报告
+  const report = XLR.report();
+  report.memoryFallback = memory.isFallback();
+  report.capabilities = systemCapabilities;
+  console.log(`[内核] ${report.totalPlugins}个插件, ${report.totalTools}个工具就绪` + 
+    (report.memoryFallback ? ' ⚠️记忆降级' : ''));
+  console.log('[内核] 插件详情:', JSON.stringify(report.plugins));
+
+  return report;
+}
+
+
+// ============================================================
+// 便捷入口：简化版Agent调用（用于mobile.html）
+// ============================================================
+let globalAgent = null;
+
+async function runAgent(userText, systemPrompt) {
+  const cfg = getConfig();
+  if (!cfg?.api_key) throw new Error('未配置API Key');
+
+  if (!globalAgent) {
+    globalAgent = new XiaoLongRen({
+      provider: cfg.provider || 'deepseek',
+      model: cfg.model || 'deepseek-chat',
+      apiKey: cfg.api_key,
+      baseUrl: cfg.base_url || '',
+    });
+    await globalAgent.init();
+  }
+
+  return await globalAgent.chat(userText, systemPrompt);
+}
+
+// ============================================================
+// SmartRouter — 前端预处理器：不等LLM，检测关键词直接调工具
+// ============================================================
+const SmartRouter = {
+  // 关键词→工具映射（正则匹配）
+  routes: [
+    { pattern: /^自检|^(做个|执行)自检|health.?check|状态检查/, tool: 'self_check', args: {} },
+    { pattern: /^自我进化|^进化|self.?evolve|自动优化/, tool: 'self_evolve', args: { focus: 'response_quality' } },
+    { pattern: /^知识库统计|^kb.?stats|知识库.*状态/, tool: 'kb_stats', args: {} },
+    { pattern: /^列.*技能|^技能列表|^已保存.*技能|load.?skills/, tool: 'load_skills', args: {} },
+    { pattern: /^自动学习|^auto.?learn|从对话.*学习/, tool: 'auto_learn', args: {} },
+    { pattern: /^操作统计|^op.?stats|调用.*统计/, tool: '__opstats__', args: {} },
+    { pattern: /记住[：:]\s*(.+)/, tool: 'kb_store', argsFn: function(m) {
+      var parts = m[1].split(/[，,]是/);
+      return { title: parts[0].trim(), content: parts[1] ? parts[1].trim() : m[1].trim(), tags: '用户记忆' };
+    }},
+    { pattern: /^查[询找]知识[：:]\s*(.+)/, tool: 'kb_search', argsFn: function(m) { return { query: m[1].trim() }; }},
+    { pattern: /^搜[索一下]?\s*[：:]?\s*(.+)/, tool: 'web_search', argsFn: function(m) { return { query: m[1].trim() }; }},
+    { pattern: /^算[一下]?\s*[：:]?\s*(.+)/, tool: 'calculator', argsFn: function(m) { return { expression: m[1].trim() }; }},
+    { pattern: /^翻译[：:]\s*(.+)/, tool: 'translate', argsFn: function(m) { return { text: m[1].trim() }; }},
+  ],
+
+  // 匹配输入，返回 { tool, args } 或 null
+  match: function(input) {
+    var text = (input || '').trim();
+    for (var i = 0; i < this.routes.length; i++) {
+      var r = this.routes[i];
+      var m = text.match(r.pattern);
+      if (m) {
+        var args = r.argsFn ? r.argsFn(m) : (r.args || {});
+        return { tool: r.tool, args: args, matched: m[0] };
+      }
+    }
+    return null;
+  },
+
+  // 执行工具并格式化结果
+  execute: async function(tool, args) {
+    try {
+      if (tool === '__opstats__') {
+        var s = OpLog.stats();
+        return '📊 操作统计：共' + s.total + '次调用，成功率' + s.success_rate + '，平均延迟' + s.avg_latency_ms + 'ms。';
+      }
+      if (typeof XLR === 'undefined' || !XLR.hasTool(tool)) {
+        console.error('[SmartRouter] 工具未注册:', tool);
+        return '❌ 工具「' + tool + '」未注册。系统可能还在初始化，请稍后重试。';
+      }
+      var result = await XLR.execute(tool, args);
+      if (result === null || result === undefined) {
+        return '❌ 工具「' + tool + '」执行返回为空。';
+      }
+      OpLog.record(tool, args, true, '', 0);
+      return this._formatResult(tool, result);
+    } catch(e) {
+      console.error('[SmartRouter] 执行失败:', tool, e);
+      try { OpLog.record(tool, args, false, e.message, 0); } catch(e2) {}
+      return '❌ 工具「' + tool + '」执行失败: ' + (e.message || String(e));
+    }
+  },
+
+  _formatResult: function(tool, raw) {
+    var data;
+    try {
+      data = typeof raw === 'string' ? JSON.parse(raw) : raw;
+    } catch(e) {
+      return String(raw);
+    }
+    
+    if (tool === 'self_check') {
+      var ops = data.operations || {};
+      var lines = [];
+      lines.push('📊 自检报告');
+      lines.push('Agent: ' + (data.agent || '?'));
+      lines.push('运行时间: ' + (data.uptime || '?'));
+      lines.push('工具: ' + (data.tools||0) + '个 / 插件: ' + (data.plugins||0) + '个');
+      lines.push('已保存技能: ' + (data.skills_saved||0) + '个');
+      if (data.skill_names && data.skill_names.length) lines.push('技能: ' + data.skill_names.join(', '));
+      lines.push('操作: ' + (ops.total||0) + '次, 成功率 ' + (ops.success_rate||'N/A'));
+      lines.push('健康: ' + (data.health||'?'));
+      return lines.join('\n');
+    }
+    
+    if (tool === 'self_evolve') {
+      var steps = data.steps || [];
+      var imp = data.improvements || [];
+      var txt = '🧬 自进化分析 (' + (data.focus||'general') + ')\n';
+      if (steps.length >= 2 && steps[1].weaknesses && steps[1].weaknesses.length) {
+        txt += '弱点: ' + steps[1].weaknesses.join('; ') + '\n';
+      }
+      if (imp.length) {
+        txt += '改进: ' + imp.map(function(i){return i.suggestion||i.action;}).join(' | ');
+      }
+      return txt;
+    }
+    
+    if (tool === 'kb_store') {
+      return '✅ 已存入: 「' + (data.title||'?') + '」(' + (data.total||'?') + '条)';
+    }
+    if (tool === 'kb_search') {
+      var results = data.results || [];
+      if (!results.length) return '🔍 未找到「' + (data.query||'?') + '」相关条目';
+      return '🔍 找到' + (data.found||results.length) + '条:\n' + results.map(function(r){return '• '+r.title+': '+r.content;}).join('\n');
+    }
+    if (tool === 'kb_stats') {
+      return '📚 知识库: ' + (data.total_entries||0) + '条, ' + (data.total_chars||0) + '字\n最新: ' + (data.newest||'无');
+    }
+    if (tool === 'load_skills') {
+      var sk = data.skills || [];
+      if (!sk.length) return '🛠 暂无已保存的技能';
+      return '🛠 ' + (data.total||sk.length) + '个技能:\n' + sk.map(function(s){return '• '+s.name;}).join('\n');
+    }
+    if (tool === 'web_search') {
+      return JSON.stringify(data);
+    }
+    
+    return JSON.stringify(data, null, 2);
+  }
+};
+
+// PSPAI 后端连接
+const PSPAI_URL = 'http://192.168.1.35:8089';
+
+// 统一入口：SmartRouter预处理器 + PSPAI后端
+async function runAgentSmart(userText, systemPrompt) {
+  // ── 第1关：SmartRouter关键词预匹配，本地执行工具 ──
+  var augmentedText = userText;
+  var routerMatch = SmartRouter.match(userText);
+  if (routerMatch) {
+    console.log('[SmartRouter] 命中路由:', routerMatch.tool);
+    try {
+      // 确保内核已初始化（XLR工具就绪）
+      if (typeof XLR === 'undefined' || !XLR.hasTool(routerMatch.tool)) {
+        console.warn('[SmartRouter] XLR未就绪，跳过本地预处理');
+      } else {
+        var toolResult = await SmartRouter.execute(routerMatch.tool, routerMatch.args);
+        augmentedText = userText + '\n\n[本地工具执行结果]\n工具: ' + routerMatch.tool + '\n结果: ' + toolResult + '\n\n请基于以上工具执行结果，用自然语言向用户汇报。不要输出JSON或代码块。';
+      }
+    } catch(e) {
+      console.error('[SmartRouter] 本地执行失败，继续走LLM:', e.message);
+    }
+  }
+  
+  // ── 第2关：发送到PSPAI后端（带工具结果或原始消息） ──
+  try {
+    var cfg = getConfig();
+    var resp = await fetch(PSPAI_URL + '/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        message: augmentedText,
+        charName: (window._currentCharName || '小龙人'),
+        lang: 'zh',
+        provider: cfg && cfg.provider ? cfg.provider : undefined
+      })
+    });
+    if (!resp.ok) throw new Error('PSPAI ' + resp.status);
+    var data = await resp.json();
+    return data.reply || '(空回复)';
+  } catch(e) {
+    console.error('[PSPAI] 连接失败:', e);
+    // 降级：走本地直连
+    return await runAgent(userText, systemPrompt);
+  }
+}
+
+console.log('[内核] xiaolongren-core.js v6.2 加载完成（插件架构+SmartRouter）');

@@ -4,7 +4,7 @@ description: >
   蜂群天犬系统 v3 —— 多Agent协作编排 + 公网智能搜索（气味记忆驱动）。
   蜂群：任务分解→多角色并行→汇总（Architect/Coder/Tester/Auditor/Integrator）。
   天犬：气味记忆 + 多引擎搜索 + 相关性评分 + 域名黑名单。
-  从M4-2旺财/旺夫系统移植到玉龙P07，经v3深度升级。
+  从合作Agent系统移植，经v3深度升级。
 ---
 
 # 🐝🐕 蜂群天犬系统 v3
@@ -35,7 +35,7 @@ description: >
 | 蜂群总线 | v1 | SQLite任务状态管理 |
 | 蜂群指挥 | v1 | 多角色编排 |
 
-## v3 核心升级（vs v2旺福版）
+## v3 核心升级（vs v2早期版本）
 
 | 维度 | v2 | v3 |
 |:---|:---|:---|
@@ -95,7 +95,7 @@ cat ~/.hermes-yulong/tools/tianquan/memory/scent_map.json
 
 ## 维护历史
 
-- 2026-05-31：从M4-2旺财/旺夫系统首次移植到玉龙P07
+- 2026-05-31：从合作Agent系统首次移植
 - 2026-05-31：v3深度升级——移除加密污染、集成气味记忆、增加评分排序、域名黑名单、Bing快速通道。验证：3组搜索1秒出结果，结果全技术内容无品牌污染
 - 测试数据详见 references/v2-v3-comparison.md
 - 八维审计详见 references/web-search-v2-v3-audit.md

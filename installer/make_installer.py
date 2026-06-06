@@ -15,7 +15,9 @@ from pathlib import Path
 APP_DISPLAY = "🐉 小龙人"
 PYTHON_VER = "3.12.9"
 REPO_ROOT = Path(__file__).parent.parent.resolve()
-FRONTEND_DIR = REPO_ROOT / "UI原型"
+FRONTEND_DIR = REPO_ROOT / "frontend" / "pwa" / "html"
+if not FRONTEND_DIR.exists():
+    FRONTEND_DIR = REPO_ROOT / "UI原型"
 OUTPUT_DIR = REPO_ROOT / "dist"
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 BUILD_DIR = Path(tempfile.mkdtemp(prefix="xlr_"))
@@ -67,12 +69,25 @@ def prepare_build():
     shutil.copytree(FRONTEND_DIR, BUILD_DIR / "frontend", dirs_exist_ok=True)
     # 启动器
     shutil.copy2(REPO_ROOT / "launcher.py", BUILD_DIR / "launcher.py")
-    # 引擎
+    # 引擎（优先二进制，fallback源码）
     engine = find_engine()
     if engine:
         name = "xiaolongren-engine.exe" if sys.platform == "win32" else "xiaolongren-engine"
         shutil.copy2(engine, BUILD_DIR / name)
         os.chmod(BUILD_DIR / name, 0o755)
+    else:
+        # 打包PSPAI源码引擎
+        eng_dir = BUILD_DIR / "engine"
+        eng_dir.mkdir(exist_ok=True)
+        pspai_dir = REPO_ROOT / "engine"
+        if pspai_dir.exists():
+            for item in pspai_dir.iterdir():
+                dest = eng_dir / item.name
+                if item.is_dir():
+                    shutil.copytree(item, dest, dirs_exist_ok=True)
+                else:
+                    shutil.copy2(item, dest)
+        print("(源码模式)", end=" ")
     n = sum(1 for _ in BUILD_DIR.rglob("*") if _.is_file())
     print(f"({n} 文件)")
     ok()
@@ -102,8 +117,8 @@ def build_windows():
         b'powershell -NoProfile -ExecutionPolicy Bypass -Command "$s=(New-Object -ComObject WScript.Shell).CreateShortcut([Environment]::GetFolderPath(\'Desktop\')+\'\\XiaoLongRen.lnk\');$s.TargetPath=\'pythonw\';$s.Arguments=\'%D%\\launcher.py\';$s.WorkingDirectory=\'%D%\';$s.Save()"\r\n'
         b'echo [3/5] Checking Python...\r\n'
         b'python --version >nul 2>&1 || (echo Python not found! Please install Python 3.10+ from python.org && pause && exit /b 1)\r\n'
-        b'echo [4/5] Installing dependencies...\r\n'
-        b'python -m pip install -q PyYAML Pillow requests >nul 2>&1\r\n'
+        b'echo [4/5] Installing dependencies (this may take a minute)...\r\n'
+        b'python -m pip install -q PyYAML Pillow requests hermes-agent >nul 2>&1\r\n'
         b'echo [5/5] Launching...\r\n'
         b'start "" pythonw "%D%\\launcher.py"\r\n'
         b'echo.\r\n'
@@ -228,7 +243,8 @@ def build_linux():
         f.write('tar xzf "$ARCHIVE" -C "$APP"\n')
         f.write('rm "$ARCHIVE"\n')
         f.write('cd "$APP"\n')
-        f.write('python3 -m pip install -q PyYAML Pillow requests 2>/dev/null || true\n')
+        f.write('echo "📦 Installing dependencies (this may take a minute)..."\n')
+        f.write('python3 -m pip install -q PyYAML Pillow requests hermes-agent 2>/dev/null || true\n')
         f.write('mkdir -p "$HOME/.local/share/applications"\n')
         f.write('cat > "$HOME/.local/share/applications/xiaolongren.desktop" << DESKTOPEOF\n')
         f.write('[Desktop Entry]\n')

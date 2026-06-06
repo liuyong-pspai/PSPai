@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>小龙人 · 六角色提示词 v2</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0a0a14;color:#c8c0b0;font-family:'PingFang SC','Microsoft YaHei',sans-serif;padding:20px;max-width:700px;margin:0 auto}
+h1{color:#ffd700;text-align:center;font-size:18px;margin-bottom:4px}
+.sub{text-align:center;color:#5a5a7a;font-size:10px;margin-bottom:18px}
+.card{background:rgba(20,20,32,0.6);border:1px solid rgba(255,255,255,0.06);border-radius:12px;padding:14px;margin-bottom:12px;position:relative}
+.card h2{font-size:14px;margin-bottom:2px}
+.card .tag{font-size:9px;color:#5a5a7a;margin-bottom:8px}
+.prompt{background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.06);border-radius:8px;padding:12px;font-size:10.5px;line-height:1.55;color:#a0a0b0;font-family:monospace;white-space:pre-wrap;word-break:break-word;position:relative}
+.copy-btn{position:absolute;top:6px;right:6px;padding:3px 9px;border-radius:5px;border:1px solid rgba(255,215,0,0.2);background:rgba(255,215,0,0.08);color:#ffd700;font-size:9px;cursor:pointer;font-family:inherit}
+.copy-btn:active{background:rgba(255,215,0,0.15)}
+.copied{color:#4ade80!important;border-color:rgba(74,222,128,0.3)!important}
+.diff-tag{display:inline-block;padding:2px 8px;border-radius:4px;font-size:8px;margin-right:4px;background:rgba(255,255,255,0.04)}
+.suffix{background:rgba(255,215,0,0.03);border:1px solid rgba(255,215,0,0.08);border-radius:8px;padding:10px;font-size:10px;line-height:1.5;color:#a09070;font-family:monospace;white-space:pre-wrap;word-break:break-word;position:relative;margin-top:12px}
+h3{color:#ffd700;font-size:12px;margin:14px 0 6px 0}
+.tips{font-size:9px;color:#4a4a5a;line-height:1.6;margin:10px 0}
+</style>
+</head>
+<body>
+
+<h1>🐉 六角色提示词 v2</h1>
+<div class="sub">v1前三张雷同 → v2每张加入差异化约束：构图·光影·角度·氛围各不相同</div>
+
+<div class="card" style="border-color:rgba(255,215,0,0.25)">
+<h2 style="color:#ffd700">1. 龙渊 — 龙宫少主</h2>
+<div class="tag"><span class="diff-tag" style="color:#ffd700">暖金</span><span class="diff-tag" style="color:#ff9900">仰视角度</span><span class="diff-tag" style="color:#ff6600">宫殿逆光</span> 手办线</div>
+<div class="prompt" id="p1">A young Chinese boy standing on ancient palace steps, warm tan skin, short messy black hair, golden slit-pupil eyes looking down confidently. Two organic coral-like dragon horns curving from temples. Wearing flowing dark gold hanfu coat with embroidered scale patterns, one hand resting on a carved stone railing. Shot from low angle looking up, majestic warm sunlight streaming from behind creating golden rim light. Ancient Chinese palace interior, ornate pillars in background. Not cute, dignified warrior youth. Original character, cel-shaded anime style, dramatic lighting.<button class="copy-btn" onclick="copy('p1',this)">复制</button></div>
+</div>
+
+<div class="card" style="border-color:rgba(0,212,200,0.2)">
+<h2 style="color:#00d4c8">2. 零 — 赛博节点</h2>
+<div class="tag"><span class="diff-tag" style="color:#00d4c8">霓虹青紫</span><span class="diff-tag" style="color:#00a0ff">侧面构图</span><span class="diff-tag" style="color:#0080ff">暗底发光</span> 键帽/发光周边线</div>
+<div class="prompt" id="p2">A slender androgynous figure in profile view, pale lavender-toned skin, asymmetric white-blue hair swept to one side revealing one glowing teal eye. Cyan circuit lines trace down the neck like tattoos. Dark techwear hoodie with neon cyan and purple trim, hood partially up. Sitting in front of a holographic screen in a dark room, cyan light reflecting on face. Digital rain visible through a window. Cyberpunk but clean and sleek, not gritty dystopian. Original character, cel-shaded anime style, rim lighting.<button class="copy-btn" onclick="copy('p2',this)">复制</button></div>
+</div>
+
+<div class="card" style="border-color:rgba(45,96,64,0.2)">
+<h2 style="color:#5a9a6a">3. 青墨 — 活墨画师</h2>
+<div class="tag"><span class="diff-tag" style="color:#4a8a4a">黑绿墨韵</span><span class="diff-tag" style="color:#3a7a3a">俯视构图</span><span class="diff-tag" style="color:#2a6a2a">宣纸留白</span> 文房系列</div>
+<div class="prompt" id="p3">A quiet young person sitting at a low wooden desk, viewed from above at a slight angle, rice-paper pale skin, long ink-black hair pooling on the desk surface. Dark green downcast eyes focused on a calligraphy brush in hand. A small ink smudge on the forehead, fingers stained black. Simple dark green robe, loose-fitting. Half-finished calligraphy scroll spread across the desk, ink droplets suspended in air around them. Rice paper texture background, minimalist negative space, traditional Chinese ink wash meets anime. Original character, soft cel-shaded.<button class="copy-btn" onclick="copy('p3',this)">复制</button></div>
+</div>
+
+<div class="card" style="border-color:rgba(232,64,32,0.2)">
+<h2 style="color:#f06030">4. 赤羽 — 青铜机甲</h2>
+<div class="tag"><span class="diff-tag" style="color:#ff4400">红橙炽热</span><span class="diff-tag" style="color:#ff2200">动态姿势</span><span class="diff-tag" style="color:#cc0000">熔炉火光</span> 盲盒线</div>
+<div class="prompt" id="p4">A muscular young warrior in a dynamic fighting stance, wheat-tan skin glistening with sweat, wild spiky reddish-brown hair blown upward. Crimson eyes blazing with intensity. Ancient Chinese bronze armor plates embedded into shoulders and forearms with glowing lava cracks, taotie monster-face patterns on the chestplate. Not a robot — living flesh with bronze armor fused to skin. Small flame wisps dancing on cheeks. Standing in a forge, molten metal glow casting orange light from below, sparks flying. Original character, cel-shaded anime style, dramatic underlighting.<button class="copy-btn" onclick="copy('p4',this)">复制</button></div>
+</div>
+
+<div class="card" style="border-color:rgba(80,152,216,0.2)">
+<h2 style="color:#80c0f0">5. 霜华 — 冰晶术师</h2>
+<div class="tag"><span class="diff-tag" style="color:#80c0ff">冰蓝纯白</span><span class="diff-tag" style="color:#60a0ff">漂浮姿态</span><span class="diff-tag" style="color:#4080dd">极光背景</span> 水晶挂件线</div>
+<div class="prompt" id="p5">An elegant figure floating in mid-air, cool porcelain skin, long blue-white gradient hair flowing weightlessly around them like underwater silk. Deep navy eyes looking peacefully downward. Small diamond ice crystal on forehead glowing softly. Wearing layered translucent robes in ice blue and silver, frost patterns crystallizing at the edges. Aurora borealis ribbons in the background sky, snowflakes suspended in the air. Ethereal and serene, not sad or lonely. Original character, cel-shaded anime style, soft diffused lighting from above.<button class="copy-btn" onclick="copy('p5',this)">复制</button></div>
+</div>
+
+<div class="card" style="border-color:rgba(122,64,208,0.2)">
+<h2 style="color:#a068f0">6. 夜影 — 皮影戏者</h2>
+<div class="tag"><span class="diff-tag" style="color:#a060ff">暗紫荧光</span><span class="diff-tag" style="color:#8040dd">剪影构图</span><span class="diff-tag" style="color:#6020bb">背光镂空</span> 荧光盲盒线</div>
+<div class="prompt" id="p6">A mysterious figure seen in silhouette against a warm amber backlight like a traditional Chinese shadow puppet screen. Pale grey skin, short asymmetrical dark purple-black hair covering half the face. One deep violet eye visible with faint purple glow. Edges of the entire figure outlined in soft purple light. Wearing minimal dark flowing robes. The background shows the shadow puppet screen with decorative cutout patterns. Flat yet dimensional, Chinese piyingxi shadow play aesthetic, not Western gothic. Original character, graphic silhouette style with cel-shaded details.<button class="copy-btn" onclick="copy('p6',this)">复制</button></div>
+</div>
+
+<h3>🔧 通用后缀</h3>
+<div class="suffix" id="ps">8K, professional anime character design sheet, suitable for merchandise and blind box production, vibrant but harmonious colors, clean lineart, no watermark, no text, no signature<button class="copy-btn" onclick="copy('ps',this)">复制</button></div>
+
+<h3>🎯 v2改动说明</h3>
+<div class="tips">
+· 龙渊：低角度仰视 + 逆光暖金 ← 之前是平视正面<br>
+· 零：侧面构图 + 暗室全息光 ← 之前也是正面<br>
+· 青墨：俯视桌面 + 水墨留白 ← 之前也偏正面<br>
+· 赤羽：战斗姿势 + 底光熔炉<br>
+· 霜华：漂浮空中 + 极光背景 ← 姿势完全区分<br>
+· 夜影：剪影构图 + 皮影背光 ← 独特画风<br>
+<br>
+六张图=六种角度+六种光照+六种氛围，不会再雷同。
+</div>
+
+<script>
+function copy(id,btn){
+  const el=document.getElementById(id);
+  const text=el.textContent.replace('复制','').trim();
+  navigator.clipboard.writeText(text).then(()=>{
+    btn.textContent='✓已复制';btn.classList.add('copied');
+    setTimeout(()=>{btn.textContent='复制';btn.classList.remove('copied')},1500);
+  });
+}
+</script>
+</body>
+</html>
