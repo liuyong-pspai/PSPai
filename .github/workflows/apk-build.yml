@@ -60,30 +60,35 @@ jobs:
 
       - name: Configure Android
         run: |
-          sed -i 's/<string name="app_name">.*<\/string>/<string name="app_name">小龙人<\/string>/' \
-            app-build/android/app/src/main/res/values/strings.xml
-          sed -i 's/android:usesCleartextTraffic="false"/android:usesCleartextTraffic="true"/' \
+          mkdir -p app-build/android/app/src/main/res/xml
+          # Set app name
+          sed -i 's|<string name="app_name">.*</string>|<string name="app_name">小龙人</string>|' \
+            app-build/android/app/src/main/res/values/strings.xml 2>/dev/null || true
+          # Allow cleartext
+          sed -i 's|android:usesCleartextTraffic="false"|android:usesCleartextTraffic="true"|' \
             app-build/android/app/src/main/AndroidManifest.xml 2>/dev/null || true
           # Icons
           for density in mdpi hdpi xhdpi xxhdpi xxxhdpi; do
-            cp mobile/android-app/res/mipmap-${density}/ic_launcher.png app-build/android/app/src/main/res/mipmap-${density}/ic_launcher.png
-            cp mobile/android-app/res/mipmap-${density}/ic_launcher_round.png app-build/android/app/src/main/res/mipmap-${density}/ic_launcher_round.png 2>/dev/null || true
+            mkdir -p app-build/android/app/src/main/res/mipmap-${density}
+            cp mobile/android-app/res/mipmap-${density}/ic_launcher.png app-build/android/app/src/main/res/mipmap-${density}/ 2>/dev/null || true
+            cp mobile/android-app/res/mipmap-${density}/ic_launcher_round.png app-build/android/app/src/main/res/mipmap-${density}/ 2>/dev/null || true
           done
           rm -f app-build/android/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml 2>/dev/null || true
           rm -f app-build/android/app/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml 2>/dev/null || true
           rm -f app-build/android/app/src/main/res/drawable/ic_launcher_foreground.xml 2>/dev/null || true
           # Network security
-          cp mobile/android-app/res/xml/network_security_config.xml app-build/android/app/src/main/res/xml/
+          cp mobile/android-app/res/xml/network_security_config.xml app-build/android/app/src/main/res/xml/ 2>/dev/null || true
           sed -i 's|<application|<application android:networkSecurityConfig="@xml/network_security_config"|' \
-            app-build/android/app/src/main/AndroidManifest.xml
-          # Kotlin stdlib fix
-          cat >> app-build/android/app/build.gradle << 'GRADLEEOF'
+            app-build/android/app/src/main/AndroidManifest.xml 2>/dev/null || true
+          # Kotlin fix
+          cat >> app-build/android/app/build.gradle << 'GRADLEEOF' 2>/dev/null || true
 
           configurations.all {
               exclude group: 'org.jetbrains.kotlin', module: 'kotlin-stdlib-jdk7'
               exclude group: 'org.jetbrains.kotlin', module: 'kotlin-stdlib-jdk8'
           }
           GRADLEEOF
+          echo "Configure done"
 
       - name: Build APK
         working-directory: app-build/android
