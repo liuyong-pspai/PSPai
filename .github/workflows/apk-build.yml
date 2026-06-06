@@ -76,10 +76,18 @@ jobs:
             [ -f $SRC/ic_launcher.png ] && cp $SRC/ic_launcher.png $DST/ic_launcher.png
             [ -f $SRC/ic_launcher_round.png ] && cp $SRC/ic_launcher_round.png $DST/ic_launcher_round.png
           done
-          # 删除自适应图标XML（否则会覆盖PNG图标显示为空白）
-          rm -f android/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml 2>/dev/null || true
-          rm -f android/app/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml 2>/dev/null || true
-          rm -f android/app/src/main/res/drawable/ic_launcher_foreground.xml 2>/dev/null || true
+          # 🔴 彻底删除自适应图标目录（否则PNG被矢量前景叠加=文字+图片效果）
+          # 不用rm -f单文件——目录可能不存在时静默失败，必须删整个mipmap-anydpi-v26
+          ADAPTIVE_DIR=android/app/src/main/res/mipmap-anydpi-v26
+          if [ -d "$ADAPTIVE_DIR" ]; then
+            echo "🗑️ 删除自适应图标目录: $ADAPTIVE_DIR"
+            rm -rf "$ADAPTIVE_DIR"
+            echo "✅ 已删除，桌面图标将使用纯PNG"
+          else
+            echo "✅ 无自适应图标目录，无需处理"
+          fi
+          # 额外保险：删除矢量前景drawable
+          rm -rf android/app/src/main/res/drawable/ic_launcher_foreground.xml 2>/dev/null || true
           # 网络安全配置
           mkdir -p android/app/src/main/res/xml
           cat > android/app/src/main/res/xml/network_security_config.xml << 'NSEOF'
