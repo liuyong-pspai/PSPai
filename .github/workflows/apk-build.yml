@@ -69,28 +69,34 @@ jobs:
             android/app/src/main/res/values/strings.xml
           sed -i 's/android:usesCleartextTraffic="false"/android:usesCleartextTraffic="true"/' \
             android/app/src/main/AndroidManifest.xml 2>/dev/null || true
-          # 🔴 暴力替换图标：删除所有旧图标/叠加文件，用我们的PNG全覆盖
-          echo "===== 暴力替换图标 ====="
-          # 1. 删除所有可能干扰的叠加文件
-          find android/app/src/main/res/ -name "*ic_launcher*" -not -name "*.png" -delete 2>/dev/null
-          find android/app/src/main/res/ -name "*.png" -path "*ic_launcher*" -delete 2>/dev/null
-          # 2. 删除anydpi目录（自适应图标会覆盖PNG）
-          find android/app/src/main/res/ -type d -name "mipmap-anydpi*" -exec rm -rf {} + 2>/dev/null
+          # 🔴 关键修复：适配Android 8+自适应图标
+          # 暴力删除所有旧图标，再用我们的PNG+自适应XML全覆盖
+          echo "===== 替换图标 ====="
+          find android/app/src/main/res/ -name "*ic_launcher*" -delete 2>/dev/null
           find android/app/src/main/res/ -type d -name "drawable-anydpi*" -exec rm -rf {} + 2>/dev/null
           find android/app/src/main/res/ -type d -name "drawable-v24" -exec rm -rf {} + 2>/dev/null
-          echo "🗑️ 已清除旧图标和叠加文件"
-          # 3. 检查残留
-          echo "🔍 残留检查:"
-          find android/app/src/main/res/ -name "*ic_launcher*" -type f 2>/dev/null || echo "  (无残留)"
-          # 4. 复制我们的PNG（覆盖所有可能的密度目录）
+          echo "🗑️ 清除完毕"
+          # 复制我们的PNG和自适应图标配置
           for density in mdpi hdpi xhdpi xxhdpi xxxhdpi; do
             SRC=${{ github.workspace }}/mobile/android-app/res/mipmap-${density}
             for DST in $(find android/app/src/main/res/ -maxdepth 1 -type d -name "mipmap-${density}*" 2>/dev/null); do
-              [ -f $SRC/ic_launcher.png ] && cp $SRC/ic_launcher.png $DST/ic_launcher.png
-              [ -f $SRC/ic_launcher_round.png ] && cp $SRC/ic_launcher_round.png $DST/ic_launcher_round.png
+              for f in ic_launcher.png ic_launcher_round.png ic_launcher_foreground.png; do
+                [ -f $SRC/$f ] && cp $SRC/$f $DST/$f
+              done
               echo "✅ $DST"
             done
           done
+          # 复制自适应图标XML配置
+          ANYDPI_SRC=${{ github.workspace }}/mobile/android-app/res/mipmap-anydpi-v26
+          ANYDPI_DST=android/app/src/main/res/mipmap-anydpi-v26
+          mkdir -p $ANYDPI_DST
+          cp $ANYDPI_SRC/ic_launcher.xml $ANYDPI_DST/ic_launcher.xml
+          cp $ANYDPI_SRC/ic_launcher_round.xml $ANYDPI_DST/ic_launcher_round.xml
+          echo "✅ 自适应图标XML已配置"
+          # 复制背景颜色配置
+          mkdir -p android/app/src/main/res/values
+          cp ${{ github.workspace }}/mobile/android-app/res/values/ic_launcher_background.xml \
+            android/app/src/main/res/values/ic_launcher_background.xml
           # 网络安全配置
           mkdir -p android/app/src/main/res/xml
           cat > android/app/src/main/res/xml/network_security_config.xml << 'NSEOF'
