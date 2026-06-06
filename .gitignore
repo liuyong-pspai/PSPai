@@ -14,3 +14,11 @@ node_modules/
 frontend/pwa/pyodide/pyodide.tar.bz2
 engine/build/
 engine/dist/
+frontend/pwa/pyodide/
+dist/
+release/
+backups/
+engine/data/
+engine/logs/
+engine/sessions/
+*.bak_*

@@ -74,7 +74,8 @@ def prepare_build():
     if engine:
         name = "xiaolongren-engine.exe" if sys.platform == "win32" else "xiaolongren-engine"
         shutil.copy2(engine, BUILD_DIR / name)
-        os.chmod(BUILD_DIR / name, 0o755)
+        if sys.platform != "win32":
+            os.chmod(BUILD_DIR / name, 0o755)
     else:
         # 打包PSPAI源码引擎
         eng_dir = BUILD_DIR / "engine"

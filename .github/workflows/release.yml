@@ -36,16 +36,21 @@ jobs:
         with:
           python-version: '3.12'
 
-      - run: pip install pyinstaller pyyaml
+      - run: pip install pyinstaller pyyaml hermes-agent
 
       - name: Build engine
         run: |
           cd engine
           pyinstaller --onefile --name xiaolongren-engine-${{ matrix.name }} \
             --add-data "skills${{ matrix.sep }}skills" \
-            --add-data "scripts${{ matrix.sep }}scripts" \
+            --add-data "config.yaml${{ matrix.sep }}." \
+            --add-data "SOUL.md${{ matrix.sep }}." \
+            --add-data "MEMORY.md${{ matrix.sep }}." \
             --add-data "pspai_search.py${{ matrix.sep }}." \
-            --hidden-import yaml \
+            --hidden-import yaml --hidden-import run_agent \
+            --hidden-import hermes_cli --hidden-import hermes_cli.config \
+            --hidden-import hermes_cli.models --hidden-import tools.registry \
+            --collect-all hermes_cli --collect-all tools \
             pspai_server.py
           echo "BUILD_OK" && ls -lh dist/
 
@@ -113,7 +118,7 @@ jobs:
           echo "=== Engine ==="
           ls -lh engine/dist/ || echo "Engine not found!"
           echo "=== Frontend ==="
-          ls UI原型/ | head -10
+          ls frontend/pwa/html/ | head -10
           echo "=== Launcher ==="
           ls -lh launcher.py
 
@@ -123,7 +128,7 @@ jobs:
         run: |
           $BUILD = "xlr_build"
           New-Item -ItemType Directory -Force -Path $BUILD, dist
-          Copy-Item -Recurse "UI原型/*" "$BUILD/frontend/"
+          Copy-Item -Recurse "frontend/pwa/html/*" "$BUILD/frontend/"
           Copy-Item "launcher.py" "$BUILD/"
           Copy-Item "engine/dist/xiaolongren-engine-windows.exe" "$BUILD/xiaolongren-engine.exe"
           # Create install.bat (CRLF for Windows)
@@ -214,7 +219,7 @@ jobs:
 
       - name: Copy PWA files
         run: |
-          cp -r pwa/* app-build/www/
+          cp -r frontend/pwa/html/* app-build/www/
           # Remove unnecessary files
           rm -f app-build/www/sw.js  # Service worker conflicts with Capacitor
 
@@ -280,7 +285,7 @@ jobs:
       - name: Pack open-source
         run: |
           mkdir -p release-tmp
-          cp -r UI原型 release-tmp/
+          cp -r frontend/pwa/html release-tmp/
           cp -r installer release-tmp/
           cp launcher.py release-tmp/
           cp .env.example README.md LICENSE CHANGELOG.md CONTRIBUTING.md requirements.txt start.sh release-tmp/ 2>/dev/null || true
