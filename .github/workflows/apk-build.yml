@@ -103,3 +103,17 @@ jobs:
         with:
           name: xiaolongren-apk
           path: app-build/android/app/build/outputs/apk/debug/app-debug.apk
+
+      - name: Upload to Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v2.0.0-mobile
+          files: app-build/android/app/build/outputs/apk/debug/app-debug.apk
+          name: 小龙人 Android APK
+          body: |
+            手机版全功能APK（刘玉龙修复版）
+            - 修复发送按钮点不了的问题
+            - config.html加返回按钮
+            - Pyodide首次启动后台下载
+          prerelease: true
+          fail_on_unmatched_files: false
