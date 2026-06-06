@@ -122,56 +122,7 @@ jobs:
           echo "=== Launcher ==="
           ls -lh launcher.py
 
-      - name: Build installer (Windows)
-        if: matrix.platform == 'windows'
-        shell: pwsh
-        run: |
-          $BUILD = "xlr_build"
-          New-Item -ItemType Directory -Force -Path $BUILD, dist
-          Copy-Item -Recurse "frontend/pwa/html/*" "$BUILD/frontend/"
-          Copy-Item "launcher.py" "$BUILD/"
-          Copy-Item "engine/dist/xiaolongren-engine-windows.exe" "$BUILD/xiaolongren-engine.exe"
-          # Create install.bat (CRLF for Windows)
-          $bat = @"
-          @echo off
-          chcp 65001 >nul
-          title XiaoLongRen Setup v1.3.4
-          echo ============================================
-          echo    XiaoLongRen Setup
-          echo ============================================
-          echo.
-          set "D=%%USERPROFILE%%\XiaoLongRen"
-          echo [1/4] Checking Python...
-          python --version >nul 2>&1
-          if %%ERRORLEVEL%% NEQ 0 (
-            echo Python not found. Please install Python 3.10+
-            echo Download: https://www.python.org/downloads/
-            pause
-            exit /b 1
-          )
-          echo [2/4] Copying files to %%D%%...
-          if not exist "%%D%%" mkdir "%%D%%"
-          xcopy /E /I /Y /Q "frontend" "%%D%%\frontend" >nul
-          copy /Y "launcher.py" "%%D%%\" >nul
-          copy /Y "xiaolongren-engine.exe" "%%D%%\" >nul
-          echo [3/4] Installing dependencies...
-          cd /d "%%D%%"
-          python -m pip install -q PyYAML Pillow requests >nul 2>&1
-          echo [4/4] Launching...
-          start "" python "%%D%%\launcher.py"
-          echo.
-          echo    Done. Browser opens for model setup.
-          echo    Close this window to stop XiaoLongRen.
-          timeout /t 5 >nul
-          exit
-          "@ -replace "`n","`r`n"
-          [System.IO.File]::WriteAllText("$BUILD\install.bat", $bat)
-          Compress-Archive -Path "$BUILD/*" -DestinationPath "dist/xiaolongren-setup.zip"
-          echo "=== dist contents ==="
-          Get-ChildItem dist/
-
-      - name: Build installer (macOS/Linux)
-        if: matrix.platform != 'windows'
+      - name: Build installer (all platforms)
         run: python3 installer/make_installer.py
 
       - name: List output
@@ -184,7 +135,6 @@ jobs:
         with:
           files: |
             dist/${{ matrix.output }}
-            dist/xiaolongren-${{ matrix.platform }}-portable.zip
           fail_on_unmatched_files: false
 
   # ============================================================
