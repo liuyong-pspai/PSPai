@@ -623,9 +623,13 @@ async function runAgentSmart(userText, systemPrompt) {
   // ── 第2关：发送到PSPAI后端（带工具结果或原始消息） ──
   try {
     var cfg = getConfig();
+    // APK环境下PSPAI后端不可用，设置5秒超时快速降级
+    var controller = new AbortController();
+    var timeoutId = setTimeout(function(){ controller.abort(); }, 5000);
     var resp = await fetch(PSPAI_URL + '/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      signal: controller.signal,
       body: JSON.stringify({
         message: augmentedText,
         charName: (window._currentCharName || '小龙人'),
@@ -633,6 +637,7 @@ async function runAgentSmart(userText, systemPrompt) {
         provider: cfg && cfg.provider ? cfg.provider : undefined
       })
     });
+    clearTimeout(timeoutId);
     if (!resp.ok) throw new Error('PSPAI ' + resp.status);
     var data = await resp.json();
     return data.reply || '(空回复)';
