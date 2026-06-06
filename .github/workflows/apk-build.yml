@@ -26,7 +26,7 @@ jobs:
       - uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
-          java-version: '21'
+          java-version: '17'
 
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
@@ -35,19 +35,15 @@ jobs:
 
       - name: Create Capacitor project
         run: |
-          mkdir -p app-build
-          cd app-build
+          mkdir -p app-build && cd app-build
           npm init -y
           npm install @capacitor/core @capacitor/cli @capacitor/android
           npx cap init 小龙人 com.pspai.xiaolongren --web-dir=www
-          mkdir -p www
 
       - name: Copy web files
         run: |
           cp -r frontend/pwa/html/* app-build/www/
-          cp app-build/www/mobile.html app-build/www/index.html
           rm -f app-build/www/server.py 2>/dev/null || true
-          echo "www files:" && ls -la app-build/www/ && du -sh app-build/www/
 
       - name: Add Android platform
         working-directory: app-build
@@ -55,57 +51,24 @@ jobs:
 
       - name: Configure Android
         run: |
-          # App name
           sed -i 's|<string name="app_name">.*</string>|<string name="app_name">小龙人</string>|' \
             app-build/android/app/src/main/res/values/strings.xml
-          # Cleartext traffic
           sed -i 's|android:usesCleartextTraffic="false"|android:usesCleartextTraffic="true"|' \
             app-build/android/app/src/main/AndroidManifest.xml 2>/dev/null || true
-          # Icons
-          for density in mdpi hdpi xhdpi xxhdpi xxxhdpi; do
-            cp mobile/android-app/res/mipmap-${density}/ic_launcher.png \
-              app-build/android/app/src/main/res/mipmap-${density}/ic_launcher.png
-            cp mobile/android-app/res/mipmap-${density}/ic_launcher_round.png \
-              app-build/android/app/src/main/res/mipmap-${density}/ic_launcher_round.png 2>/dev/null || true
+          # Icon
+          for d in mdpi hdpi xhdpi xxhdpi xxxhdpi; do
+            cp mobile/android-app/res/mipmap-${d}/ic_launcher.png \
+              app-build/android/app/src/main/res/mipmap-${d}/ic_launcher.png
+            cp mobile/android-app/res/mipmap-${d}/ic_launcher_round.png \
+              app-build/android/app/src/main/res/mipmap-${d}/ic_launcher_round.png 2>/dev/null || true
           done
-          # Delete adaptive icon XML (Hongmeng compatible)
+          # Delete adaptive icon XMLs (Hongmeng compat)
           rm -rf app-build/android/app/src/main/res/mipmap-anydpi-v26 2>/dev/null || true
           rm -f app-build/android/app/src/main/res/drawable-v24/ic_launcher_foreground.* 2>/dev/null || true
-          # Network security
-          if [ -f mobile/android-app/res/xml/network_security_config.xml ]; then
-            mkdir -p app-build/android/app/src/main/res/xml
-            cp mobile/android-app/res/xml/network_security_config.xml app-build/android/app/src/main/res/xml/
-            sed -i 's|<application|<application android:networkSecurityConfig="@xml/network_security_config"|' \
-              app-build/android/app/src/main/AndroidManifest.xml
-          fi
-          # Kotlin fix
-          echo '# fix kotlin duplicates' >> app-build/android/app/build.gradle
-          echo 'configurations.all {' >> app-build/android/app/build.gradle
-          echo "    exclude group: 'org.jetbrains.kotlin', module: 'kotlin-stdlib-jdk7'" >> app-build/android/app/build.gradle
-          echo "    exclude group: 'org.jetbrains.kotlin', module: 'kotlin-stdlib-jdk8'" >> app-build/android/app/build.gradle
-          echo '}' >> app-build/android/app/build.gradle
-          echo "Done:" && du -sh app-build/www/
-
-      - name: Debug env
-        run: |
-          echo "ANDROID_HOME=$ANDROID_HOME"
-          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT"
-          ls -la $ANDROID_HOME/platforms/ 2>/dev/null || echo "No platforms"
-          ls -la $ANDROID_HOME/build-tools/ 2>/dev/null || echo "No build-tools"
-          which java && java -version 2>&1
-          cat app-build/android/gradle.properties 2>/dev/null || echo "No gradle.properties"
-          cat app-build/android/local.properties 2>/dev/null || echo "No local.properties"
 
       - name: Build APK
         working-directory: app-build/android
-        run: ANDROID_HOME=${{ env.ANDROID_HOME }} ANDROID_SDK_ROOT=${{ env.ANDROID_SDK_ROOT }} ./gradlew assembleDebug --stacktrace 2>&1 | tail -50
-
-      - name: Check APK
-        run: |
-          APK=$(find app-build -name "*.apk" -type f | head -1)
-          ls -lh $APK
-          echo "=== Icon check ==="
-          unzip -l $APK | grep "ic_launcher" | head -10
+        run: ANDROID_HOME=$ANDROID_HOME ./gradlew assembleDebug 2>&1 | tail -30
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
@@ -114,24 +77,15 @@ jobs:
           path: app-build/android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
 
-      - name: Tag commit
-        run: |
-          git config user.name "CI Builder"
-          git config user.email "ci@pspai.com"
-          git tag -f PSP3.6
-          git push --tags
-
       - name: Upload to Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: PSP3.6
-          files: |
-            app-build/android/app/build/outputs/apk/debug/app-debug.apk
+          files: app-build/android/app/build/outputs/apk/debug/app-debug.apk
           name: 小龙人 PSP3.6 Capacitor版
           body: |
-            ✅ 基于Capacitor框架（v2.0.0-mobile原版方案）
-            ✅ 发送按钮鸿蒙触控修复（ontouchend+event.preventDefault）
-            ✅ 纯PNG图标（删除自适应XML，鸿蒙兼容）
-            ✅ 不包含Pyodide（直连云端大模型，APK更轻量）
+            Capacitor框架构建。基于v2.0.0-mobile原方案。
+            发送按钮鸿蒙触控修复。纯PNG图标。
+            直连云端大模型，APK轻量。
           prerelease: true
           fail_on_unmatched_files: false
