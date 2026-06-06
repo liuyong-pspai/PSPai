@@ -18,86 +18,34 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
+        with: { node-version: '20' }
       - uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin'
-          java-version: '21'
-
+        with: { distribution: 'temurin', java-version: '21' }
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
         with:
           packages: 'platforms;android-34 build-tools;34.0.0 platform-tools'
 
-      - name: Create Capacitor project
+      - name: Build APK
         run: |
+          set -e
           mkdir -p app-build/www
           cp -r frontend/pwa/html/* app-build/www/
           cp app-build/www/mobile.html app-build/www/index.html
-          # 清理不需要的文件
           rm -f app-build/www/server.py
-          rm -f app-build/www/prompts.html config.html download.html 2>/dev/null
-          # Pyodide WASM运行时（700MB）不打包进APK
-          # 首次启动时自动从CDN下载，不阻塞使用
-          rm -rf app-build/www/pyodide/ 2>/dev/null || true
-          echo "www files: $(find app-build/www -type f | wc -l)"
-          du -sh app-build/www/
+          cd app-build
+          npm init -y > /dev/null 2>&1
+          npm install @capacitor/core @capacitor/cli @capacitor/android 2>&1 | tail -1
+          npx cap init 小龙人 com.pspai.xiaolongren --web-dir=www 2>&1
+          npx cap add android 2>&1
+          echo "sdk.dir=${ANDROID_HOME}" > android/local.properties
+          cd android
+          ./gradlew assembleDebug --no-daemon 2>&1 | tail -5
+          echo "BUILD_OK"
+          ls -lh app/build/outputs/apk/debug/app-debug.apk
 
-      - name: Init Capacitor
-        working-directory: app-build
-        run: |
-          npm init -y
-          npm install @capacitor/core @capacitor/cli @capacitor/android
-          npx cap init 小龙人 com.pspai.xiaolongren --web-dir=www
-
-      - name: Add Android platform
-        working-directory: app-build
-        run: npx cap add android
-
-      - name: Configure Android
-        run: |
-          mkdir -p app-build/android/app/src/main/res/xml
-          # Set app name
-          sed -i 's|<string name="app_name">.*</string>|<string name="app_name">小龙人</string>|' \
-            app-build/android/app/src/main/res/values/strings.xml 2>/dev/null || true
-          # Allow cleartext
-          sed -i 's|android:usesCleartextTraffic="false"|android:usesCleartextTraffic="true"|' \
-            app-build/android/app/src/main/AndroidManifest.xml 2>/dev/null || true
-          # Icons
-          for density in mdpi hdpi xhdpi xxhdpi xxxhdpi; do
-            mkdir -p app-build/android/app/src/main/res/mipmap-${density}
-            cp mobile/android-app/res/mipmap-${density}/ic_launcher.png app-build/android/app/src/main/res/mipmap-${density}/ 2>/dev/null || true
-            cp mobile/android-app/res/mipmap-${density}/ic_launcher_round.png app-build/android/app/src/main/res/mipmap-${density}/ 2>/dev/null || true
-          done
-          rm -f app-build/android/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml 2>/dev/null || true
-          rm -f app-build/android/app/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml 2>/dev/null || true
-          rm -f app-build/android/app/src/main/res/drawable/ic_launcher_foreground.xml 2>/dev/null || true
-          # Network security
-          cp mobile/android-app/res/xml/network_security_config.xml app-build/android/app/src/main/res/xml/ 2>/dev/null || true
-          sed -i 's|<application|<application android:networkSecurityConfig="@xml/network_security_config"|' \
-            app-build/android/app/src/main/AndroidManifest.xml 2>/dev/null || true
-          # Kotlin fix
-          cat >> app-build/android/app/build.gradle << 'GRADLEEOF' 2>/dev/null || true
-
-          configurations.all {
-              exclude group: 'org.jetbrains.kotlin', module: 'kotlin-stdlib-jdk7'
-              exclude group: 'org.jetbrains.kotlin', module: 'kotlin-stdlib-jdk8'
-          }
-          GRADLEEOF
-          echo "Configure done"
-
-      - name: Build APK
-        working-directory: app-build/android
-        run: |
-          echo "sdk.dir=${ANDROID_HOME}" > local.properties
-          ./gradlew assembleDebug --no-daemon
-
-      - name: Upload APK artifact
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
           name: xiaolongren-apk
           path: app-build/android/app/build/outputs/apk/debug/app-debug.apk
