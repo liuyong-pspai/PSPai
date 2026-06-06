@@ -48,14 +48,35 @@ jobs:
           echo 'include ":app"' > $APP/settings.gradle
           echo 'rootProject.name = "XiaoLongRen"' >> $APP/settings.gradle
           echo 'org.gradle.jvmargs=-Xmx4g' > $APP/gradle.properties
-          # Build
+          # Build with gradle wrapper
           cd $APP
-          gradle assembleDebug --no-daemon --stacktrace 2>&1 | tail -20
-          ls -lh app/build/outputs/apk/debug/app-debug.apk || echo "APK NOT FOUND"
-      - uses: actions/upload-artifact@v4
+          # Generate gradlew wrapper
+          gradle wrapper --gradle-version 8.5 2>/dev/null || true
+          if [ ! -f gradlew ]; then
+            # Manual gradlew stub
+            mkdir -p gradle/wrapper
+            echo 'distributionBase=GRADLE_USER_HOME' > gradle/wrapper/gradle-wrapper.properties
+            echo 'distributionPath=wrapper/dists' >> gradle/wrapper/gradle-wrapper.properties
+            echo 'distributionUrl=https\://services.gradle.org/distributions/gradle-8.5-bin.zip' >> gradle/wrapper/gradle-wrapper.properties
+            echo 'zipStoreBase=GRADLE_USER_HOME' >> gradle/wrapper/gradle-wrapper.properties
+            echo 'zipStorePath=wrapper/dists' >> gradle/wrapper/gradle-wrapper.properties
+            curl -sL "https://services.gradle.org/distributions/gradle-8.5-bin.zip" -o /tmp/gradle.zip
+            unzip -q -o /tmp/gradle.zip -d /tmp/gradle-8.5
+            /tmp/gradle-8.5/gradle-8.5/bin/gradle assembleDebug --no-daemon --stacktrace 2>&1 | tail -25
+          else
+            chmod +x gradlew
+            ./gradlew assembleDebug --no-daemon --stacktrace 2>&1 | tail -25
+          fi
+          echo "--- APK ---"
+          find . -name "*.apk" -type f 2>/dev/null
+          ls -lh app/build/outputs/apk/debug/app-debug.apk 2>/dev/null || echo "APK NOT FOUND"
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
         with:
           name: xiaolongren-native-apk
-          path: app-build/app/build/outputs/apk/debug/app-debug.apk
+          path: |
+            app-build/app/build/outputs/apk/debug/app-debug.apk
+            app-build/app/build/outputs/apk/debug/app-*.apk
       - name: Upload to Release
         uses: softprops/action-gh-release@v2
         with:
