@@ -1,4 +1,4 @@
-name: Build APK
+name: Build APK (Full)
 
 on:
   push:
@@ -27,23 +27,30 @@ jobs:
         with:
           packages: 'platforms;android-34 build-tools;34.0.0 platform-tools'
 
-      - name: Build APK
+      - name: Download Pyodide runtime
+        run: |
+          echo "Downloading Pyodide full runtime..."
+          mkdir -p frontend/pwa/pyodide
+          # 从GitHub Release下载预打包的Pyodide
+          curl -L --max-time 600 -o /tmp/pyodide.tar.bz2 \
+            "https://github.com/liuyong-pspai/PSPai/releases/download/pyodide-v0.27.5/pyodide-full.tar.bz2"
+          tar -xjf /tmp/pyodide.tar.bz2 -C frontend/pwa/
+          echo "Pyodide extracted:"
+          du -sh frontend/pwa/pyodide/
+          ls -la frontend/pwa/pyodide/pyodide.asm.wasm frontend/pwa/pyodide/pyodide.js 2>/dev/null
+
+      - name: Build APK (Full)
         run: |
           set -e
           mkdir -p app-build/www
           cp -r frontend/pwa/html/* app-build/www/
-          # 全功能版：保留Pyodide核心运行时（WASM引擎+Python标准库），只去重包
-          # KEEP: pyodide.asm.wasm(10MB), python_stdlib.zip(2MB), pyodide.js, pyodide.mjs, python
-          # 包(.whl)首次启动时按需通过micropip从CDN加载，不占APK体积
+          # 全功能版：复制完整Pyodide运行时
           cp -r frontend/pwa/pyodide app-build/www/pyodide
-          # 只删包文件，保留核心运行时
-          rm -f app-build/www/pyodide/*.whl app-build/www/pyodide/*.whl.metadata 2>/dev/null || true
-          rm -f app-build/www/pyodide/*.tar app-build/www/pyodide/*.so 2>/dev/null || true
-          rm -f app-build/www/pyodide/pyodide.js.map app-build/www/pyodide/pyodide.mjs.map 2>/dev/null || true
-          rm -f app-build/www/pyodide/package.json 2>/dev/null || true
-          echo "Pyodide核心保留: $(du -sh app-build/www/pyodide/ | cut -f1)"
+          cp frontend/pwa/html/pyodide-bridge.js app-build/www/pyodide-bridge.js 2>/dev/null || true
           cp app-build/www/mobile.html app-build/www/index.html
           rm -f app-build/www/server.py
+          echo "www files: $(find app-build/www -type f | wc -l)"
+          du -sh app-build/www/
           cd app-build
           npm init -y > /dev/null 2>&1
           npm install @capacitor/core @capacitor/cli @capacitor/android
@@ -100,19 +107,22 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: xiaolongren-apk
+          name: xiaolongren-full-apk
           path: app-build/android/app/build/outputs/apk/debug/app-debug.apk
 
       - name: Upload to Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v2.0.0-mobile
+          tag_name: PSP3.0
           files: app-build/android/app/build/outputs/apk/debug/app-debug.apk
-          name: 小龙人 Android APK
+          name: 小龙人 PSP3.0 全功能手机版
           body: |
-            手机版全功能APK（刘玉龙修复版）
-            - 修复发送按钮点不了的问题
+            🐉 小龙人 PSP3.0 全功能手机APK
+            - 完整Pyodide Python引擎（开箱即用）
+            - 6大数字生命体角色
+            - 多模型支持（DeepSeek/OpenAI/通义千问/智谱GLM/Anthropic）
+            - 语音对话 + 文字聊天 + 文件上传
+            - 修复发送按钮鸿蒙兼容性
             - config.html加返回按钮
-            - Pyodide首次启动后台下载
           prerelease: true
           fail_on_unmatched_files: false
