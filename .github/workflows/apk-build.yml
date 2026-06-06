@@ -31,13 +31,25 @@ jobs:
         run: |
           echo "Downloading Pyodide full runtime..."
           mkdir -p frontend/pwa/pyodide
-          # 从GitHub Release下载预打包的Pyodide
-          curl -L --max-time 600 -o /tmp/pyodide.tar.bz2 \
-            "https://github.com/liuyong-pspai/PSPai/releases/download/pyodide-v0.27.5/pyodide-full.tar.bz2"
-          tar -xjf /tmp/pyodide.tar.bz2 -C frontend/pwa/
-          echo "Pyodide extracted:"
-          du -sh frontend/pwa/pyodide/
-          ls -la frontend/pwa/pyodide/pyodide.asm.wasm frontend/pwa/pyodide/pyodide.js 2>/dev/null
+          # 从官方Pyodide Release下载（约350MB压缩包，解压后~700MB）
+          curl -L --max-time 900 --retry 2 --retry-delay 10 \
+            -o /tmp/pyodide.tar.bz2 \
+            "https://github.com/pyodide/pyodide/releases/download/0.27.5/pyodide-0.27.5.tar.bz2" || {
+            echo "⚠️ GitHub超时，尝试jsDelivr CDN..."
+            curl -L --max-time 900 --retry 2 \
+              -o /tmp/pyodide.tar.bz2 \
+              "https://cdn.jsdelivr.net/gh/pyodide/pyodide@0.27.5/dist/pyodide-0.27.5.tar.bz2"
+          }
+          if [ -f /tmp/pyodide.tar.bz2 ] && [ -s /tmp/pyodide.tar.bz2 ]; then
+            tar -xjf /tmp/pyodide.tar.bz2 -C frontend/pwa/
+            rm /tmp/pyodide.tar.bz2
+            echo "Pyodide ready:"
+            du -sh frontend/pwa/pyodide/
+          else
+            echo "❌ Pyodide下载失败，构建轻量版（首次启动后台下载）"
+            mkdir -p frontend/pwa/pyodide
+            cp frontend/pwa/html/pyodide/pyodide.js frontend/pwa/pyodide/
+          fi
 
       - name: Build APK (Full)
         run: |
