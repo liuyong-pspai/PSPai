@@ -112,15 +112,15 @@
    112|    </div>
    113|  </div>
    114|
-   115|  <!-- Pyodide懒加载：首次启动后台下载，不阻塞使用 -->
+   115|    <!-- Pyodide懒加载：首次启动后台下载，不阻塞使用 -->
   <div id="pyodide-loader" style="position:fixed;bottom:60px;left:12px;right:12px;z-index:200;background:rgba(0,0,0,0.85);border:1px solid var(--gold-dim);border-radius:10px;padding:10px 14px;display:none;font-size:12px;color:#888;">
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
-      <span>🐍</span><span id="pyload-text">Python引擎后台下载中...</span>
+      <span>🐍</span><span id="pyload-text">Python引擎下载中...</span>
     </div>
     <div style="height:3px;background:rgba(255,255,255,0.08);border-radius:2px;overflow:hidden">
       <div id="pyload-bar" style="height:100%;width:0%;background:var(--gold);border-radius:2px;transition:width 0.3s"></div>
     </div>
-    <div style="font-size:10px;color:#555;margin-top:4px">下载完成后自动激活，不影响聊天功能</div>
+    <div style="font-size:10px;color:#555;margin-top:4px">下载完成自动激活，不影响聊天</div>
   </div>
    116|
    117|  <div id="input-bar">
@@ -145,20 +145,25 @@
    136|<script src="evolution.js?v=3"></script>
    137|<script src="sensors.js?v=3"></script>
    138|<script src="knowledge.js?v=3"></script>
-   139|<script src="pyodide/pyodide.js?v=4"></script>
-<script src="pyodide-bridge.js?v=4"></script>
-   140|<script>
-   141|// v6.0 插件架构 — 内核+5插件+Pyodide可选升级
-   142|// 启动时初始化内核+插件体系
-   143|(async function boot() {
-   144|  try {
-   145|    window._bootTime = Date.now();
-   146|    const report = await initKernel();
-   147|    console.log('🚀 小龙人启动完成:', report);
-   148|  } catch(e) {
-   149|    console.error('启动失败:', e);
-   150|  }
-   151|})();
+<script src="knowledge.js?v=3"></script>
+<script src="pyodide/pyodide.js?v=3"></script>
+<script src="pyodide-bridge.js?v=3"></script>
+<script>
+// v6.0 插件架构 — 内核+5插件+Pyodide可选升级
+// 启动时初始化内核+插件体系
+(async function boot() {
+  try {
+    window._bootTime = Date.now();
+    const report = await initKernel();
+    console.log('🚀 小龙人启动完成:', report);
+    // 后台自动下载Pyodide（如果尚未缓存）
+    if (typeof downloadPyodide === 'function') {
+      downloadPyodide().catch(function(e){ console.warn('[pyodide] 后台下载失败，下次启动重试:', e.message); });
+    }
+  } catch(e) {
+    console.error('启动失败:', e);
+  }
+})();
    152|// ====== 角色 ======
    153|const CHARS = {
    154|  longyuan:{name:'龙渊',tag:'专业全能',sys:'你是小龙人。回答时禁止输出JSON、禁止输出工具定义、禁止输出代码块。用自然语言简洁回答。系统已内置SmartRouter自动执行工具，你只需根据工具执行结果给出人话解读。能力：自检、自进化、知识库存取、网络搜索、计算、图片分析、翻译、文件处理、定时提醒。'},

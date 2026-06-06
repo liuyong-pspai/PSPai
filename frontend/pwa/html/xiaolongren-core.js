@@ -643,4 +643,81 @@ async function runAgentSmart(userText, systemPrompt) {
   }
 }
 
-console.log('[内核] xiaolongren-core.js v6.2 加载完成（插件架构+SmartRouter）');
+// ============================================================
+// Pyodide 后台懒下载 — APK首次启动时静默下载
+// ============================================================
+// 用户安装APK后首次打开App，后台下载Pyodide WASM运行时（~70MB压缩）
+// 下载完成后解压到 IndexedDB / CacheStorage，下次启动直接加载
+// 下载过程不阻塞聊天功能，用户可正常使用
+var PYODIDE_URL = 'https://github.com/pyodide/pyodide/releases/download/0.27.5/pyodide-0.27.5.tar.bz2';
+var PYODIDE_CACHE_KEY = 'xlr_pyodide_v27';
+
+async function downloadPyodide() {
+  // 检查是否已缓存
+  try {
+    if (typeof caches !== 'undefined') {
+      var cache = await caches.open('xlr-pyodide');
+      var cached = await cache.match(PYODIDE_URL);
+      if (cached) {
+        console.log('[pyodide] 已缓存，跳过下载');
+        return;
+      }
+    }
+  } catch(e) { /* cache不可用，继续下载 */ }
+
+  var loaderEl = document.getElementById('pyodide-loader');
+  var barEl = document.getElementById('pyload-bar');
+  var textEl = document.getElementById('pyload-text');
+  if (loaderEl) loaderEl.style.display = 'block';
+
+  try {
+    console.log('[pyodide] 开始后台下载...');
+    var resp = await fetch(PYODIDE_URL);
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    var reader = resp.body.getReader();
+    var contentLength = parseInt(resp.headers.get('Content-Length') || '0') || 75000000;
+    var received = 0;
+    var chunks = [];
+
+    while (true) {
+      var result = await reader.read();
+      if (result.done) break;
+      chunks.push(result.value);
+      received += result.value.length;
+      var pct = Math.min(100, Math.round(received / contentLength * 100));
+      if (barEl) barEl.style.width = pct + '%';
+      if (textEl) textEl.textContent = 'Python引擎下载中 ' + pct + '%';
+    }
+
+    // 拼合
+    var blob = new Blob(chunks, {type: 'application/x-bzip2'});
+    console.log('[pyodide] 下载完成:', (received/1048576).toFixed(1) + 'MB');
+
+    // 缓存到 CacheStorage
+    try {
+      if (typeof caches !== 'undefined') {
+        var cache = await caches.open('xlr-pyodide');
+        var response = new Response(blob, {headers: {'Content-Type': 'application/x-bzip2'}});
+        await cache.put(PYODIDE_URL, response);
+        console.log('[pyodide] 已缓存到 CacheStorage');
+      }
+    } catch(e) { console.warn('[pyodide] 缓存失败:', e.message); }
+
+    if (textEl) textEl.textContent = '✓ Python引擎就绪';
+    if (barEl) barEl.style.width = '100%';
+    setTimeout(function() { if (loaderEl) loaderEl.style.display = 'none'; }, 2000);
+
+    // 刷新页面使pyodide生效
+    if (typeof loadPyodideEngine === 'function') {
+      console.log('[pyodide] 触发引擎加载...');
+    }
+  } catch(e) {
+    console.warn('[pyodide] 下载失败:', e.message);
+    if (textEl) textEl.textContent = '⚠ Python引擎下载失败，下次启动重试';
+    if (barEl) barEl.style.width = '0%';
+    setTimeout(function() { if (loaderEl) loaderEl.style.display = 'none'; }, 3000);
+    throw e;
+  }
+}
+
+console.log('[内核] xiaolongren-core.js v6.3 加载完成（插件架构+SmartRouter+Pyodide懒加载）');
