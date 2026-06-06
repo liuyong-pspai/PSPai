@@ -69,36 +69,28 @@ jobs:
             android/app/src/main/res/values/strings.xml
           sed -i 's/android:usesCleartextTraffic="false"/android:usesCleartextTraffic="true"/' \
             android/app/src/main/AndroidManifest.xml 2>/dev/null || true
-          # 🔴 关键修复：Capacitor生成的Android项目图标在mipmap-{density}-v4目录下
-          # 直接复制到不带v4的目录不会被使用，必须覆盖所有可能的目标
-          echo "🔍 检查Capacitor生成的图标目录结构..."
-          ls -d android/app/src/main/res/mipmap-* 2>/dev/null || echo "(暂无)"
+          # 🔴 暴力替换图标：删除所有旧图标/叠加文件，用我们的PNG全覆盖
+          echo "===== 暴力替换图标 ====="
+          # 1. 删除所有可能干扰的叠加文件
+          find android/app/src/main/res/ -name "*ic_launcher*" -not -name "*.png" -delete 2>/dev/null
+          find android/app/src/main/res/ -name "*.png" -path "*ic_launcher*" -delete 2>/dev/null
+          # 2. 删除anydpi目录（自适应图标会覆盖PNG）
+          find android/app/src/main/res/ -type d -name "mipmap-anydpi*" -exec rm -rf {} + 2>/dev/null
+          find android/app/src/main/res/ -type d -name "drawable-anydpi*" -exec rm -rf {} + 2>/dev/null
+          find android/app/src/main/res/ -type d -name "drawable-v24" -exec rm -rf {} + 2>/dev/null
+          echo "🗑️ 已清除旧图标和叠加文件"
+          # 3. 检查残留
+          echo "🔍 残留检查:"
+          find android/app/src/main/res/ -name "*ic_launcher*" -type f 2>/dev/null || echo "  (无残留)"
+          # 4. 复制我们的PNG（覆盖所有可能的密度目录）
           for density in mdpi hdpi xhdpi xxhdpi xxxhdpi; do
             SRC=${{ github.workspace }}/mobile/android-app/res/mipmap-${density}
-            # 同时覆盖v4和非v4目录
-            for DST_BASE in "android/app/src/main/res/mipmap-${density}-v4" "android/app/src/main/res/mipmap-${density}"; do
-              if [ -d "$DST_BASE" ]; then
-                [ -f $SRC/ic_launcher.png ] && cp $SRC/ic_launcher.png $DST_BASE/ic_launcher.png
-                [ -f $SRC/ic_launcher_round.png ] && cp $SRC/ic_launcher_round.png $DST_BASE/ic_launcher_round.png
-                echo "✅ 已覆盖: $DST_BASE"
-              fi
+            for DST in $(find android/app/src/main/res/ -maxdepth 1 -type d -name "mipmap-${density}*" 2>/dev/null); do
+              [ -f $SRC/ic_launcher.png ] && cp $SRC/ic_launcher.png $DST/ic_launcher.png
+              [ -f $SRC/ic_launcher_round.png ] && cp $SRC/ic_launcher_round.png $DST/ic_launcher_round.png
+              echo "✅ $DST"
             done
           done
-          # 🔴 彻底删除自适应图标目录和所有叠加源文件
-          # Capacitor会生成: mipmap-anydpi-v26/*.xml, drawable-anydpi-v24/*.xml, drawable/*.xml
-          # 任何残留的矢量前景+背景叠加 = 文字+图片效果
-          for DIR in \
-            "android/app/src/main/res/mipmap-anydpi-v26" \
-            "android/app/src/main/res/mipmap-anydpi-v24" \
-            "android/app/src/main/res/drawable-anydpi-v24"; do
-            if [ -d "$DIR" ]; then
-              echo "🗑️ 删除叠加目录: $DIR"
-              rm -rf "$DIR"
-            fi
-          done
-          # 额外删除drawable包里的前景/背景文件
-          rm -f android/app/src/main/res/drawable/ic_launcher_foreground.xml 2>/dev/null || true
-          rm -f android/app/src/main/res/drawable/ic_launcher_background.xml 2>/dev/null || true
           # 网络安全配置
           mkdir -p android/app/src/main/res/xml
           cat > android/app/src/main/res/xml/network_security_config.xml << 'NSEOF'
