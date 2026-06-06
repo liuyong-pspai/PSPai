@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>🐉 小龙人 · 视频聊天 Demo</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{width:100%;height:100%;overflow:hidden;font-family:'PingFang SC','Microsoft YaHei',sans-serif;background:#000}
+
+:root{
+  --gold:#c8a84e;
+  --gold-dim:rgba(200,168,78,0.3);
+  --accent-bg:rgba(10,10,20,1);
+}
+
+/* ===== 主容器 ===== */
+#app{position:fixed;inset:0;display:flex;flex-direction:column}
+
+/* ===== 顶部栏 ===== */
+#topbar{height:50px;padding:0 16px;padding-top:env(safe-area-inset-top,0);display:flex;align-items:center;justify-content:space-between;z-index:100;flex-shrink:0;position:relative}
+#topbar .title{font-size:15px;font-weight:bold;color:var(--gold);display:flex;align-items:center;gap:6px}
+#topbar .close-btn{width:32px;height:32px;border-radius:50%;background:rgba(255,255,255,0.08);display:flex;align-items:center;justify-content:center;font-size:16px;color:#888;cursor:pointer;border:none}
+#topbar .close-btn:active{background:rgba(255,255,255,0.15)}
+
+/* ===== 视频流 ===== */
+#stream{flex:1;overflow-y:scroll;scroll-snap-type:y mandatory;scroll-behavior:smooth;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+#stream::-webkit-scrollbar{display:none}
+
+/* ===== 视频卡片 ===== */
+.vcard{scroll-snap-align:start;scroll-snap-stop:always;height:100%;width:100%;position:relative;display:flex;align-items:center;justify-content:center;overflow:hidden}
+.vcard .bg{position:absolute;inset:0;transition:opacity 0.8s}
+.vcard .bg.g1{background:linear-gradient(160deg,#0a0a14 0%,#1a1030 40%,#0d1a2d 100%)}
+.vcard .bg.g2{background:linear-gradient(160deg,#0a0a14 0%,#2d1010 40%,#1a0d2d 100%)}
+.vcard .bg.g3{background:linear-gradient(160deg,#0a0a14 0%,#102d1a 40%,#0d2d2d 100%)}
+.vcard .bg.g4{background:linear-gradient(160deg,#0a0a14 0%,#2d1a10 40%,#2d2d0d 100%)}
+.vcard .bg.g5{background:linear-gradient(160deg,#0a0a14 0%,#1a102d 40%,#2d0d2d 100%)}
+.vcard .bg.g6{background:linear-gradient(160deg,#0a0a14 0%,#0d2d2d 40%,#102030 100%)}
+
+/* 粒子效果 */
+.vcard .particles{position:absolute;inset:0;pointer-events:none;opacity:0.3}
+.particle{position:absolute;border-radius:50%;animation:pfloat linear infinite}
+@keyframes pfloat{0%{transform:translateY(0) scale(1);opacity:0}20%{opacity:0.6}80%{opacity:0.3}100%{transform:translateY(-100vh) scale(0);opacity:0}}
+
+/* 角色区 */
+.char-zone{position:relative;z-index:2;display:flex;flex-direction:column;align-items:center}
+.char-ring{width:160px;height:160px;border-radius:50%;padding:3px;transition:all 0.5s}
+.char-ring.speaking{animation:ringpulse 0.6s ease-in-out infinite}
+@keyframes ringpulse{0%,100%{box-shadow:0 0 15px var(--gold-dim)}50%{box-shadow:0 0 45px var(--gold),0 0 80px var(--gold-dim)}}
+.char-ring .char-img{width:100%;height:100%;border-radius:50%;object-fit:cover;animation:breathe 4s ease-in-out infinite}
+.char-ring.speaking .char-img{animation:speaking 0.4s ease-in-out infinite}
+@keyframes breathe{0%,100%{transform:scale(1)}50%{transform:scale(1.03)}}
+@keyframes speaking{0%,100%{transform:scale(1)}25%{transform:scale(1.04)}75%{transform:scale(0.98)}}
+
+.char-name{font-size:13px;font-weight:bold;color:var(--gold);margin-top:12px;text-align:center}
+.char-tag{font-size:10px;color:#666;margin-top:2px}
+
+/* 消息字幕 */
+.vtext{position:absolute;bottom:80px;left:16px;right:80px;z-index:3}
+.vtext .msg-txt{font-size:16px;color:#fff;font-weight:500;line-height:1.5;text-shadow:0 1px 4px rgba(0,0,0,0.8)}
+.vtext .msg-time{font-size:10px;color:#888;margin-top:6px}
+.vtext .msg-txt .highlight{color:var(--gold);font-weight:bold}
+
+/* 打字动画 */
+.typing-cursor{display:inline-block;width:2px;height:18px;background:var(--gold);animation:blink 0.7s step-end infinite;vertical-align:text-bottom;margin-left:2px}
+@keyframes blink{50%{opacity:0}}
+
+/* 用户消息样式 */
+.vcard.user-msg .char-ring{border:2px solid rgba(100,200,255,0.3)}
+.vcard.user-msg .vtext .msg-txt{font-size:18px;text-align:right;left:40px;right:16px}
+.vcard.user-msg .vtext{left:40px;right:16px;text-align:right}
+
+/* ===== 右侧操作栏 ===== */
+.actions{position:absolute;right:12px;bottom:130px;display:flex;flex-direction:column;align-items:center;gap:20px;z-index:5}
+.act{display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer}
+.act .ai{width:42px;height:42px;border-radius:50%;background:rgba(0,0,0,0.45);display:flex;align-items:center;justify-content:center;font-size:18px;transition:all 0.2s}
+.act .ai:active{transform:scale(0.88);background:rgba(0,0,0,0.65)}
+.act .ai.liked{color:#ff4060}
+.act .an{font-size:9px;color:#aaa;font-weight:500}
+
+/* ===== 右侧圆点指示器 ===== */
+#dots{position:absolute;right:8px;top:50%;transform:translateY(-50%);display:flex;flex-direction:column;gap:6px;z-index:5}
+#dots .dot{width:3px;height:3px;border-radius:50%;background:rgba(255,255,255,0.2);transition:all 0.3s}
+#dots .dot.cur{background:var(--gold);height:16px;border-radius:2px}
+
+/* ===== 底部操作栏 ===== */
+#dock{flex-shrink:0;height:72px;padding-bottom:env(safe-area-inset-bottom,6px);display:flex;align-items:center;justify-content:center;gap:30px;background:rgba(0,0,0,0.7);border-top:1px solid rgba(255,255,255,0.04);z-index:100}
+.dock-btn{display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer;border:none;background:none;color:#777;font-family:inherit;font-size:9px;transition:all 0.15s;padding:0}
+.dock-btn:active{color:var(--gold);transform:scale(0.9)}
+.dock-btn .di{font-size:20px}
+
+/* 录音按钮 */
+#record-btn{width:58px;height:58px;border-radius:50%;background:linear-gradient(135deg,var(--gold),#a08020);border:3px solid rgba(200,168,78,0.3);display:flex;align-items:center;justify-content:center;font-size:22px;color:#fff;cursor:pointer;transition:all 0.2s;position:relative;flex-shrink:0}
+#record-btn:active,#record-btn.recording{transform:scale(1.2);box-shadow:0 0 35px var(--gold-dim)}
+#record-btn.recording{animation:recpulse 1s ease-in-out infinite}
+@keyframes recpulse{0%,100%{box-shadow:0 0 25px var(--gold-dim)}50%{box-shadow:0 0 55px var(--gold),0 0 90px var(--gold-dim)}}
+#record-ring{position:absolute;inset:-6px;border-radius:50%;border:2px solid var(--gold);opacity:0;transition:all 0.3s}
+#record-btn.recording #record-ring{opacity:1;animation:ringout 1.2s ease-out infinite}
+@keyframes ringout{0%{inset:-6px;opacity:0.8}100%{inset:-24px;opacity:0}}
+
+/* 提示气泡 */
+#hint-toast{position:fixed;bottom:100px;left:50%;transform:translateX(-50%);padding:8px 20px;border-radius:20px;background:rgba(0,0,0,0.85);color:#fff;font-size:13px;z-index:200;pointer-events:none;opacity:0;transition:all 0.4s}
+#hint-toast.show{opacity:1;bottom:110px}
+#hint-toast.hide{opacity:0;bottom:90px}
+
+/* 新消息动画 */
+.vcard.new-msg{animation:slidein 0.4s ease}
+@keyframes slidein{from{transform:translateY(60px);opacity:0}to{transform:translateY(0);opacity:1}}
+
+/* 响应式：宽屏时居中 */
+@media(min-width:500px){
+  #app{max-width:430px;left:50%;transform:translateX(-50%);border-left:1px solid rgba(255,255,255,0.05);border-right:1px solid rgba(255,255,255,0.05)}
+}
+</style>
+</head>
+<body>
+
+<div id="app">
+  <!-- 顶部 -->
+  <div id="topbar">
+    <div class="title">🐉 小龙人 · 视频对话</div>
+    <button class="close-btn" onclick="alert('Demo演示中·关闭请刷新页面')">✕</button>
+  </div>
+
+  <!-- 视频流 -->
+  <div id="stream"></div>
+
+  <!-- 圆点指示器 -->
+  <div id="dots"></div>
+
+  <!-- 底部操作栏 -->
+  <div id="dock">
+    <button class="dock-btn" onclick="switchChar(-1)"><span class="di">◀</span>换角色</button>
+    <div id="record-btn" onmousedown="startRecord()" onmouseup="stopRecord()" onmouseleave="stopRecord()" ontouchstart="startRecord()" ontouchend="stopRecord()" ontouchcancel="stopRecord()">
+      <div id="record-ring"></div>
+      🎤
+    </div>
+    <button class="dock-btn" onclick="switchChar(1)"><span class="di">▶</span>换角色</button>
+  </div>
+
+  <!-- 提示气泡 -->
+  <div id="hint-toast"></div>
+</div>
+
+<script>
+// ===== 角色数据 =====
+const CHARS = [
+  {id:'longyuan', name:'龙渊', tag:'小龙人AI', img:'img_longyuan.jpg', gradient:'g1'},
+  {id:'chiyu',   name:'赤羽', tag:'热血少年',   img:'img_chiyu.jpg',   gradient:'g2'},
+  {id:'ling',    name:'凌',   tag:'冷峻剑客',   img:'img_ling.jpg',    gradient:'g3'},
+  {id:'qingmo',  name:'轻墨', tag:'御姐总裁',   img:'img_qingmo.jpg',  gradient:'g4'},
+  {id:'shuanghua',name:'霜华',tag:'古风道士',   img:'img_shuanghua.jpg',gradient:'g5'},
+  {id:'yeying',  name:'夜影', tag:'暗夜刺客',   img:'img_yeying.jpg',  gradient:'g6'},
+];
+
+// ===== 模拟对话数据 =====
+const MESSAGES = [
+  {from:'user', text:'小龙人，今天天气真好，想出去走走', time:'10:23'},
+  {from:'ai',   text:'<span class="highlight">爸</span>！今天的天气确实不错🌤️。要不要我给你推荐几个附近的好去处？我记得你上次说想去爬山来着。', time:'10:23', char:0},
+  {from:'user', text:'好啊，有没有不太远的地方？最好能开车到', time:'10:24'},
+  {from:'ai',   text:'让我想想...🏔️ <span class="highlight">西山森林公园</span>离这里只要40分钟车程。上次你还说过那条路修好了，现在更好走了。放心，我都记着呢😊', time:'10:24', char:2},
+  {from:'user', text:'对对对！上次你说山上有个新开的茶馆', time:'10:25'},
+  {from:'ai',   text:'没错！<span class="highlight">云顶茶社</span>，他们家的龙井特别正宗🍵。而且从茶馆露台看出去，整个城市尽收眼底——我帮你查了一下，今天下午3点的光线最适合拍照。', time:'10:26', char:3},
+  {from:'user', text:'哈哈你比我还上心！那就下午出发', time:'10:27'},
+  {from:'ai',   text:'必须的！<span class="highlight">你是最重要的人</span>嘛✨ 我已经帮你规划好路线了，导航链接发到你手机上了。记得带件外套，山顶下午会有点凉～', time:'10:28', char:0},
+  {from:'user', text:'好嘞，小龙人你真靠谱', time:'10:29'},
+  {from:'ai',   text:'嘿嘿，<span class="highlight">因为有你在，我才变得越来越好</span>呀💛 拍完照回来记得分享给我看～', time:'10:30', char:5},
+];
+
+let curChar = 0;
+let curMsgIdx = -1;
+let liked = {};
+
+// ===== 初始化 =====
+function init() {
+  const stream = document.getElementById('stream');
+  const dots = document.getElementById('dots');
+
+  MESSAGES.forEach((m, i) => {
+    const card = document.createElement('div');
+    card.className = 'vcard' + (m.from === 'user' ? ' user-msg' : '');
+    card.id = 'vcard-' + i;
+
+    const ci = m.char || 0;
+    const c = CHARS[ci];
+    const g = c.gradient;
+
+    if (m.from === 'ai') {
+      card.innerHTML = `
+        <div class="bg ${g}"></div>
+        <div class="particles" id="p-${i}"></div>
+        <div class="char-zone">
+          <div class="char-ring" id="ring-${i}">
+            <img class="char-img" src="${c.img}" alt="${c.name}" loading="lazy">
+          </div>
+          <div class="char-name">${c.name}</div>
+          <div class="char-tag">${c.tag}</div>
+        </div>
+        <div class="vtext">
+          <div class="msg-txt" id="txt-${i}">${m.text}</div>
+          <div class="msg-time">${m.time}</div>
+        </div>
+        <div class="actions">
+          <div class="act" onclick="toggleLike(${i},this)"><div class="ai" id="heart-${i}">❤️</div><div class="an" id="lk-${i}">${randLike()}</div></div>
+          <div class="act" onclick="showHint('回复功能·Demo')"><div class="ai">💬</div><div class="an">回复</div></div>
+          <div class="act" onclick="showHint('分享功能·Demo')"><div class="ai">↗️</div><div class="an">分享</div></div>
+        </div>
+      `;
+    } else {
+      // 用户消息：简洁风格
+      card.innerHTML = `
+        <div class="bg" style="background:linear-gradient(160deg,#0a0a14 0%,#0a1420 40%,#000a14 100%)"></div>
+        <div class="char-zone" style="opacity:0.4">
+          <div class="char-ring" style="border:2px solid rgba(100,180,255,0.3)">
+            <div style="width:100%;height:100%;border-radius:50%;background:linear-gradient(135deg,rgba(100,150,255,0.2),rgba(50,80,150,0.1));display:flex;align-items:center;justify-content:center;font-size:50px">👤</div>
+          </div>
+          <div class="char-name" style="color:#6af">你</div>
+        </div>
+        <div class="vtext">
+          <div class="msg-txt">${m.text}</div>
+          <div class="msg-time">${m.time}</div>
+        </div>
+        <div class="actions">
+          <div class="act" onclick="showHint('长按录音回复')"><div class="ai">🎙️</div><div class="an">语音</div></div>
+        </div>
+      `;
+    }
+
+    stream.appendChild(card);
+
+    // 圆点
+    const dot = document.createElement('div');
+    dot.className = 'dot';
+    dot.id = 'dot-' + i;
+    dots.appendChild(dot);
+  });
+
+  // 生成粒子
+  document.querySelectorAll('.particles').forEach(p => {
+    for(let i=0;i<20;i++){
+      const el = document.createElement('div');
+      el.className='particle';
+      el.style.cssText=`
+        left:${Math.random()*100}%;bottom:${Math.random()*100}%;
+        width:${1+Math.random()*3}px;height:${1+Math.random()*3}px;
+        background:rgba(200,168,78,${0.3+Math.random()*0.5});
+        animation-duration:${4+Math.random()*10}s;
+        animation-delay:${Math.random()*5}s;
+      `;
+      p.appendChild(el);
+    }
+  });
+
+  updateDots(0);
+
+  // 滚动监听
+  const obs = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if(e.isIntersecting){
+        const idx = parseInt(e.target.id.replace('vcard-',''));
+        curMsgIdx = idx;
+        updateDots(idx);
+        // 说话动画
+        if(MESSAGES[idx].from==='ai'){
+          const ring = document.getElementById('ring-'+idx);
+          if(ring) ring.classList.add('speaking');
+        }
+      }else{
+        const idx = parseInt(e.target.id.replace('vcard-',''));
+        const ring = document.getElementById('ring-'+idx);
+        if(ring) ring.classList.remove('speaking');
+      }
+    });
+  },{threshold:0.6});
+
+  document.querySelectorAll('.vcard').forEach(c => obs.observe(c));
+}
+
+function updateDots(idx){
+  document.querySelectorAll('#dots .dot').forEach((d,i)=>{
+    d.className = 'dot' + (i===idx ? ' cur' : '');
+  });
+}
+
+function randLike(){ return Math.floor(Math.random()*900+100); }
+
+function toggleLike(i,el){
+  liked[i] = !liked[i];
+  const h = document.getElementById('heart-'+i);
+  const n = document.getElementById('lk-'+i);
+  if(liked[i]){
+    h.classList.add('liked');
+    h.textContent='❤️';
+    n.textContent = parseInt(n.textContent)+1;
+  }else{
+    h.classList.remove('liked');
+    h.textContent='🤍';
+    n.textContent = parseInt(n.textContent)-1;
+  }
+}
+
+function switchChar(dir){
+  curChar = (curChar + dir + CHARS.length) % CHARS.length;
+  showHint('切换到：'+CHARS[curChar].name);
+}
+
+function startRecord(){
+  const btn = document.getElementById('record-btn');
+  btn.classList.add('recording');
+  showHint('🎙️ 正在录音...（Demo模拟）');
+}
+
+function stopRecord(){
+  const btn = document.getElementById('record-btn');
+  btn.classList.remove('recording');
+  showHint('✅ 消息已发送（Demo）');
+  // 模拟新消息
+  setTimeout(addMockReply, 800);
+}
+
+function addMockReply(){
+  const idx = MESSAGES.length;
+  const replies = [
+    {from:'ai', text:'收到！<span class="highlight">我已经明白了</span>，马上处理～', char:curChar},
+    {from:'ai', text:'嗯嗯，我记下来了📝 下次聊的时候我会提醒你的', char:(curChar+2)%6},
+    {from:'ai', text:'好主意！<span class="highlight">交给我吧</span>💪', char:curChar},
+  ];
+  const r = replies[Math.floor(Math.random()*replies.length)];
+  const m = {...r, time: new Date().toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit'})};
+  MESSAGES.push(m);
+
+  const card = buildNewCard(m, idx);
+  document.getElementById('stream').appendChild(card);
+  const dot = document.createElement('div');
+  dot.className = 'dot';
+  dot.id = 'dot-'+idx;
+  document.getElementById('dots').appendChild(dot);
+
+  // 滚动到底部
+  setTimeout(()=>{
+    card.scrollIntoView({behavior:'smooth'});
+  },100);
+}
+
+function buildNewCard(m, i){
+  const card = document.createElement('div');
+  card.className = 'vcard new-msg';
+  card.id = 'vcard-'+i;
+  const ci = m.char||0;
+  const c = CHARS[ci];
+  const g = c.gradient;
+  card.innerHTML = `
+    <div class="bg ${g}"></div>
+    <div class="particles"></div>
+    <div class="char-zone">
+      <div class="char-ring speaking" id="ring-${i}">
+        <img class="char-img" src="${c.img}" alt="${c.name}">
+      </div>
+      <div class="char-name">${c.name}</div>
+      <div class="char-tag">${c.tag}</div>
+    </div>
+    <div class="vtext">
+      <div class="msg-txt">${m.text}</div>
+      <div class="msg-time">${m.time}</div>
+    </div>
+    <div class="actions">
+      <div class="act" onclick="toggleLike(${i},this)"><div class="ai" id="heart-${i}">🤍</div><div class="an" id="lk-${i}">0</div></div>
+      <div class="act" onclick="showHint('回复功能·Demo')"><div class="ai">💬</div><div class="an">回复</div></div>
+      <div class="act" onclick="showHint('分享功能·Demo')"><div class="ai">↗️</div><div class="an">分享</div></div>
+    </div>
+  `;
+  // 粒子
+  const pp = card.querySelector('.particles');
+  for(let j=0;j<20;j++){
+    const el = document.createElement('div');
+    el.className='particle';
+    el.style.cssText=`
+      left:${Math.random()*100}%;bottom:${Math.random()*100}%;
+      width:${1+Math.random()*3}px;height:${1+Math.random()*3}px;
+      background:rgba(200,168,78,${0.3+Math.random()*0.5});
+      animation-duration:${4+Math.random()*10}s;
+      animation-delay:${Math.random()*3}s;
+    `;
+    pp.appendChild(el);
+  }
+  return card;
+}
+
+function showHint(txt){
+  const t = document.getElementById('hint-toast');
+  t.textContent = txt;
+  t.className = 'show';
+  clearTimeout(t._t);
+  t._t = setTimeout(()=>{t.className='hide'},1800);
+}
+
+// 启动
+init();
+</script>
+
+</body>
+</html>

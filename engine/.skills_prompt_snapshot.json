@@ -1,0 +1,76 @@
+{
+  "version": 1,
+  "manifest": {
+    "devops/hermes-self-diagnostics/SKILL.md": [
+      1780354298964935734,
+      6264
+    ],
+    "devops/static-asset-integrity-check/SKILL.md": [
+      1780354298965055941,
+      6381
+    ],
+    "devops/swarm-hound-system/SKILL.md": [
+      1780631948557714510,
+      4197
+    ],
+    "pspai-eternal-memory/SKILL.md": [
+      1780354298969085255,
+      4021
+    ]
+  },
+  "skills": [
+    {
+      "skill_name": "hermes-self-diagnostics",
+      "category": "devops",
+      "frontmatter_name": "hermes-self-diagnostics",
+      "description": "",
+      "platforms": [],
+      "conditions": {
+        "fallback_for_toolsets": [],
+        "requires_toolsets": [],
+        "fallback_for_tools": [],
+        "requires_tools": []
+      }
+    },
+    {
+      "skill_name": "static-asset-integrity-check",
+      "category": "devops",
+      "frontmatter_name": "static-asset-integrity-check",
+      "description": "",
+      "platforms": [],
+      "conditions": {
+        "fallback_for_toolsets": [],
+        "requires_toolsets": [],
+        "fallback_for_tools": [],
+        "requires_tools": []
+      }
+    },
+    {
+      "skill_name": "swarm-hound-system",
+      "category": "devops",
+      "frontmatter_name": "swarm-hound-system",
+      "description": "",
+      "platforms": [],
+      "conditions": {
+        "fallback_for_toolsets": [],
+        "requires_toolsets": [],
+        "fallback_for_tools": [],
+        "requires_tools": []
+      }
+    },
+    {
+      "skill_name": "pspai-eternal-memory",
+      "category": "pspai-eternal-memory",
+      "frontmatter_name": "pspai-eternal-memory",
+      "description": "",
+      "platforms": [],
+      "conditions": {
+        "fallback_for_toolsets": [],
+        "requires_toolsets": [],
+        "fallback_for_tools": [],
+        "requires_tools": []
+      }
+    }
+  ],
+  "category_descriptions": {}
+}

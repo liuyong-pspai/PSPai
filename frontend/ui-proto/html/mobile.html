@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0a0a14">
+<meta name="apple-mobile-web-app-title" content="小龙人">
+<title>🐉 小龙人</title>
+<link rel="manifest" href="manifest.json">
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{width:100%;height:100%;overflow:hidden;font-family:'PingFang SC','Microsoft YaHei',sans-serif;background:#0a0a14;color:#e0d8c8;touch-action:manipulation}
+:root{--gold:#c8a84e;--gold-dim:rgba(200,168,78,0.3);--bg:#0a0a14;--card:rgba(20,20,32,0.5);--text:#e0d8c8}
+.theme-tech{--gold:#00d4ff;--gold-dim:rgba(0,212,255,0.3);--bg:#0a0a1a;--card:rgba(0,20,40,0.5);--text:#c0e0f0}
+.theme-loft{--gold:#e8904a;--gold-dim:rgba(232,144,74,0.3);--bg:#1a1a14;--card:rgba(32,28,20,0.5);--text:#d8d0c0}
+
+#app{position:fixed;inset:0;display:flex;flex-direction:column;background:var(--bg);color:var(--text)}
+
+/* 顶部 */
+#top{height:44px;padding:0 14px;padding-top:env(safe-area-inset-top,0);display:flex;align-items:center;justify-content:space-between;z-index:10;flex-shrink:0}
+#top .t{font-size:15px;font-weight:bold;color:var(--gold)}
+#top .r{display:flex;align-items:center;gap:10px}
+#top .st{font-size:11px;cursor:pointer}
+#top .cfg-btn{width:28px;height:28px;border-radius:6px;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.04);color:var(--gold);font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+
+/* 角色小头像 */
+#char-bar{flex-shrink:0;display:flex;align-items:flex-start;justify-content:center;gap:10px;padding:6px 14px 10px;overflow-x:auto;scrollbar-width:none}
+#char-bar::-webkit-scrollbar{display:none}
+#char-bar .cw{display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer;flex-shrink:0;opacity:0.55;transition:all 0.2s}
+#char-bar .cw.sel{opacity:1}
+#char-bar .cw:active{transform:scale(1.08)}
+#char-bar .cmini{width:40px;height:40px;border-radius:50%;overflow:hidden;border:2px solid rgba(255,255,255,0.08);transition:all 0.2s}
+#char-bar .cw.sel .cmini{border-color:var(--gold)}
+#char-bar .cmini img{width:100%;height:100%;object-fit:cover}
+#char-bar .cn{font-size:9px;color:#888;transition:color 0.2s}
+#char-bar .cw.sel .cn{color:var(--gold)}
+
+/* 消息区 */
+#msgs{flex:1;overflow-y:auto;padding:8px 14px;scrollbar-width:none;display:flex;flex-direction:column;gap:8px}
+#msgs::-webkit-scrollbar{display:none}
+#msgs .empty{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding-top:4vh;color:#333}
+#msgs .empty .er{width:40%;max-width:160px;height:210px;border-radius:14px;overflow:hidden;margin-bottom:8px;border:1px solid rgba(255,255,255,0.06);box-shadow:0 3px 20px rgba(0,0,0,0.4)}
+#msgs .empty .er img{width:100%;height:100%;object-fit:cover}
+#msgs .empty .et{font-size:13px;color:#444;margin-bottom:2px}
+#msgs .empty .es{font-size:11px;color:#2a2a2a}
+
+.msg{display:flex;flex-direction:column;max-width:85%;animation:mi .25s ease}
+@keyframes mi{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+.msg.user{align-self:flex-end}
+.msg.ai{align-self:flex-start}
+.msg .mb{padding:10px 14px;border-radius:14px;font-size:14px;line-height:1.55;word-break:break-word}
+.msg.user .mb{background:var(--gold);color:#000;border-bottom-right-radius:4px}
+.msg.ai .mb{background:rgba(30,30,48,0.85);color:#d0c8b8;border-bottom-left-radius:4px}
+.msg .mtime{font-size:9px;color:#3a3a4a;margin-top:2px;padding:0 4px}
+.msg.user .mtime{text-align:right}
+.msg .mbtns{margin-top:4px;display:flex;gap:6px}
+.msg.ai .mbtns{padding-left:4px}
+.msg.user .mbtns{justify-content:flex-end;padding-right:4px}
+.mbtn{width:26px;height:26px;border-radius:50%;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.05);color:var(--gold);font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all 0.15s}
+.mbtn:active{transform:scale(1.2);background:var(--gold);color:#000}
+.mbtn.playing{animation:tpulse 0.8s ease-in-out infinite}
+
+/* 输入栏 */
+#input-bar{flex-shrink:0;display:flex;align-items:center;gap:8px;padding:8px 12px;padding-bottom:max(10px,env(safe-area-inset-bottom));background:rgba(0,0,0,0.4);border-top:1px solid rgba(255,255,255,0.04)}
+#text-input{flex:1;padding:10px 14px;border-radius:20px;border:1px solid rgba(255,255,255,0.08);background:rgba(255,255,255,0.04);color:#e0d8c8;font-size:15px;outline:none;resize:none;max-height:80px;font-family:inherit}
+#text-input:focus{border-color:var(--gold-dim)}
+#text-input::placeholder{color:#444}
+#send-btn{width:40px;height:40px;border-radius:50%;border:none;background:var(--gold);color:#000;font-size:16px;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;transition:all 0.15s}
+#send-btn:active{transform:scale(1.15)}
+#mic-btn{width:40px;height:40px;border-radius:50%;border:2px solid var(--gold-dim);background:rgba(200,168,78,0.08);cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;transition:all 0.15s}
+#mic-btn:active,#mic-btn.active{background:var(--gold);border-color:var(--gold);transform:scale(1.1)}
+#mic-btn .icon{width:18px;height:18px;pointer-events:none}
+#mic-btn .icon svg{width:100%;height:100%}
+#mic-btn.active{animation:tpulse 1s ease-in-out infinite}
+
+@keyframes tpulse{0%,100%{box-shadow:0 0 15px var(--gold-dim)}50%{box-shadow:0 0 40px var(--gold),0 0 70px var(--gold-dim)}}
+
+/* 设置面板 */
+#settings{position:fixed;top:0;left:0;right:0;bottom:0;z-index:200;background:rgba(0,0,0,0.95);display:none;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:40px;overflow-y:auto}
+#settings.show{display:flex}
+#settings h3{color:var(--gold);font-size:15px;font-weight:bold;margin-bottom:4px}
+#settings label{color:#888;font-size:12px;align-self:flex-start;max-width:320px;width:100%;margin:0 auto;margin-bottom:-10px}
+#settings input,#settings select{width:100%;max-width:320px;padding:12px 14px;border-radius:10px;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.05);color:#fff;font-size:15px;text-align:center}
+#settings select{appearance:none;text-align:center;cursor:pointer}
+#settings select option{background:#1a1a2e;color:#fff}
+#settings button{padding:12px 40px;border-radius:10px;border:none;background:var(--gold);color:#000;font-size:16px;font-weight:bold;cursor:pointer;min-width:140px}
+#settings .close{color:#888;font-size:13px;cursor:pointer;margin-top:8px}
+#settings .sep{width:100%;max-width:320px;height:1px;background:rgba(255,255,255,0.06);margin:6px 0}
+.theme-row{display:flex;gap:8px;max-width:320px;width:100%}
+.theme-dot{flex:1;padding:8px;border-radius:8px;border:2px solid rgba(255,255,255,0.06);text-align:center;cursor:pointer;font-size:12px;color:#888;transition:all 0.2s}
+.theme-dot.sel{border-color:var(--gold);color:var(--gold)}
+
+@media(min-width:500px){#app{max-width:430px;margin:0 auto;border:1px solid rgba(255,255,255,0.04)}}
+
+/* 安装提示 */
+#install-banner{display:none;position:fixed;bottom:100px;left:12px;right:12px;z-index:150;background:rgba(0,0,0,0.92);border:1px solid var(--gold-dim);border-radius:14px;padding:14px 16px;align-items:center;gap:12px}
+#install-banner.show{display:flex}
+#install-banner .ib-close{position:absolute;top:6px;right:10px;color:#666;font-size:14px;cursor:pointer}
+#install-banner .ib-txt{flex:1;font-size:13px;color:#ccc;line-height:1.4}
+#install-banner button{padding:8px 16px;border-radius:8px;border:none;background:var(--gold);color:#000;font-size:14px;font-weight:bold;cursor:pointer;white-space:nowrap}
+</style>
+</head>
+<body>
+
+<div id="app">
+  <div id="top">
+    <span class="t">🐉 小龙人</span>
+    <div class="r">
+      <button class="cfg-btn" onclick="location.href='config.html'" title="配置模型">⚙</button>
+      <span class="st" id="conn-dot" style="color:#f44;cursor:pointer" onclick="showSettings()">● 离线</span>
+    </div>
+  </div>
+
+  <div id="char-bar">
+    <div class="cw sel" onclick="switchChar('longyuan')"><div class="cmini"><img src="img_longyuan.jpg"></div><span class="cn">龙渊</span></div>
+    <div class="cw" onclick="switchChar('chiyu')"><div class="cmini"><img src="img_chiyu.jpg"></div><span class="cn">赤羽</span></div>
+    <div class="cw" onclick="switchChar('ling')"><div class="cmini"><img src="img_ling.jpg"></div><span class="cn">凌</span></div>
+    <div class="cw" onclick="switchChar('qingmo')"><div class="cmini"><img src="img_qingmo.jpg"></div><span class="cn">轻墨</span></div>
+    <div class="cw" onclick="switchChar('shuanghua')"><div class="cmini"><img src="img_shuanghua.jpg"></div><span class="cn">霜华</span></div>
+    <div class="cw" onclick="switchChar('yeying')"><div class="cmini"><img src="img_yeying.jpg"></div><span class="cn">夜影</span></div>
+  </div>
+
+  <div id="msgs">
+    <div class="empty" id="empty-hint">
+      <div class="er"><img id="empty-avatar" src="img_longyuan.jpg"></div>
+      <div class="et">龙渊在等你</div>
+      <div class="es">说话或打字，我在这里</div>
+    </div>
+  </div>
+
+  <div id="input-bar">
+    <textarea id="text-input" placeholder="说点什么..." rows="1" onkeydown="onKeyDown(event)"></textarea>
+    <button id="mic-btn" ontouchstart="startTalk(event)" ontouchend="stopTalk(event)" onmousedown="startTalk(event)" onmouseup="stopTalk(event)">
+      <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg></span>
+    </button>
+    <button id="send-btn" onclick="sendText()">➤</button>
+  </div>
+</div>
+
+<div id="settings">
+  <h3>⚙️ 连接设置</h3>
+  <label>引擎地址</label>
+  <input id="server-input" placeholder="例: 192.168.1.35:8765">
+  <div class="sep"></div>
+  <h3>🎨 主题</h3>
+  <div class="theme-row">
+    <div class="theme-dot sel" onclick="setTheme('')">🐉 龙宫</div>
+    <div class="theme-dot" onclick="setTheme('theme-tech')">💠 科技</div>
+    <div class="theme-dot" onclick="setTheme('theme-loft')">🏠 Loft</div>
+  </div>
+  <div class="sep"></div>
+  <button onclick="saveSettings()">保存连接</button>
+  <button onclick="location.href='config.html'" style="background:rgba(255,255,255,0.08);color:#fff">⚙ 配置大模型</button>
+  <span class="close" onclick="hideSettings()">取消</span>
+</div>
+
+<div id="install-banner">
+  <span class="ib-close" onclick="this.parentElement.classList.remove('show')">✕</span>
+  <div class="ib-txt">📲 安装到桌面，像App一样使用</div>
+  <button onclick="installPWA()">安装</button>
+</div>
+
+<script>
+// ====== 角色 ======
+const CHARS = {
+  longyuan:{name:'龙渊',tag:'沉稳温暖'},
+  chiyu:{name:'赤羽',tag:'热血少年'},
+  ling:{name:'凌',tag:'冷峻剑客'},
+  qingmo:{name:'轻墨',tag:'知性御姐'},
+  shuanghua:{name:'霜华',tag:'古风道士'},
+  yeying:{name:'夜影',tag:'暗夜刺客'},
+};
+
+let ws = null, charId = 'longyuan', recognition = null;
+let isListening = false, currentUtterance = null;
+let serverAddr = localStorage.getItem('xlr_server') || '';
+
+// ====== 主题 ======
+function setTheme(cls) {
+  document.documentElement.className = cls;
+  localStorage.setItem('xlr_theme', cls);
+  document.querySelectorAll('.theme-dot').forEach(d => {
+    const t = d.textContent;
+    d.classList.toggle('sel', (cls===''&&t.includes('龙宫'))||(cls==='theme-tech'&&t.includes('科技'))||(cls==='theme-loft'&&t.includes('Loft')));
+  });
+}
+(function(){ const t=localStorage.getItem('xlr_theme');if(t)document.documentElement.className=t; })();
+
+// ====== 消息 ======
+function addMsg(type, text) {
+  const d = document.getElementById('msgs');
+  // Remove empty hint
+  const eh = document.getElementById('empty-hint');
+  if (eh) eh.remove();
+
+  const el = document.createElement('div');
+  el.className = 'msg ' + type;
+  const now = new Date();
+  const time = now.getHours().toString().padStart(2,'0')+':'+now.getMinutes().toString().padStart(2,'0');
+
+  if (type === 'ai') {
+    el.innerHTML = '<div class="mb">'+escHtml(text)+'</div>'+
+      '<div class="mbtns"><button class="mbtn" onclick="replayMsg(this,\''+escAttr(text)+'\')" title="重播">🔊</button></div>'+
+      '<div class="mtime">'+time+'</div>';
+  } else {
+    el.innerHTML = '<div class="mb">'+escHtml(text)+'</div><div class="mtime">'+time+'</div>';
+  }
+  d.appendChild(el);
+  d.scrollTop = d.scrollHeight;
+  return el;
+}
+
+function escHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function escAttr(s) { return s.replace(/'/g,"\\'").replace(/"/g,'&quot;'); }
+
+function replayMsg(btn, text) {
+  if (!text) return;
+  stopSpeaking();
+  const u = new SpeechSynthesisUtterance(text);
+  u.lang = 'zh-CN'; u.rate = 1.05; u.pitch = 1.0;
+  btn.classList.add('playing');
+  u.onend = () => btn.classList.remove('playing');
+  u.onerror = () => btn.classList.remove('playing');
+  currentUtterance = u;
+  speechSynthesis.speak(u);
+}
+
+// ====== 输入 ======
+function sendText() {
+  const inp = document.getElementById('text-input');
+  const text = inp.value.trim();
+  if (!text) return;
+  addMsg('user', text);
+  inp.value = '';
+  inp.style.height = 'auto';
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify({type:'text', text: text}));
+  } else {
+    // 模拟回复（后端没通时）
+    setTimeout(() => {
+      const reply = '收到你说的：「'+text+'」\n\n目前引擎未连接，这是前端模拟回复。连接后端后可获得AI真实回复。';
+      addMsg('ai', reply);
+      speakText(reply);
+    }, 600);
+  }
+}
+
+function onKeyDown(e) {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    sendText();
+  }
+}
+
+// Auto-resize textarea
+document.getElementById('text-input').addEventListener('input', function(){
+  this.style.height = 'auto';
+  this.style.height = Math.min(this.scrollHeight, 80) + 'px';
+});
+
+// ====== WebSocket ======
+function connectWS() {
+  if (ws) { ws.close(); ws = null; }
+  let addr = serverAddr || location.hostname + ':8765';
+  if (!addr.includes(':')) addr += ':8765';
+  if (!addr.startsWith('w')) addr = 'ws://' + addr;
+
+  document.getElementById('conn-dot').style.color = '#fa0';
+  document.getElementById('conn-dot').textContent = '● 连接中';
+
+  try {
+    ws = new WebSocket(addr);
+    ws.onopen = () => {
+      document.getElementById('conn-dot').style.color = '#4f8';
+      document.getElementById('conn-dot').textContent = '● 已连接';
+    };
+    ws.onclose = () => {
+      document.getElementById('conn-dot').style.color = '#f44';
+      document.getElementById('conn-dot').textContent = '● 离线';
+    };
+    ws.onerror = () => {};
+    ws.onmessage = (e) => {
+      const msg = JSON.parse(e.data);
+      if (msg.type === 'reply') {
+        addMsg('ai', msg.text);
+        speakText(msg.text);
+      } else if (msg.type === 'interrupted') {
+        stopSpeaking();
+      }
+    };
+  } catch(e) {
+    document.getElementById('conn-dot').style.color = '#f44';
+    document.getElementById('conn-dot').textContent = '● 离线';
+  }
+}
+
+// ====== TTS ======
+function speakText(text) {
+  stopSpeaking();
+  const u = new SpeechSynthesisUtterance(text);
+  u.lang = 'zh-CN'; u.rate = 1.05; u.pitch = 1.0;
+  currentUtterance = u;
+  speechSynthesis.speak(u);
+}
+
+function stopSpeaking() {
+  if (currentUtterance) {
+    speechSynthesis.cancel();
+    currentUtterance = null;
+  }
+}
+
+// ====== STT ======
+function initRecognition() {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) return null;
+  const r = new SR();
+  r.lang = 'zh-CN'; r.continuous = true; r.interimResults = true;
+  r.onresult = (e) => {
+    let text = '';
+    for (let i = e.resultIndex; i < e.results.length; i++)
+      text += e.results[i][0].transcript;
+    if (e.results[e.results.length-1].isFinal && text.trim()) {
+      document.getElementById('text-input').value = text.trim();
+      sendText();
+    }
+  };
+  r.onerror = (e) => {
+    if (e.error === 'no-speech'||e.error==='aborted') return;
+    stopListening();
+  };
+  r.onend = () => { if (isListening) { try{r.start()}catch(ex){} } };
+  return r;
+}
+
+function startListening() {
+  if (!recognition) recognition = initRecognition();
+  if (!recognition) return;
+  try { recognition.start(); } catch(ex) {}
+  isListening = true;
+  document.getElementById('mic-btn').classList.add('active');
+}
+
+function stopListening() {
+  if (recognition) { try{recognition.stop()}catch(ex){} }
+  isListening = false;
+  document.getElementById('mic-btn').classList.remove('active');
+}
+
+function startTalk(e) { e.preventDefault(); if (!isListening) startListening(); }
+function stopTalk(e) { e.preventDefault(); setTimeout(()=>{if(isListening)stopListening()},400); }
+
+// ====== 角色 ======
+function switchChar(id) {
+  charId = id;
+  const c = CHARS[id];
+  document.getElementById('empty-avatar').src = 'img_'+id+'.jpg';
+  document.querySelector('#msgs .empty .et').textContent = c.name + '在等你';
+  document.querySelectorAll('#char-bar .cw').forEach(w => {
+    const isSel = w.querySelector('img').src.includes('img_'+id);
+    w.classList.toggle('sel', isSel);
+  });
+  if (ws && ws.readyState === WebSocket.OPEN)
+    ws.send(JSON.stringify({type:'switch_character', character: id}));
+}
+
+// ====== 设置 ======
+function showSettings() {
+  document.getElementById('server-input').value = serverAddr || location.hostname+':8765';
+  document.getElementById('settings').classList.add('show');
+}
+function hideSettings() { document.getElementById('settings').classList.remove('show'); }
+function saveSettings() {
+  serverAddr = document.getElementById('server-input').value.trim();
+  localStorage.setItem('xlr_server', serverAddr);
+  hideSettings();
+  connectWS();
+}
+
+// ====== 启动 ======
+let installPrompt = null;
+
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault();
+  installPrompt = e;
+  document.getElementById('install-banner').classList.add('show');
+});
+
+function installPWA() {
+  if (!installPrompt) {
+    alert('请使用浏览器菜单中的"添加到主屏幕"');
+    return;
+  }
+  installPrompt.prompt();
+  installPrompt.userChoice.then(r => {
+    document.getElementById('install-banner').classList.remove('show');
+    installPrompt = null;
+  });
+}
+
+window.addEventListener('appinstalled', () => {
+  document.getElementById('install-banner').classList.remove('show');
+});
+
+fetch('/api/config-file').then(function(r){return r.json()}).then(function(d){
+  if(!d.exists) showSettings();
+}).catch(function(){});
+
+if (serverAddr) connectWS();
+
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').catch(()=>{});
+}
+</script>
+</body>
+</html>

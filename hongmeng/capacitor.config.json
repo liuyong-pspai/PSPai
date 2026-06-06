@@ -1,8 +1,0 @@
-{
-  "appId": "com.pspai.xiaolongren",
-  "appName": "小龙人",
-  "webDir": ".",
-  "server": {
-    "androidScheme": "https"
-  }
-}

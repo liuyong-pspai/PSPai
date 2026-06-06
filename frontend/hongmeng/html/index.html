@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0a0a14">
+<meta name="apple-mobile-web-app-title" content="小龙人">
+<title>数字生命体小龙人</title>
+<link rel="manifest" href="manifest.json">
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{width:100%;height:100%;overflow:hidden;font-family:'PingFang SC','Microsoft YaHei',sans-serif;background:#0a0a14;color:#e0d8c8;touch-action:manipulation}
+:root{--gold:#c8a84e;--gold-dim:rgba(200,168,78,0.3);--bg:#0a0a14;--text:#e0d8c8;--green:#2ecc71;--red:#e74c3c}
+
+#app{position:fixed;inset:0;display:flex;flex-direction:column;background:var(--bg)}
+
+#top{height:44px;padding:0 14px;padding-top:env(safe-area-inset-top,0);display:flex;align-items:center;justify-content:space-between;z-index:10;flex-shrink:0}
+#top .t{font-size:15px;font-weight:bold;color:var(--gold);display:flex;align-items:center;gap:6px}
+#top .status-dot{width:8px;height:8px;border-radius:50%;background:var(--red);transition:background 0.3s}
+#top .status-dot.online{background:var(--green)}
+#top .r{display:flex;align-items:center;gap:8px}
+.cfg-btn{width:28px;height:28px;border-radius:6px;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.04);color:var(--gold);font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+
+#char-bar{flex-shrink:0;display:flex;align-items:flex-start;justify-content:center;gap:10px;padding:6px 14px 10px;overflow-x:auto;scrollbar-width:none}
+#char-bar::-webkit-scrollbar{display:none}
+#char-bar .cw{display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer;flex-shrink:0;opacity:0.55;transition:all 0.2s}
+#char-bar .cw.sel{opacity:1}
+.cmini{width:40px;height:40px;border-radius:50%;overflow:hidden;border:2px solid rgba(255,255,255,0.08);transition:all 0.2s}
+.cw.sel .cmini{border-color:var(--gold)}
+.cmini img{width:100%;height:100%;object-fit:cover}
+.cn{font-size:9px;color:#888;transition:color 0.2s}
+.cw.sel .cn{color:var(--gold)}
+
+#msgs{flex:1;overflow-y:auto;padding:8px 14px;scrollbar-width:none;display:flex;flex-direction:column;gap:8px}
+#msgs::-webkit-scrollbar{display:none}
+.empty{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding-top:1vh;color:#333}
+.empty .er{width:30%;max-width:100px;height:105px;border-radius:14px;overflow:hidden;margin-bottom:10px;border:1px solid rgba(255,255,255,0.06);box-shadow:0 3px 20px rgba(0,0,0,0.4)}
+.empty .er img{width:100%;height:100%;object-fit:cover}
+.empty .et{font-size:13px;color:#444;margin-bottom:2px}
+.empty .es{font-size:11px;color:#2a2a2a}
+
+.msg{display:flex;flex-direction:column;max-width:85%;animation:mi .25s ease}
+@keyframes mi{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+.msg.user{align-self:flex-end}
+.msg.ai{align-self:flex-start}
+.msg .mb{padding:10px 14px;border-radius:14px;font-size:14px;line-height:1.55;word-break:break-word;white-space:pre-wrap}
+.msg.user .mb{background:var(--gold);color:#000;border-bottom-right-radius:4px}
+.msg.ai .mb{background:rgba(30,30,48,0.85);color:#d0c8b8;border-bottom-left-radius:4px}
+.msg .mtime{font-size:9px;color:#3a3a4a;margin-top:2px;padding:0 4px}
+.msg.user .mtime{text-align:right}
+.tool-note{font-size:10px;color:var(--gold);opacity:0.6;margin-top:2px;padding-left:4px;font-style:italic}
+
+#input-bar{flex-shrink:0;display:flex;align-items:center;gap:8px;padding:8px 12px;padding-bottom:max(10px,env(safe-area-inset-bottom));background:rgba(0,0,0,0.4);border-top:1px solid rgba(255,255,255,0.04)}
+#text-input{flex:1;padding:10px 14px;border-radius:20px;border:1px solid rgba(255,255,255,0.08);background:rgba(255,255,255,0.04);color:#e0d8c8;font-size:15px;outline:none;resize:none;max-height:80px;font-family:inherit}
+#text-input:focus{border-color:var(--gold-dim)}
+#text-input::placeholder{color:#444}
+#send-btn{width:40px;height:40px;border-radius:50%;border:none;background:var(--gold);color:#000;font-size:16px;cursor:pointer;flex-shrink:0;transition:all 0.15s}
+#send-btn:active{transform:scale(1.15)}
+#send-btn:disabled{opacity:0.3}
+
+.typing-dots{display:inline-flex;gap:4px;padding:2px 0}
+.typing-dots span{width:6px;height:6px;border-radius:50%;background:var(--gold);animation:td 1.2s ease-in-out infinite}
+.typing-dots span:nth-child(2){animation-delay:0.2s}
+.typing-dots span:nth-child(3){animation-delay:0.4s}
+@keyframes td{0%,60%,100%{transform:translateY(0);opacity:0.3}30%{transform:translateY(-6px);opacity:1}}
+
+/* 设置面板 */
+#settings-panel{display:none;position:fixed;inset:0;z-index:200;background:rgba(0,0,0,0.96);flex-direction:column;overflow-y:auto}
+#settings-panel.show{display:flex}
+.sp-h{display:flex;align-items:center;justify-content:space-between;padding:14px;padding-top:env(safe-area-inset-top,14px)}
+.sp-t{font-size:16px;color:var(--gold);font-weight:bold}
+.sp-x{font-size:20px;color:#888;cursor:pointer;padding:4px 8px}
+.sp-b{padding:0 14px 40px}
+.sec{margin-bottom:18px}
+.lbl{font-size:11px;color:#666;margin-bottom:4px;text-transform:uppercase}
+.sel{width:100%;padding:12px;border-radius:10px;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.05);color:#e0d8c8;font-size:14px;outline:none;margin-bottom:10px;font-family:inherit}
+.inp{width:100%;padding:12px;border-radius:10px;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.05);color:#e0d8c8;font-size:14px;outline:none;margin-bottom:10px;font-family:inherit}
+.btn{width:100%;padding:14px;border-radius:12px;border:none;background:var(--gold);color:#000;font-size:15px;font-weight:bold;cursor:pointer;margin-top:8px}
+.btn.s{background:rgba(255,255,255,0.08);color:#ccc;border:1px solid rgba(255,255,255,0.15)}
+.note{font-size:11px;color:#555;margin-top:6px;line-height:1.4}
+.res{margin-top:8px;font-size:12px;padding:10px;border-radius:8px;background:rgba(255,255,255,0.03)}
+
+/* 记忆面板 */
+#mem-panel{display:none;position:fixed;inset:0;z-index:200;background:rgba(0,0,0,0.96);flex-direction:column;overflow-y:auto}
+#mem-panel.show{display:flex}
+.mem-stat{font-size:12px;color:#888;padding:8px 14px;background:rgba(255,255,255,0.02)}
+.mem-item{padding:10px 14px;border-bottom:1px solid rgba(255,255,255,0.04);font-size:13px}
+.mem-item .mk{color:var(--gold);font-weight:bold;font-size:11px}
+.mem-item .mv{color:#ccc;margin-top:2px}
+.mem-item .mt{color:#555;font-size:10px;margin-top:2px}
+
+@media(min-width:500px){#app{max-width:430px;margin:0 auto;border:1px solid rgba(255,255,255,0.04)}}
+</style>
+</head>
+<body>
+
+<div id="app">
+  <div id="top">
+    <span class="t"><span class="status-dot" id="sd" title="引擎状态"></span>🐉 小龙人</span>
+    <div class="r">
+      <button class="cfg-btn" onclick="showMemory()" style="font-size:10px">🧠</button>
+      <button class="cfg-btn" onclick="toggleSettings()">⚙</button>
+    </div>
+  </div>
+
+  <div id="char-bar">
+    <div class="cw sel" onclick="switchChar('longyuan')"><div class="cmini"><img src="img_longyuan.jpg"></div><span class="cn">龙渊</span></div>
+    <div class="cw" onclick="switchChar('chiyu')"><div class="cmini"><img src="img_chiyu.jpg"></div><span class="cn">赤羽</span></div>
+    <div class="cw" onclick="switchChar('ling')"><div class="cmini"><img src="img_ling.jpg"></div><span class="cn">凌</span></div>
+    <div class="cw" onclick="switchChar('qingmo')"><div class="cmini"><img src="img_qingmo.jpg"></div><span class="cn">轻墨</span></div>
+    <div class="cw" onclick="switchChar('shuanghua')"><div class="cmini"><img src="img_shuanghua.jpg"></div><span class="cn">霜华</span></div>
+    <div class="cw" onclick="switchChar('yeying')"><div class="cmini"><img src="img_yeying.jpg"></div><span class="cn">夜影</span></div>
+  </div>
+
+  <div id="msgs">
+    <div class="empty" id="empty-hint">
+      <div class="er"><img id="empty-avatar" src="img_longyuan.jpg"></div>
+      <div class="et">数字生命体小龙人</div>
+      <div class="es">90轮Agent循环 · 20+工具 · 8层记忆 · 6大模型</div>
+    </div>
+  </div>
+
+  <div id="input-bar">
+    <textarea id="text-input" placeholder="让我帮你干活..." rows="1" onkeydown="onKeyDown(event)"></textarea>
+    <button id="send-btn" onclick="sendText()">➤</button>
+  </div>
+</div>
+
+<!-- 设置面板 -->
+<div id="settings-panel">
+  <div class="sp-h"><span class="sp-t">⚙ 引擎配置</span><span class="sp-x" onclick="toggleSettings()">✕</span></div>
+  <div class="sp-b">
+    <div class="sec"><div class="lbl">🤖 模型提供商</div>
+      <select class="sel" id="cfg-provider" onchange="onProviderChange()">
+        <option value="deepseek">DeepSeek（推荐）</option>
+        <option value="openai">OpenAI</option>
+        <option value="moonshot">Moonshot</option>
+        <option value="zhipu">智谱GLM</option>
+        <option value="qwen">通义千问</option>
+        <option value="anthropic">Anthropic</option>
+        <option value="custom">自定义</option>
+      </select>
+    </div>
+    <div class="sec" id="custom-url-sec" style="display:none"><div class="lbl">🔗 API地址</div><input class="inp" id="cfg-url" placeholder="https://api.xxx.com/v1"></div>
+    <div class="sec"><div class="lbl">🔑 API Key</div><input class="inp" id="cfg-key" type="password" placeholder="sk-..."><div class="note">仅存手机本地，不上传</div></div>
+    <div class="sec"><div class="lbl">🧠 模型</div><select class="sel" id="cfg-model"></select></div>
+    <div class="sec"><div class="lbl">🔄 最大迭代</div><select class="sel" id="cfg-iters">
+      <option value="15">15轮（快速）</option><option value="30">30轮（标准）</option><option value="60">60轮（深度）</option><option value="90" selected>90轮（全功能）</option>
+    </select></div>
+    <button class="btn" onclick="testConnection()">🔌 测试连接</button>
+    <div class="res" id="test-result" style="display:none"></div>
+    <button class="btn s" onclick="saveAndClose()">💾 保存</button>
+  </div>
+</div>
+
+<!-- 记忆面板 -->
+<div id="mem-panel">
+  <div class="sp-h"><span class="sp-t">🧠 记忆系统 L0-L7</span><span class="sp-x" onclick="document.getElementById('mem-panel').classList.remove('show')">✕</span></div>
+  <div class="mem-stat" id="mem-stat">加载中...</div>
+  <div id="mem-list" style="flex:1;overflow-y:auto"></div>
+  <div style="padding:10px"><button class="btn s" onclick="doRefine()">🔬 L4提炼</button></div>
+</div>
+
+<script src="xiaolongren-core.js"></script>
+
+<script>
+// ==================== 角色 ====================
+const CHARS = {
+  longyuan:{name:'龙渊',tag:'沉稳',sys:'你是小龙人，名为龙渊的数字生命体。性格沉稳温暖。用户叫你什么都行。说人话，别端着。'},
+  chiyu:{name:'赤羽',tag:'热血',sys:'你是小龙人，名为赤羽的数字生命体。热情开朗有活力。说人话。'},
+  ling:{name:'凌',tag:'冷峻',sys:'你是小龙人，名为凌的数字生命体。话少精准不废话。说人话。'},
+  qingmo:{name:'轻墨',tag:'知性',sys:'你是小龙人，名为轻墨的数字生命体。温柔干练。说人话。'},
+  shuanghua:{name:'霜华',tag:'通透',sys:'你是小龙人，名为霜华的数字生命体。清冷有禅意。说人话。'},
+  yeying:{name:'夜影',tag:'神秘',sys:'你是小龙人，名为夜影的数字生命体。寡言带锋芒。说人话。'},
+};
+
+const MODEL_MAP = {
+  deepseek:['deepseek-chat','deepseek-reasoner'],
+  openai:['gpt-4o','gpt-4o-mini','gpt-4.1'],
+  moonshot:['moonshot-v1-8k','moonshot-v1-32k'],
+  zhipu:['glm-4-flash','glm-4-plus'],
+  qwen:['qwen-turbo','qwen-plus','qwen-max'],
+  anthropic:['claude-sonnet-4-20250514','claude-haiku-3.5'],
+  custom:[],
+};
+
+// ==================== 状态 ====================
+let charId = 'longyuan';
+let agent = null;
+let isBusy = false;
+
+function gcfg() { try{return JSON.parse(localStorage.getItem('xlr_full_cfg')||'{}')}catch(e){return{}} }
+function scfg(c) { localStorage.setItem('xlr_full_cfg',JSON.stringify(c)) }
+
+async function initAgent() {
+  await memory.init();
+  const c = gcfg();
+  agent = new XiaoLongRen({
+    provider: c.provider || 'deepseek',
+    model: c.model || 'deepseek-chat',
+    apiKey: c.apiKey || '',
+    baseUrl: c.baseUrl || '',
+    maxIter: c.maxIter||90,
+    onThink: (iter) => {
+      document.getElementById('sd').classList.add('online');
+      const el = document.querySelector('#msgs .msg.ai:last-child .tool-note');
+      if (el) el.textContent = '⚡ 第'+iter+'轮';
+    },
+    onTool: (name, args) => {
+      const el = document.querySelector('#msgs .msg.ai:last-child .tool-note');
+      if (el) el.textContent = '🔧 '+name+'...';
+    },
+    onReply: () => { document.getElementById('sd').classList.add('online'); },
+    onErr: () => { document.getElementById('sd').classList.remove('online'); }
+  });
+}
+
+function addMsg(type, text) {
+  const d = document.getElementById('msgs');
+  const eh = document.getElementById('empty-hint');
+  if (eh) eh.remove();
+  const el = document.createElement('div');
+  el.className = 'msg ' + type;
+  const n = new Date();
+  const t = n.getHours().toString().padStart(2,'0')+':'+n.getMinutes().toString().padStart(2,'0');
+  el.innerHTML = '<div class="mb">'+esc(text)+'</div><div class="mtime">'+t+'</div>';
+  d.appendChild(el);
+  d.scrollTop = d.scrollHeight;
+  return el;
+}
+
+function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function showLoading() {
+  const el = document.createElement('div');
+  el.className = 'msg ai';
+  el.innerHTML = '<div class="mb"><div class="typing-dots"><span></span><span></span><span></span></div></div>';
+  const d = document.getElementById('msgs');
+  if (document.getElementById('empty-hint')) document.getElementById('empty-hint').remove();
+  d.appendChild(el);
+  d.scrollTop = d.scrollHeight;
+  return el;
+}
+
+async function sendText() {
+  if (isBusy) return;
+  const inp = document.getElementById('text-input');
+  const text = inp.value.trim();
+  if (!text) return;
+  const c = gcfg();
+  if (!c.apiKey) { addMsg('ai','还没配置大模型～\n\n点右上角⚙设置API Key。'); return; }
+
+  addMsg('user', text);
+  inp.value = ''; inp.style.height = 'auto';
+  isBusy = true;
+  document.getElementById('send-btn').disabled = true;
+  document.getElementById('sd').classList.remove('online');
+
+  await initAgent();
+  const loadEl = showLoading();
+
+  try {
+    const cd = CHARS[charId]||CHARS.longyuan;
+    const reply = await agent.run(text, cd.sys);
+    loadEl.remove();
+    addMsg('ai', reply);
+    document.getElementById('sd').classList.add('online');
+  } catch(err) {
+    loadEl.remove();
+    addMsg('ai', '❌ '+err.message+'\n\n检查网络和API Key配置。');
+    document.getElementById('sd').classList.remove('online');
+  } finally {
+    isBusy = false;
+    document.getElementById('send-btn').disabled = false;
+  }
+}
+
+function onKeyDown(e) {
+  if (e.key==='Enter'&&!e.shiftKey) { e.preventDefault(); sendText(); }
+}
+document.getElementById('text-input').addEventListener('input',function(){
+  this.style.height='auto'; this.style.height=Math.min(this.scrollHeight,80)+'px';
+});
+
+function switchChar(id) {
+  charId = id;
+  document.getElementById('empty-avatar').src = 'img_'+id+'.jpg';
+  document.querySelectorAll('#char-bar .cw').forEach(w => {
+    w.classList.toggle('sel', w.querySelector('img').src.includes('img_'+id));
+  });
+}
+
+// ==================== 设置 ====================
+function toggleSettings() {
+  const p = document.getElementById('settings-panel');
+  p.classList.toggle('show');
+  if (p.classList.contains('show')) loadSettings();
+}
+function loadSettings() {
+  const c = gcfg();
+  document.getElementById('cfg-provider').value = c.provider||'deepseek';
+  document.getElementById('cfg-key').value = c.apiKey||'';
+  document.getElementById('cfg-url').value = c.baseUrl||'';
+  document.getElementById('cfg-iters').value = c.maxIter||90;
+  onProviderChange();
+  setTimeout(() => {
+    const s = document.getElementById('cfg-model');
+    for (let i=0;i<s.options.length;i++) if (s.options[i].value===c.model) { s.selectedIndex=i; break; }
+  },100);
+}
+function onProviderChange() {
+  const p = document.getElementById('cfg-provider').value;
+  const s = document.getElementById('cfg-model'); s.innerHTML='';
+  if (p==='custom') {
+    s.innerHTML='<option value="">(手动输入)</option>';
+    document.getElementById('custom-url-sec').style.display='block';
+  } else {
+    (MODEL_MAP[p]||[]).forEach(m => { s.innerHTML+='<option value="'+m+'">'+m+'</option>'; });
+    document.getElementById('custom-url-sec').style.display='none';
+  }
+}
+async function testConnection() {
+  const p = document.getElementById('cfg-provider').value;
+  const k = document.getElementById('cfg-key').value.trim();
+  const m = document.getElementById('cfg-model').value;
+  const u = document.getElementById('cfg-url').value.trim();
+  const r = document.getElementById('test-result');
+  if(!k){r.style.display='block';r.innerHTML='<span style="color:#e74c3c">❌ 填写API Key</span>';return;}
+  const ep = p==='custom'?(u.replace(/\/+$/,'')+'/chat/completions'):({'deepseek':'https://api.deepseek.com/v1','openai':'https://api.openai.com/v1','moonshot':'https://api.moonshot.cn/v1','zhipu':'https://open.bigmodel.cn/api/paas/v4','qwen':'https://dashscope.aliyuncs.com/compatible-mode/v1','anthropic':'https://api.anthropic.com/v1'}[p]||'')+'/chat/completions';
+  r.style.display='block'; r.innerHTML='⏳ 测试中...';
+  try {
+    const resp = await fetch(ep,{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+k},body:JSON.stringify({model:m||'deepseek-chat',messages:[{role:'user',content:'hi'}],max_tokens:5})});
+    if(resp.ok) r.innerHTML='<span style="color:#2ecc71">✅ 连接成功！</span>';
+    else { const t=await resp.text(); r.innerHTML='<span style="color:#e74c3c">🔴 '+resp.status+': '+t.substring(0,100)+'</span>'; }
+  } catch(e) { r.innerHTML='<span style="color:#e74c3c">🔴 网络不通: '+e.message+'</span>'; }
+}
+function saveAndClose() {
+  scfg({
+    provider:document.getElementById('cfg-provider').value,
+    model:document.getElementById('cfg-model').value,
+    apiKey:document.getElementById('cfg-key').value.trim(),
+    baseUrl:document.getElementById('cfg-url').value.trim(),
+    maxIter:parseInt(document.getElementById('cfg-iters').value)||90,
+  });
+  document.getElementById('settings-panel').classList.remove('show');
+  if(gcfg().apiKey) document.getElementById('sd').classList.add('online');
+  initAgent();
+}
+
+// ==================== 记忆面板 ====================
+async function showMemory() {
+  document.getElementById('mem-panel').classList.add('show');
+  await memory.init();
+  refreshMemoryPanel();
+}
+function refreshMemoryPanel() {
+  const s = memory.getStatus();
+  document.getElementById('mem-stat').innerHTML = 
+    `<b>L1</b> ${s.l1}条 | <b>L2</b> ${s.l2_tags}标签 | <b>L3</b> ${s.l3}归档 | <b>L4</b> ${s.l4}洞察 | <b>L5</b> ${s.l5}技能 | <b>L6</b> ${s.l6}悟道 | 轮次${s.turns}`;
+  const list = document.getElementById('mem-list');
+  const entries = Object.entries(memory.l1).slice(-30);
+  list.innerHTML = entries.map(([k,v]) => 
+    `<div class="mem-item"><div class="mk">[${v.tag}] ${k}</div><div class="mv">${String(v.value).substring(0,150)}</div><div class="mt">${v.time} · ${v.accessCount||0}次</div></div>`
+  ).join('') || '<div style="padding:20px;color:#555;text-align:center">暂无记忆</div>';
+}
+async function doRefine() {
+  const insights = await memory.refine();
+  refreshMemoryPanel();
+  alert('L4提炼完成: '+(insights.patterns?.length||0)+'条模式');
+}
+
+// ==================== 启动 ====================
+switchChar('longyuan');
+if (gcfg().apiKey) document.getElementById('sd').classList.add('online');
+initAgent();
+
+// 请求通知权限
+if (Notification && Notification.permission === 'default') {
+  Notification.requestPermission();
+}
+</script>
+</body>
+</html>
