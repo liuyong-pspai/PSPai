@@ -41,9 +41,9 @@ jobs:
           # 清理不需要的文件
           rm -f app-build/www/server.py
           rm -f app-build/www/prompts.html config.html download.html 2>/dev/null
-          # 清理pyodide相关文件（APK纯前端无需Python引擎）
+          # Pyodide WASM运行时（700MB）不打包进APK
+          # 首次启动时自动从CDN下载，不阻塞使用
           rm -rf app-build/www/pyodide/ 2>/dev/null || true
-          rm -f app-build/www/pyodide-bridge.js 2>/dev/null || true
           echo "www files: $(find app-build/www -type f | wc -l)"
           du -sh app-build/www/
 
