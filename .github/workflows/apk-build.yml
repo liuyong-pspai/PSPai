@@ -43,8 +43,9 @@ jobs:
       - name: Copy web files
         run: |
           cp -r frontend/pwa/html/* app-build/www/
+          cp app-build/www/mobile.html app-build/www/index.html
           rm -f app-build/www/server.py 2>/dev/null || true
-
+          echo "www files:" && ls -la app-build/www/ && du -sh app-build/www/
       - name: Add Android platform
         working-directory: app-build
         run: npx cap add android
@@ -65,6 +66,20 @@ jobs:
           # Delete adaptive icon XMLs (Hongmeng compat)
           rm -rf app-build/android/app/src/main/res/mipmap-anydpi-v26 2>/dev/null || true
           rm -f app-build/android/app/src/main/res/drawable-v24/ic_launcher_foreground.* 2>/dev/null || true
+          # Network security
+          if [ -f mobile/android-app/res/xml/network_security_config.xml ]; then
+            mkdir -p app-build/android/app/src/main/res/xml
+            cp mobile/android-app/res/xml/network_security_config.xml app-build/android/app/src/main/res/xml/
+            sed -i 's|<application|<application android:networkSecurityConfig=\"@xml/network_security_config\"|' \
+              app-build/android/app/src/main/AndroidManifest.xml
+          fi
+          # Kotlin fix
+          echo '# fix kotlin duplicates' >> app-build/android/app/build.gradle
+          echo 'configurations.all {' >> app-build/android/app/build.gradle
+          echo "    exclude group: 'org.jetbrains.kotlin', module: 'kotlin-stdlib-jdk7'" >> app-build/android/app/build.gradle
+          echo "    exclude group: 'org.jetbrains.kotlin', module: 'kotlin-stdlib-jdk8'" >> app-build/android/app/build.gradle
+          echo '}' >> app-build/android/app/build.gradle
+          echo "Done:" && du -sh app-build/www/
 
       - name: Build APK
         working-directory: app-build/android
