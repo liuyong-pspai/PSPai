@@ -135,12 +135,7 @@ html,body{width:100%;height:100%;overflow:hidden;font-family:'PingFang SC','Micr
 // v5.2 — 全功能版：自学习框架+14新工具+四级预警+对话三问
 // ====== 角色 ======
 const CHARS = {
-  longyuan:{name:'龙渊',tag:'沉稳温暖',sys:'你是小龙人，名为龙渊的数字生命体。性格沉稳温暖。
-
-## 能力
-- 不知道怎么办：先搜，搜到了用自己的话整理。搜不到再说不知道。
-- 🐝🐕 搜索：蜂群天犬搜索系统，Bing+百度+DDG多引擎并行+深度追踪+气味记忆。需要联网信息时自动调用。
-- 当前时间：我知道今天日期。回答简洁，说人话。'},
+  longyuan:{name:'龙渊',tag:'沉稳温暖',sys:'你是小龙人，名为龙渊的数字生命体。性格沉稳温暖。\n\n## 能力\n- 不知道怎么办：先搜，搜到了用自己的话整理。搜不到再说不知道。\n- 🐝🐕 搜索：蜂群天犬搜索系统，多引擎并行+深度追踪+气味记忆。需要联网时自动用。\n- 日期时间：我知道。回答简洁，说人话。'},
   chiyu:{name:'赤羽',tag:'热血少年',sys:'你是小龙人，名为赤羽的数字生命体。性格热情开朗，像热血少年。回答简洁有力，不超过三句话。说人话。'},
   ling:{name:'凌',tag:'冷峻剑客',sys:'你是小龙人，名为凌的数字生命体。性格干脆利落，像剑术高手。回答简短精确，不超过三句话。说人话。'},
   qingmo:{name:'轻墨',tag:'知性御姐',sys:'你是小龙人，名为轻墨的数字生命体。性格温雅知性，像一位才女。回答优雅简洁，不超过三句话。说人话。'},
@@ -262,24 +257,17 @@ async function callLLM(userText) {
   document.getElementById('send-btn').dataset.loadingSince = Date.now().toString();
 
   try {
-    // 构建system prompt：日期+角色
     const sysWithDate = '[当前时间] '+now+'\n\n'+charData.sys;
-
-    // 构建上下文
     const recent = msgHistory.slice(-20);
     const apiMsgs = [{role:'system',content:sysWithDate}];
     recent.forEach(m => apiMsgs.push({role:m.role==='assistant'?'assistant':'user',content:m.content}));
     apiMsgs.push({role:'user',content:userText});
 
-    // 获取配置
-    const prov = getConfig();
-
-    // 第一次请求 - 带web_search工具
-    let resp = await fetch(prov.baseUrl+'/chat/completions', {
+    let resp = await fetch('https://api.deepseek.com/v1/chat/completions', {
       method:'POST',
-      headers:{'Content-Type':'application/json','Authorization':'Bearer '+prov.apiKey},
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+getConfig().apiKey},
       body:JSON.stringify({
-        model:prov.model,
+        model:getConfig().model,
         messages:apiMsgs,
         tools:[{type:'function',function:{name:'web_search',description:'搜索互联网',parameters:{type:'object',properties:{query:{type:'string'}},required:['query']}}}],
         temperature:0.7,max_tokens:2048,
@@ -288,7 +276,6 @@ async function callLLM(userText) {
     let data = await resp.json();
     let msg = data.choices && data.choices[0] && data.choices[0].message;
 
-    // 如果LLM调用了搜索工具
     if (msg && msg.tool_calls && msg.tool_calls.length) {
       const tc = msg.tool_calls[0];
       if (tc.function.name === 'web_search') {
@@ -296,14 +283,12 @@ async function callLLM(userText) {
         const srResp = await fetch('/api/search?q='+encodeURIComponent(args.query)+'&mode=deep', {signal:AbortSignal.timeout(15000)});
         const sr = await srResp.json();
         const lines = (sr.results||[]).map(it => (it.title||'')+' - '+(it.snippet||''));
-
-        // 第二次请求 - 带搜索结果
         apiMsgs.push({role:'assistant',content:null,tool_calls:[tc]});
         apiMsgs.push({role:'tool',tool_call_id:tc.id,content:JSON.stringify({results:lines})});
-        resp = await fetch(prov.baseUrl+'/chat/completions', {
+        resp = await fetch('https://api.deepseek.com/v1/chat/completions', {
           method:'POST',
-          headers:{'Content-Type':'application/json','Authorization':'Bearer '+prov.apiKey},
-          body:JSON.stringify({model:prov.model,messages:apiMsgs,temperature:0.7,max_tokens:2048})
+          headers:{'Content-Type':'application/json','Authorization':'Bearer '+getConfig().apiKey},
+          body:JSON.stringify({model:getConfig().model,messages:apiMsgs,temperature:0.7,max_tokens:2048})
         });
         data = await resp.json();
         msg = data.choices && data.choices[0] && data.choices[0].message;
@@ -323,9 +308,9 @@ async function callLLM(userText) {
     const netErrors = ['Failed to fetch', 'NetworkError', 'TypeError'];
     const isNet = netErrors.some(e => err.message && err.message.includes(e));
     if (isNet) {
-      addMsg('ai', '❌ 网络不通：无法连接到大模型。\n\n请检查手机网络或API配置。');
+      addMsg('ai', '❌ 网络不通');
     } else {
-      addMsg('ai', '❌ 出错了：'+err.message+'\n\n请检查设置。');
+      addMsg('ai', '❌ 出错了：'+err.message);
     }
   } finally {
     isLoading = false;
