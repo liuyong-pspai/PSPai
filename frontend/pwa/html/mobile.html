@@ -9,10 +9,11 @@
 <meta http-equiv=Cache-Control content="no-cache, no-store, must-revalidate">
 <meta http-equiv=Pragma content=no-cache>
 <meta http-equiv=Expires content=0>
-<title>小龙人</title>\n<meta http-equiv="pragma" content="no-cache">\n<meta http-equiv="expires" content="0">\n<meta http-equiv="cache-control" content="no-cache, must-revalidate">\n<meta name="version" content="v6.3.2">\n
+<title>小龙人 v6.3.3</title>\n<meta name="version" content="v6.3.3">
+<meta http-equiv="pragma" content="no-cache">\n<meta http-equiv="expires" content="0">\n<meta http-equiv="cache-control" content="no-cache, must-revalidate">\n<meta name="version" content="v6.3.2">\n
 <style>
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-html,body{width:100%;height:100%;overflow:hidden;font-family:'PingFang SC','Microsoft YaHei',sans-serif;background:#0a0a14;color:#e0d8c8}
+html,body{width:100%;height:100%;overflow:hidden;touch-action:manipulation;font-family:'PingFang SC','Microsoft YaHei',sans-serif;background:#0a0a14;color:#e0d8c8}
 :root{--gold:#c8a84e;--gold-dim:rgba(200,168,78,0.3);--bg:#0a0a14;--card:rgba(20,20,32,0.5);--text:#e0d8c8;--danger:#e74c3c}
 #app{position:fixed;inset:0;display:flex;flex-direction:column}
 #top{height:44px;padding:0 14px;padding-top:env(safe-area-inset-top,0);display:flex;align-items:center;justify-content:space-between;z-index:10;flex-shrink:0;background:rgba(0,0,0,0.3);border-bottom:1px solid rgba(255,255,255,0.04)}
@@ -32,7 +33,8 @@ html,body{width:100%;height:100%;overflow:hidden;font-family:'PingFang SC','Micr
 #char-bar .cmini img{width:100%;height:100%;object-fit:cover}
 #char-bar .cn{font-size:9px;color:#888}
 #char-bar .cw.sel .cn{color:var(--gold)}
-#msgs{flex:1;overflow-y:auto;padding:8px 14px;display:flex;flex-direction:column;gap:8px}
+#msgs{flex:1;overflow-y:auto;padding:8px 14px;scrollbar-width:none;display:flex;flex-direction:column;gap:8px}
+#msgs::-webkit-scrollbar{display:none}
 #msgs .empty{flex:1;display:flex;flex-direction:column;align-items:center;padding-top:6vh;color:#333}
 #msgs .empty .er{width:80px;height:80px;border-radius:14px;overflow:hidden;margin-bottom:10px;border:1px solid rgba(255,255,255,0.06)}
 #msgs .empty .er img{width:100%;height:100%;object-fit:cover}
@@ -86,7 +88,7 @@ html,body{width:100%;height:100%;overflow:hidden;font-family:'PingFang SC','Micr
 </div>
 </div>
 <div id=input-bar>
-<textarea id=text-input placeholder="说点什么..." rows=1></textarea>
+<textarea id="text-input" placeholder="说点什么..." rows="1" onkeydown="onKeyDown(event)"></textarea>
 <button id="send-btn" type="button" ontouchend="sendText();event.preventDefault()" onclick="sendText()">➤</button>
 </div>
 </div>
@@ -382,7 +384,9 @@ function saveSkillFromConv(text,reply){
   }
 }
 
-// ====== 发送（刘玉龙原版onclick） ======
+function onKeyDown(e){if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();sendText()}}
+
+// ====== 发送 ======
 function sendText(){
   if(isLoading){
     var btn=document.getElementById('send-btn');

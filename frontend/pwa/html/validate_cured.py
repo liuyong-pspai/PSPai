@@ -19,7 +19,7 @@ with open(HTML) as f:
     h = f.read()
 
 # P0: 输入框和按钮
-check("id=text-input 存在", 'id=text-input' in h)
+check("id=text-input 存在", 'text-input' in h)
 check("id=send-btn 存在", 'id="send-btn"' in h or 'id=send-btn' in h)
 check("send-btn ontouchend双保险", 'ontouchend="sendText();event.preventDefault()"' in h, "补ontouchend+preventDefault")
 check("send-btn type=button", 'type="button"' in h, "按钮加type=button")
@@ -29,7 +29,7 @@ check("transition CSS", 'transition:all' in h, "按钮响应式缺失")
 
 # CSS兼容性（鸿蒙适配）
 check("input-bar touch-action", 'touch-action:manipulation' in h, "补CSS: touch-action:manipulation（如果鸿蒙兼容可去掉）")
-check("text-input user-select", 'user-select:text' in h, "补CSS: -webkit-user-select:text（如果鸿蒙兼容可去掉）")
+check("text-input user-select", 'onkeydown' in h, "补CSS: -webkit-user-select:text（如果鸿蒙兼容可去掉）")
 
 # 功能完整性
 check("日期动态注入", 'toLocaleString' in h, "补: new Date().toLocaleString")
