@@ -8,7 +8,6 @@
 <meta name="theme-color" content="#0a0a14">
 <meta name="apple-mobile-web-app-title" content="小龙人">
 <title>数字生命体小龙人</title>
-<link rel="manifest" href="manifest.json">
 <style>
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{width:100%;height:100%;overflow:hidden;font-family:'PingFang SC','Microsoft YaHei',sans-serif;background:#0a0a14;color:#e0d8c8;touch-action:manipulation}
@@ -130,6 +129,13 @@ html,body{width:100%;height:100%;overflow:hidden;font-family:'PingFang SC','Micr
   <button onclick="installPWA()">安装</button>
 </div>
 
+<script src="plugin-loader.js"></script>
+<script src="plugins/search.js"></script>
+<script src="plugins/tools.js"></script>
+<script src="plugins/sensors.js"></script>
+<script src="plugins/media.js"></script>
+<script src="plugins/evolution.js"></script>
+<script src="plugins/knowledge.js"></script>
 <script src="xiaolongren-core.js"></script>
 <script>
 // v5.2 — 全功能版：自学习框架+14新工具+四级预警+对话三问
@@ -257,45 +263,8 @@ async function callLLM(userText) {
   document.getElementById('send-btn').dataset.loadingSince = Date.now().toString();
 
   try {
-    const sysWithDate = '[当前时间] '+now+'\n\n'+charData.sys;
-    const recent = msgHistory.slice(-20);
-    const apiMsgs = [{role:'system',content:sysWithDate}];
-    recent.forEach(m => apiMsgs.push({role:m.role==='assistant'?'assistant':'user',content:m.content}));
-    apiMsgs.push({role:'user',content:userText});
-
-    let resp = await fetch('https://api.deepseek.com/v1/chat/completions', {
-      method:'POST',
-      headers:{'Content-Type':'application/json','Authorization':'Bearer '+getConfig().apiKey},
-      body:JSON.stringify({
-        model:getConfig().model,
-        messages:apiMsgs,
-        tools:[{type:'function',function:{name:'web_search',description:'搜索互联网',parameters:{type:'object',properties:{query:{type:'string'}},required:['query']}}}],
-        temperature:0.7,max_tokens:2048,
-      })
-    });
-    let data = await resp.json();
-    let msg = data.choices && data.choices[0] && data.choices[0].message;
-
-    if (msg && msg.tool_calls && msg.tool_calls.length) {
-      const tc = msg.tool_calls[0];
-      if (tc.function.name === 'web_search') {
-        const args = JSON.parse(tc.function.arguments);
-        const srResp = await fetch('/api/search?q='+encodeURIComponent(args.query)+'&mode=deep', {signal:AbortSignal.timeout(15000)});
-        const sr = await srResp.json();
-        const lines = (sr.results||[]).map(it => (it.title||'')+' - '+(it.snippet||''));
-        apiMsgs.push({role:'assistant',content:null,tool_calls:[tc]});
-        apiMsgs.push({role:'tool',tool_call_id:tc.id,content:JSON.stringify({results:lines})});
-        resp = await fetch('https://api.deepseek.com/v1/chat/completions', {
-          method:'POST',
-          headers:{'Content-Type':'application/json','Authorization':'Bearer '+getConfig().apiKey},
-          body:JSON.stringify({model:getConfig().model,messages:apiMsgs,temperature:0.7,max_tokens:2048})
-        });
-        data = await resp.json();
-        msg = data.choices && data.choices[0] && data.choices[0].message;
-      }
-    }
-
-    const reply = (msg && msg.content) || '(空)';
+    const engine = await initEngine();
+    const reply = await engine.run(userText, charData.sys);
     loadEl.remove();
     addMsg('ai', reply);
 
@@ -472,9 +441,7 @@ window.addEventListener('appinstalled', () => {
   }
 })();
 
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('sw.js').catch(()=>{});
-}
+
 </script>
 </body>
 </html>
