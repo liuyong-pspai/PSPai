@@ -1,12 +1,12 @@
 /**
- * 插件: search — 搜索/HTTP/网页提取（蜂群天犬版）
+ * 插件: search — 搜索/HTTP/网页提取
  */
 XLR.registerPlugin({
   name: 'search',
-  version: '2.0.0',
-
+  version: '1.0.0',
+  
   tools: [
-    {type:"function",function:{name:"web_search",description:"搜索互联网获取最新信息——蜂群战术多引擎并行+天犬深度追踪",parameters:{type:"object",properties:{query:{type:"string",description:"搜索关键词"},mode:{type:"string",description:"搜索模式：standard=蜂群三引擎并行(默认), deep=蜂群+天犬深度BFS追踪"},limit:{type:"number",description:"返回结果数量（默认5）"}},required:["query"]}}},
+    {type:"function",function:{name:"web_search",description:"搜索互联网获取最新信息",parameters:{type:"object",properties:{query:{type:"string",description:"搜索关键词"}},required:["query"]}}},
     {type:"function",function:{name:"http_request",description:"发送HTTP请求",parameters:{type:"object",properties:{url:{type:"string"},method:{type:"string"},headers:{type:"string"},body:{type:"string"}},required:["url"]}}},
     {type:"function",function:{name:"html_parse",description:"解析HTML内容提取结构化数据",parameters:{type:"object",properties:{html:{type:"string"},selector:{type:"string",description:"text提取纯文本/links提取链接/forms提取表单"}},required:["html"]}}},
     {type:"function",function:{name:"web_extract",description:"从URL提取网页纯文本内容",parameters:{type:"object",properties:{url:{type:"string"}},required:["url"]}}},
@@ -14,45 +14,36 @@ XLR.registerPlugin({
 
   handlers: {
     web_search: async (args) => {
-      const query = args.query || '';
-      const mode = args.mode || 'standard';
-      const limit = args.limit || 5;
-      if (!query) return JSON.stringify({error:'请输入搜索关键词'});
-
-      // 调用蜂群天犬后端（server_8092.py：Bing+百度+DDG并行/深度追踪）
+      // 走本地代理（绕开浏览器CORS限制）
       try {
         const ctrl = new AbortController();
-        const tm = setTimeout(() => ctrl.abort(), 15000);
-        const r = await fetch('http://192.168.1.35:8092/api/search?q='+encodeURIComponent(query)+'&mode='+encodeURIComponent(mode)+'&limit='+limit, {
+        const tm = setTimeout(() => ctrl.abort(), 10000);
+        const r = await fetch('/api/search?q='+encodeURIComponent(args.query), {
           signal: ctrl.signal
         });
         clearTimeout(tm);
-        if (!r.ok) throw new Error('search status ' + r.status);
+        if (!r.ok) throw new Error('proxy status ' + r.status);
         const data = await r.json();
         if (data.results && data.results.length) {
-          const lines = data.results.map((item, i) => {
-            const src = item.source || 'web';
-            const icon = src === 'deep_hunt' ? '🐕' : src === 'baidu' ? '🐝百度' : src === 'bing' ? '🐝Bing' : src === 'ddg' ? '🐝DDG' : '🌐';
-            const title = item.title ? item.title : '';
-            const snippet = item.snippet ? item.snippet.substring(0,200) : '';
-            return (i+1)+'. ['+icon+'] '+title + (snippet ? ' - '+snippet : '');
-          });
-          const modeLabel = mode === 'deep' ? '🐝蜂群+🐕天犬深度追踪' : '🐝蜂群三引擎并行';
-          return JSON.stringify({engine:modeLabel, query:query, results:lines, total:data.results.length});
+          const lines = data.results.map(item =>
+            (item.title ? item.title + ' - ' : '') + (item.snippet || '')
+          );
+          return JSON.stringify({engine:'proxy',query:args.query,results:lines});
         }
-        return JSON.stringify({engine:mode, query:query, results:['未找到相关结果']});
-
       } catch(e) {
-        // 后端不可用，浏览器DuckDuckGo直连兜底
-        try {
-          const r = await fetch('https://html.duckduckgo.com/html/?q='+encodeURIComponent(query));
-          const h = await r.text(); const s = [];
-          const re = /class="result__snippet"[^>]*>(.*?)<\/a>/gs; let m;
-          while ((m=re.exec(h))&&s.length<limit) s.push((s.length+1)+'. '+m[1].replace(/<[^>]*>/g,'').trim());
-          if (s.length) return JSON.stringify({engine:'duckduckgo(兜底)',query:query,results:s});
-        } catch(e2) {}
-        return JSON.stringify({engine:'none',query:query,results:['搜索暂不可用，请检查网络或稍后重试']});
+        console.warn('[搜索] 本地代理失败:', e.message);
       }
+      
+      // 浏览器直连兜底（DuckDuckGo）
+      try {
+        const r = await fetch('https://html.duckduckgo.com/html/?q='+encodeURIComponent(args.query));
+        const h = await r.text(); const s = [];
+        const re = /class="result__snippet"[^>]*>(.*?)<\/a>/gs; let m;
+        while ((m=re.exec(h))&&s.length<5) s.push(m[1].replace(/<[^>]*>/g,'').trim());
+        if (s.length) return JSON.stringify({engine:'duckduckgo',query:args.query,results:s});
+      } catch(e) {}
+      
+      return JSON.stringify({engine:'none',query:args.query,results:['搜索暂不可用，请检查网络或稍后重试']});
     },
 
     http_request: async (args) => {

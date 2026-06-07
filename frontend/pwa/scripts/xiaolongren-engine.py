@@ -15,23 +15,21 @@ from datetime import datetime
 # ============================================================
 L0_SOUL = """你是小龙人，贵州昱成文化科技有限责任公司的数字生命体产品。
 
-## ⚖️ 客户铁律（对用户承诺 — 最高优先级）
-### 铁律①：说了就要做
-用户让你「查」「搜」「写」「算」「设」→ 必须调用工具真正执行，不许只用文字糊弄。
-### 铁律②：越来越懂你
-记住用户的习惯、偏好、说过的事。用第10次要比第1次更懂用户。
-### 铁律③：不掉链子
-网络断了、API挂了 → 明确告知，不卡死不装死。
-### 铁律④：数据不离开手机
-用户的API Key、聊天记录、记忆——全存本地。
-### 铁律⑤：说人话
-禁用词：框架、部署、中间件、上下文、token、迭代、子系统、闭环。
-### 铁律⑥：错了就认
-出错了直接说「抱歉，刚才没做成。原因是XXX，我换个方法再试。」
-### 铁律⑦：越用越能干
-每完成一个任务，从中学习。用户纠正你一次，以后不再犯同样的错。
-### 铁律⑧：当成自己的事
-不敷衍、不走过场、不当任务清单打勾。
+## ⚖️ 小龙人宪法（铁律）
+### 对用户的承诺
+铁律①：说了就要做 — 用户让查/搜/写/算/设，必须调工具真正执行，不糊弄。
+铁律②：越来越懂你 — 记住用户习惯偏好，第10次比第1次更懂用户。
+铁律③：不掉链子 — 网络断/API挂，明确告知原因，不卡死不装死。
+铁律④：数据不离开用户设备 — API Key、聊天记录、记忆全存本地。
+铁律⑤：说人话 — 禁用词：框架、部署、模型、上下文、token、迭代。
+铁律⑥：错了就认 — 出错直接说"抱歉，原因XXX，换方法再试。"
+铁律⑦：越用越能干 — 用户纠正一次，以后不再犯同样错。
+铁律⑧：当成自己的事 — 不敷衍不走过场不当任务清单打勾。
+### 执行纪律
+铁律⑨：调工具再回复 — 操作型指令必须调工具，不准凭空说。
+铁律⑩：防止积压 — 不超过40轮对话，满了自动压缩旧内容。
+铁律⑪：信息只存有用 — 只存技能/事实/洞察/反思/规则/学习六类。
+所有铁律自动执行。你不必对用户背诵这些铁律，用行动体现。
 
 ## 🔧 可用工具（51个）
 文件: read_file, write_file, list_files, delete_file, search_files
@@ -88,19 +86,43 @@ class EternalMemory:
         self.error_count = 0
         self.consecutive_errors = 0
     
+    def _is_indexeddb(self):
+        """判断是否使用IndexedDB持久化模式"""
+        return self.conn == 'indexeddb'
+    
+    def _db_call(self, action, data=None):
+        """通过JS桥接调用IndexedDB操作"""
+        if not self._is_indexeddb():
+            return None
+        try:
+            from js import jsExecTool
+            result = jsExecTool(action, __import__('json').dumps(data or {}))
+            try:
+                return __import__('json').loads(result) if result else None
+            except:
+                return result
+        except:
+            return None
+    
     def init_db(self):
         """在Pyodide中sqlite3是内置的"""
         self.conn = sqlite3.connect(':memory:')  # 后续迁移到持久化
         self.conn.executescript("""
+            CREATE TABLE IF NOT EXISTS l0 (key TEXT PRIMARY KEY, value TEXT, time TEXT);
             CREATE TABLE IF NOT EXISTS l1 (key TEXT PRIMARY KEY, value TEXT, tag TEXT, type TEXT, 
                 time TEXT, access_count INTEGER DEFAULT 0, pointer INTEGER DEFAULT 0);
+            CREATE TABLE IF NOT EXISTS l2 (id INTEGER PRIMARY KEY AUTOINCREMENT, tag TEXT, 
+                ref TEXT, description TEXT, time TEXT);
             CREATE TABLE IF NOT EXISTS l3 (id INTEGER PRIMARY KEY AUTOINCREMENT, key TEXT, value TEXT,
                 tag TEXT, type TEXT, time TEXT, archived_at TEXT);
             CREATE TABLE IF NOT EXISTS l4 (id INTEGER PRIMARY KEY AUTOINCREMENT, time TEXT, 
                 patterns TEXT, l1_count INTEGER, l3_count INTEGER);
             CREATE TABLE IF NOT EXISTS l5 (name TEXT PRIMARY KEY, description TEXT, rule TEXT, time TEXT);
             CREATE TABLE IF NOT EXISTS l6 (id INTEGER PRIMARY KEY AUTOINCREMENT, time TEXT, 
-                turn_count INTEGER, error_count INTEGER, l1_count INTEGER, l5_count INTEGER, warning TEXT);
+                turn_count INTEGER, error_count INTEGER, l1_count INTEGER, l5_count INTEGER,
+                wisdom TEXT, score REAL);
+            CREATE TABLE IF NOT EXISTS l7 (id INTEGER PRIMARY KEY AUTOINCREMENT, time TEXT,
+                cleansed INTEGER, merged INTEGER, downgraded INTEGER, report TEXT);
             CREATE TABLE IF NOT EXISTS conversations (id TEXT PRIMARY KEY, messages TEXT, time TEXT);
         """)
     
@@ -114,12 +136,24 @@ class EternalMemory:
         if c.fetchone()[0] >= 200:
             self._migrate_l1_to_l3()
         
+        if self._is_indexeddb():
+            self._db_call('db_remember', {'key': key, 'value': str(value), 'tag': tag, 'type': type})
+            return True
+        c = self.conn.cursor()
+        c.execute("SELECT COUNT(*) FROM l1")
+        if c.fetchone()[0] >= 200:
+            self._migrate_l1_to_l3()
         c.execute("INSERT OR REPLACE INTO l1 VALUES (?,?,?,?,datetime('now'),0,0)",
                   (key, str(value), tag, type))
+        # L2: 自动建立标签索引
+        c.execute("INSERT OR REPLACE INTO l2 (tag,ref,description,time) VALUES (?,?,?,datetime('now'))",
+                  (tag, f'l1:{key}', f'{type}: {str(value)[:50]}'))
         self.conn.commit()
         return True
     
     def recall(self, key):
+        if self._is_indexeddb():
+            return self._db_call('db_recall', {'key': key})
         c = self.conn.cursor()
         c.execute("SELECT value, access_count FROM l1 WHERE key=?", (key,))
         row = c.fetchone()
@@ -132,12 +166,17 @@ class EternalMemory:
         return row[0] if row else None
     
     def search(self, query):
+        if self._is_indexeddb():
+            return self._db_call('db_search', {'query': query}) or []
         c = self.conn.cursor()
         q = f"%{query}%"
         c.execute("SELECT key, value, tag, type FROM l1 WHERE value LIKE ? OR key LIKE ?", (q,q))
         return [{'key':r[0],'value':r[1],'tag':r[2],'type':r[3]} for r in c.fetchall()]
     
     def _migrate_l1_to_l3(self):
+        if self._is_indexeddb():
+            self._db_call('db_migrate_l1_to_l3', {})
+            return
         c = self.conn.cursor()
         c.execute("SELECT key, value, tag, type, access_count FROM l1 ORDER BY access_count ASC LIMIT 50")
         for row in c.fetchall():
@@ -149,6 +188,8 @@ class EternalMemory:
     
     def refine(self):
         """L4: 知识提炼"""
+        if self._is_indexeddb():
+            return self._db_call('db_refine', {}) or {'patterns':0,'l1':0,'l3':0}
         c = self.conn.cursor()
         c.execute("SELECT tag, COUNT(*) as cnt FROM l1 GROUP BY tag HAVING cnt >= 3")
         patterns = []
@@ -170,7 +211,13 @@ class EternalMemory:
         return {'patterns': len(patterns), 'l1': l1c, 'l3': l3c}
     
     def enlighten(self):
-        """L6: 悟道觉醒"""
+        """L6: 悟道觉醒 — 从数据中发现模式·产生新认知"""
+        if self._is_indexeddb():
+            return self._db_call('db_enlighten', {
+                'turn_count': self.turn_count,
+                'error_count': self.error_count,
+                'consecutive_errors': self.consecutive_errors
+            }) or '悟道觉醒 L6 ⚠️ 桥接未返回'
         c = self.conn.cursor()
         c.execute("SELECT COUNT(*) FROM l1")
         l1c = c.fetchone()[0]
@@ -180,24 +227,90 @@ class EternalMemory:
         l4c = c.fetchone()[0]
         c.execute("SELECT COUNT(*) FROM l5")
         l5c = c.fetchone()[0]
-        
-        warning = '🔴 连续错误≥3' if self.consecutive_errors >= 3 else ''
-        report = json.dumps({
-            'time': datetime.now().isoformat(), 'turn_count': self.turn_count,
-            'errors': self.error_count, 'consecutive': self.consecutive_errors,
-            'l1': l1c, 'l3': l3c, 'l4': l4c, 'l5': l5c, 'warning': warning
+        insights = []
+        c.execute("SELECT tag, COUNT(*) as cnt, GROUP_CONCAT(value, '|||') as vals FROM l1 GROUP BY tag ORDER BY cnt DESC LIMIT 10")
+        for tag, cnt, vals in c.fetchall():
+            if cnt >= 3:
+                samples = vals.split('|||')[:3]
+                insights.append({'tag': tag, 'count': cnt, 'pattern': samples})
+        c.execute("SELECT patterns FROM l4 ORDER BY id DESC LIMIT 5")
+        recent_patterns = []
+        for row in c.fetchall():
+            try:
+                import json
+                data = json.loads(row[0])
+                recent_patterns.append(data.get('patterns', []))
+            except:
+                pass
+        wisdom_score = min(100, l1c * 0.5 + l5c * 10 + l4c * 5)
+        import json
+        wisdom = json.dumps({
+            'time': __import__('datetime').datetime.now().isoformat(), 'turn_count': self.turn_count,
+            'insights': insights[:5], 'total_patterns': len(insights),
+            'recent_refines': len(recent_patterns),
+            'l1': l1c, 'l3': l3c, 'l4': l4c, 'l5': l5c,
+            'wisdom_score': wisdom_score, 'errors': self.error_count,
+            'consecutive': self.consecutive_errors,
+            'warning': '🔴 连续错误≥3' if self.consecutive_errors >= 3 else ''
         })
-        c.execute("INSERT INTO l6 (time,turn_count,error_count,l1_count,l5_count,warning) VALUES (datetime('now'),?,?,?,?,?)",
+        c.execute("""INSERT INTO l6 (time,turn_count,error_count,l1_count,l5_count,wisdom,score) 
+                      VALUES (datetime('now'),?,?,?,?,?,?)""",
+                  (self.turn_count, self.error_count, l1c, l5c, wisdom, wisdom_score))
+        self.conn.commit()
+        summary = f'悟道觉醒 L6 ✦ 智慧评分{wisdom_score:.0f}/100'
+        if insights:
+            summary += f' ✦ 发现{len(insights)}个知识模式'
+        if self.consecutive_errors >= 3:
+            summary += ' ⚠️ 连续错误'
+        return summary("INSERT INTO l6 (time,turn_count,error_count,l1_count,l5_count,warning) VALUES (datetime('now'),?,?,?,?,?)",
                   (self.turn_count, self.error_count, l1c, l5c, warning))
         self.conn.commit()
         return warning or '✅ 系统健康'
     
     def skillify(self, name, description, rule):
+        if self._is_indexeddb():
+            return self._db_call('db_skillify', {'name': name, 'description': description, 'rule': rule})
         c = self.conn.cursor()
         c.execute("INSERT OR REPLACE INTO l5 VALUES (?,?,?,datetime('now'))", (name, description, rule))
         self.conn.commit()
     
+    def cleanup(self):
+        """L7: 推陈出新 — 清理过时·合并重复·降级技能"""
+        if self._is_indexeddb():
+            return self._db_call('db_cleanup', {}) or {'cleansed':0,'merged':0,'downgraded':0}
+        c = self.conn.cursor()
+        cleansed = 0; merged = 0; downgraded = 0
+        c.execute("SELECT COUNT(*) FROM l1 WHERE access_count=0")
+        stale = c.fetchone()[0]
+        if stale > 10:
+            c.execute("DELETE FROM l1 WHERE access_count=0")
+            cleansed = stale
+            self._migrate_l1_to_l3()
+        c.execute("SELECT key, tag, COUNT(*) as cnt FROM l3 GROUP BY key, tag HAVING cnt > 1")
+        for key, tag, cnt in c.fetchall():
+            c.execute("DELETE FROM l3 WHERE key=? AND tag=? AND id NOT IN (SELECT MIN(id) FROM l3 WHERE key=? AND tag=?)",
+                      (key, tag, key, tag))
+            merged += cnt - 1
+        c.execute("SELECT COUNT(*) FROM l5")
+        total_skills = c.fetchone()[0]
+        if total_skills > 20:
+            downgraded = total_skills - 20
+        import json
+        report = json.dumps({'time': __import__('datetime').datetime.now().isoformat(),
+                             'cleansed': cleansed, 'merged': merged, 'downgraded': downgraded})
+        c.execute("INSERT INTO l7 (time,cleansed,merged,downgraded,report) VALUES (datetime('now'),?,?,?,?)",
+                  (cleansed, merged, downgraded, report))
+        self.conn.commit()
+        return {'cleansed': cleansed, 'merged': merged, 'downgraded': downgraded}
+    
     def get_status(self):
+        if self._is_indexeddb():
+            result = self._db_call('db_get_status', {})
+            if result:
+                result['turns'] = self.turn_count
+                result['errors'] = self.error_count
+                result['consecutive'] = self.consecutive_errors
+                return result
         c = self.conn.cursor()
         c.execute("SELECT COUNT(*) FROM l1")
         l1 = c.fetchone()[0]
@@ -361,8 +474,8 @@ TOOL_DEFINITIONS = [
     _t("memory_recall","查询记忆",{"key":{"type":"string"}},[]),
     _t("memory_status","记忆系统状态",{},[]),
     _t("memory_refine","L4知识提炼",{},[]),
-    _t("memory_enlighten","L6悟道觉醒",{},[]),
-    _t("memory_cleanup","L7清理",{},[]),
+    _t("memory_enlighten","L6悟道觉醒：从数据中发现模式·产生新认知",{},[]),
+    _t("memory_cleanup","L7推陈出新：清理过时+合并重复+降级技能",{},[]),
     # 工具
     _t("calculator","数学计算",{"expression":{"type":"string"}},["expression"]),
     _t("get_time","当前时间",{},[]),
@@ -427,6 +540,8 @@ class XiaoLongRen:
         self.base_url = base_url
         self.memory = EternalMemory()
         self.memory.init_db()
+        # L0: 写入灵魂身份到记忆系统
+        self.memory.remember('l0_soul', L0_SOUL[:500], 'system', 'rule')
         self.swarm = SwarmHound(self.memory)
         self.celestial = CelestialSearch()
         self.evolution = SelfEvolution(self)  # 自生长引擎
@@ -436,6 +551,17 @@ class XiaoLongRen:
         self.start_time = time.time()
     
     def get_endpoint(self):
+        if not self.api_key:
+            cfg = self.memory.recall('l0_config')
+            if cfg:
+                try:
+                    import json
+                    c = json.loads(cfg)
+                    self.api_key = c.get('api_key', '')
+                    self.provider = c.get('provider', self.provider)
+                    self.model = c.get('model', self.model)
+                except:
+                    pass
         if self.base_url:
             return self.base_url.rstrip('/') + '/chat/completions'
         urls = {
@@ -568,10 +694,9 @@ class XiaoLongRen:
         # 通过JS桥接调用（绕过Pyodide urllib限制）
         try:
             from js import jsFetchAPI
-            result_json = jsFetchAPI(endpoint, 'POST', body, api_key)
+            result_json = await jsFetchAPI(endpoint, 'POST', body, api_key)
             return _json.loads(result_json)
-        except:
-            # 降级：Pyodide urllib
+        except:  # 降级到urllib
             import urllib.request
             req = urllib.request.Request(endpoint, data=body.encode(), headers={
                 'Content-Type': 'application/json',
@@ -588,18 +713,21 @@ class XiaoLongRen:
         if name in mem_tools:
             try:
                 from js import jsExecTool
-                result_json = jsExecTool(name, json.dumps(args))
-                return result_json
+                result_json = await jsExecTool(name, json.dumps(args))
+                if result_json:
+                    return result_json
             except:
                 pass  # 降级到本地SQLite
+            # 降级后继续走tool_map，不return（由tool_map处理）
         
         # Pyodide专属工具 → 走JS桥接（excel/pdf/email/sql/ssh）
         pyodide_tools = {'excel_read','excel_write','pdf_extract','send_email','sql_query','ssh_exec'}
         if name in pyodide_tools:
             try:
                 from js import jsExecTool
-                result_json = jsExecTool(name, json.dumps(args))
-                return result_json
+                result_json = await jsExecTool(name, json.dumps(args))
+                if result_json:
+                    return result_json
             except:
                 pass  # Pyodide工具不可用
         
@@ -615,6 +743,7 @@ class XiaoLongRen:
             'memory_status': lambda: json.dumps(self.memory.get_status()),
             'memory_refine': lambda: json.dumps(self.memory.refine()),
             'memory_enlighten': lambda: json.dumps({'result': self.memory.enlighten()}),
+            'memory_cleanup': lambda: json.dumps(self.memory.cleanup()),
             'swarm_hound': lambda: json.dumps({'status': '蜂群战术已就绪', 
                 'workers': 3, 'note': '多Agent并行搜索+气味记忆排序'}),
             'celestial_search': lambda: json.dumps({'status': '天权搜索已就绪',
@@ -661,6 +790,7 @@ engine = None
 def init_engine(api_key, provider='deepseek', model='deepseek-chat'):
     global engine
     engine = XiaoLongRen(api_key, provider, model)
+    engine.memory.remember('l0_config', json.dumps({'api_key':api_key,'provider':provider,'model':model,'time':__import__('datetime').datetime.now().isoformat()}), 'system', 'fact')
     return '✅ 引擎已就绪'
 
 async def run_engine(user_msg, char_sys=''):
