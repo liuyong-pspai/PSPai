@@ -11,10 +11,10 @@ const XLR = (function() {
   const allTools = [];      // 所有已注册工具定义
   let loadOrder = [];
   
-  // 伊莎⑤：桥接存储（插件产数据→Agent消费）
+  // 桥接存储（插件产数据→Agent消费）
   const bridgeStore = {};
   
-  // 伊莎⑥：健康记录（错误计数+最后活跃时间）
+  // 健康记录（错误计数+最后活跃时间）
   const healthLog = {};
 
   return {
@@ -76,7 +76,7 @@ const XLR = (function() {
         }
       }
       
-      // 伊莎②：初始化完成后自动自诊断
+      // 初始化后自动自诊断
       const diag = XLR.selfDiagnose();
       console.log(`[XLR] 🔍 自诊断: ${diag.grade} — ${diag.summary}`);
       if (diag.issues.length > 0) {
@@ -97,14 +97,14 @@ const XLR = (function() {
       
       try {
         const result = await entry.handler(args);
-        // 伊莎⑥：记录成功执行（重置该插件错误计数趋势）
+        // 记录成功执行
         if (healthLog[entry.plugin]) {
           healthLog[entry.plugin].lastActive = Date.now();
         }
         return result;
       } catch (e) {
         console.error(`[XLR] 工具 "${toolName}" 执行失败:`, e);
-        // 伊莎⑥：记录错误
+        // 记录错误
         if (healthLog[entry.plugin]) {
           healthLog[entry.plugin].errors++;
         }
@@ -186,7 +186,7 @@ const XLR = (function() {
     },
 
     // ============================================================
-    // 伊莎②：自诊断 — "应该≠实际"对照表
+    // 自诊断 — "应该≠实际"对照表
     // ============================================================
     selfDiagnose() {
       const issues = [];
@@ -224,7 +224,7 @@ const XLR = (function() {
     },
 
     // ============================================================
-    // 伊莎⑤：桥接 — 插件产数据→Agent消费
+    // 桥接 — 插件产数据→Agent消费
     // ============================================================
     bridge(name, data) {
       bridgeStore[name] = { data, timestamp: Date.now(), consumed: false };
@@ -245,7 +245,7 @@ const XLR = (function() {
     },
 
     // ============================================================
-    // 伊莎⑥：健康扫描
+    // 健康扫描
     // ============================================================
     healthCheck() {
       const now = Date.now();
