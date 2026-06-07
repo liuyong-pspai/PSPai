@@ -10,7 +10,7 @@ const memory = (function() {
   let fallbackMode = false;
   const fallbackStore = new Map();
   const DB_NAME = 'xiaolongren_memory';
-  const DB_VER = 6;
+  const DB_VER = 7;
   const MEMORY_VERSION = 2;
 
   async function open() {
@@ -36,7 +36,8 @@ const memory = (function() {
         if (!d.objectStoreNames.contains('l1')) d.createObjectStore('l1', {keyPath:'key'});
         if (!d.objectStoreNames.contains('l4')) d.createObjectStore('l4', {keyPath:'id',autoIncrement:true});
         if (!d.objectStoreNames.contains('l5')) d.createObjectStore('l5', {keyPath:'name'});
-        if (!d.objectStoreNames.contains('conversations')) d.createObjectStore('conversations', {keyPath:'id',autoIncrement:true});
+        if (!d.objectStoreNames.contains('l2')) d.createObjectStore('l2', {keyPath:'id',autoIncrement:true});
+        if (!d.objectStoreNames.contains('l2_tags')) d.createObjectStore('l2_tags', {keyPath:'tag'});
       };
       req.onsuccess = (e) => { db = e.target.result; resolve(db); };
       req.onerror = (e) => {
@@ -67,6 +68,41 @@ const memory = (function() {
     if (fallbackMode) { const k='l4_'+Date.now(); fallbackStore.set(k,{patterns,time:Date.now()}); return true; }
     if (!db || typeof db === 'string') return true;
     return new Promise(r => { tx('l4').add({patterns,time:Date.now()}).onsuccess=()=>r(true); });
+  }
+
+  // ============================================================
+  // L2 标签索引 — 给记忆打标签，按标签搜索
+  // ============================================================
+  async function tagL1(key, tag, desc) {
+    // l2: 标签→记忆映射
+    if (fallbackMode) { fallbackStore.set('l2_'+Date.now(),{key,tag,desc,time:Date.now()}); return true; }
+    if (!db || typeof db === 'string') return true;
+    return new Promise(r => { tx('l2').add({key,tag,desc:desc||'',time:Date.now()}).onsuccess=()=>r(true); });
+  }
+  async function searchByTag(tag) {
+    if (fallbackMode) {
+      const res=[]; fallbackStore.forEach((v,k)=>{if(k.startsWith('l2_')&&v.tag===tag)res.push(v);}); return res;
+    }
+    if (!db || typeof db === 'string') return [];
+    return new Promise(r => {
+      const all=[]; const req=tx('l2','readonly').openCursor();
+      req.onsuccess=(e)=>{const c=e.target.result;if(c){if(c.value.tag===tag)all.push(c.value);c.continue();}else r(all);};
+    });
+  }
+  async function listTags() {
+    if (fallbackMode) {
+      const tags=new Set(); fallbackStore.forEach((v,k)=>{if(k.startsWith('l2_'))tags.add(v.tag);}); return [...tags];
+    }
+    if (!db || typeof db === 'string') return [];
+    return new Promise(r => {
+      const tags=new Set(); const req=tx('l2','readonly').openCursor();
+      req.onsuccess=(e)=>{const c=e.target.result;if(c){tags.add(c.value.tag);c.continue();}else r([...tags]);};
+    });
+  }
+  async function removeTag(id) {
+    if (fallbackMode) return true;
+    if (!db || typeof db === 'string') return true;
+    return new Promise(r => { tx('l2').delete(id).onsuccess=()=>r(true); });
   }
   async function saveSkill(name, desc, rule) {
     if (fallbackMode) { fallbackStore.set('l5_'+name,{name,description:desc,rule,time:Date.now()}); return true; }
@@ -105,6 +141,7 @@ const memory = (function() {
     init: open,
     isFallback: ()=>fallbackMode,
     l1: {get:getL1, set:setL1},
+    l2: {tag:tagL1, search:searchByTag, tags:listTags, remove:removeTag},
     l4: {add:addL4},
     l5: {save:saveSkill, getAll:getSkills},
     conversations: {save:saveConversation, load:loadConversation},
