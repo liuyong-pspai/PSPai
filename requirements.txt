@@ -1,5 +1,0 @@
-# 小龙人 XiaoLongRen — 依赖清单
-# 安装：pip install -r requirements.txt
-PyYAML>=6.0
-Pillow>=10.0
-requests>=2.28
