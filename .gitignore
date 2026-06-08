@@ -30,6 +30,15 @@ xiaolongren-engine-macos*
 .venv-mobile/
 .venv/
 mobile/.venv/
+mobile/android-app/node_modules/
+mobile/android-app/.android/
+mobile/android-app/.gradle/
 env/
 venv/
 node_modules/
+_downloads/
+engine/models_dev_cache.json
+engine/backups/
+engine/scripts/
+engine/__pycache__/
+frontend/pwa/html/node_modules/
