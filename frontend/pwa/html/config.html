@@ -78,7 +78,10 @@ h1 { font-size: 28px; text-align: center; margin-bottom: 8px; }
   color: #e0e0e0; font-size: 14px; transition: border-color 0.2s;
 }
 .form-group input:focus, .form-group select:focus {
-  outline: none; border-color: #667eea;
+    outline: none; border-color: #667eea;
+}
+.form-group select option {
+    color: #e0e0e0; background: #1a1a2e; padding: 8px;
 }
 .form-group select { appearance: none; cursor: pointer; }
 .form-group select option { background: #1a1a2e; color: #e0e0e0; }
@@ -177,7 +180,16 @@ h1 { font-size: 28px; text-align: center; margin-bottom: 8px; }
     </div>
     <div class="form-group" id="group-model">
       <label for="modelSelect" id="label-model">🤖 模型</label>
-      <select id="modelSelect"></select>
+      <input type="text" id="modelSelect" placeholder="deepseek-v4-flash" list="model-list" autocomplete="off">
+      <datalist id="model-list">
+        <option value="deepseek-v4-flash">
+        <option value="deepseek-v4-pro">
+        <option value="deepseek-chat">
+        <option value="deepseek-reasoner">
+        <option value="gpt-4o">
+        <option value="gpt-4o-mini">
+        <option value="gpt-4.1">
+      </datalist>
     </div>
     <div class="form-group hidden" id="group-baseurl">
       <label for="baseUrl">🔗 自定义API地址 (可选)</label>
@@ -284,7 +296,7 @@ function setLang(l) {
 // Provider数据
 // ============================================================
 const providers = [
-  { id: 'deepseek',   models: ['deepseek-chat', 'deepseek-reasoner'], tag: 'free',   defaultModel: 'deepseek-chat' },
+  { id: 'deepseek',   models: ['deepseek-v4-flash', 'deepseek-v4-pro', 'deepseek-chat', 'deepseek-reasoner'], tag: 'free',   defaultModel: 'deepseek-v4-flash' },
   { id: 'openai',     models: ['gpt-4o', 'gpt-4o-mini', 'gpt-4.1'],    tag: 'power',  defaultModel: 'gpt-4o-mini' },
   { id: 'anthropic',  models: ['claude-sonnet-4-20250514', 'claude-haiku-3.5'], tag: 'power', defaultModel: 'claude-haiku-3.5' },
   { id: 'moonshot',   models: ['moonshot-v1-8k', 'moonshot-v1-32k'],   tag: 'cheap',  defaultModel: 'moonshot-v1-8k' },
@@ -304,7 +316,7 @@ const characters = [
 
 // 用户选择（内存中）
 let selectedProvider = 'deepseek';
-let selectedModel = 'deepseek-chat';
+let selectedModel = 'deepseek-v4-flash';
 let selectedCharacter = 'longyuan';
 let apiKey = '';
 let currentStep = 0;
@@ -344,14 +356,9 @@ function render() {
   const pdata = providers.find(p => p.id === selectedProvider);
   const sel = document.getElementById('modelSelect');
   if (pdata && pdata.models.length > 0) {
-    sel.innerHTML = pdata.models.map(m => 
-      `<option value="${escapeHtml(m)}" ${m === selectedModel ? 'selected' : ''}>${escapeHtml(m)}</option>`
-    ).join('');
+    sel.placeholder = pdata.defaultModel || pdata.models[0];
+    if (!sel.value) sel.value = selectedModel;
     document.getElementById('group-model').classList.remove('hidden');
-    if (!pdata.models.includes(selectedModel)) {
-      selectedModel = pdata.defaultModel;
-      sel.value = selectedModel;
-    }
   } else {
     document.getElementById('group-model').classList.add('hidden');
   }
@@ -590,11 +597,12 @@ function saveAndLaunch() {
   btn.textContent = i18n[lang].saving;
   
   const baseUrl = window._customBaseUrl || document.getElementById('baseUrl')?.value?.trim() || '';
+  const key = document.getElementById('apiKey')?.value?.trim() || apiKey;
   
   const config = {
     provider: selectedProvider,
-    model: selectedModel,
-    api_key: apiKey,
+    model: document.getElementById('modelSelect')?.value?.trim() || selectedModel,
+    api_key: key,
     base_url: baseUrl,
     character: selectedCharacter,
     language: lang,
@@ -604,16 +612,17 @@ function saveAndLaunch() {
   try {
     // PWA模式：存在浏览器本地，直接跳转
     localStorage.setItem('xiaolongren_config', JSON.stringify(config));
-    showStatus(i18n[lang].saveOk, '');
-    setTimeout(() => {
-      window.location.href = 'mobile.html';
-    }, 800);
   } catch (err) {
-    console.error('保存失败:', err);
-    showStatus(i18n[lang].saveErr, 'error');
-    btn.disabled = false;
-    btn.textContent = i18n[lang].launch;
+    // file://协议下某些浏览器不支持 localStorage，忽略
+    console.warn('localStorage不可用，将使用内存配置:', err.message);
   }
+  showStatus(i18n[lang].saveOk, '');
+  setTimeout(() => {
+    if (typeof memory !== 'undefined' && memory.conversations) {
+      try { memory.conversations.save([{role:'system',content:'配置已保存'}]) } catch(e) {}
+    }
+    window.location.href = 'mobile.html?configured=1';
+  }, 800);
 }
 
 // 恢复之前的选择

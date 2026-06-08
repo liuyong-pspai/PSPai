@@ -34,6 +34,29 @@ html,body{width:100%;height:100%;overflow:hidden;font-family:'PingFang SC','Micr
 #memo-box .mb-save{background:var(--gold);color:#000}
 #memo-box .mb-close{background:rgba(255,255,255,0.06);color:#888}
 
+/* 配置弹窗 */
+#cfg-overlay{position:fixed;inset:0;z-index:999;background:rgba(0,0,0,0.7);display:none;align-items:center;justify-content:center;padding:16px}
+#cfg-overlay.show{display:flex}
+#cfg-box{width:100%;max-width:380px;background:#161618;border-radius:16px;padding:20px;border:1px solid rgba(255,255,255,0.08);max-height:90vh;overflow-y:auto}
+#cfg-box h2{font-size:16px;color:var(--gold);margin-bottom:16px;text-align:center}
+#cfg-box .cg{margin-bottom:14px}
+#cfg-box .cg label{display:block;font-size:12px;color:#888;margin-bottom:4px}
+#cfg-box .cg select,#cfg-box .cg input{width:100%;padding:10px 12px;border-radius:8px;border:1px solid rgba(255,255,255,0.08);background:rgba(0,0,0,0.3);color:#e0d8c8;font-size:14px;outline:none}
+#cfg-box .cg select:focus,#cfg-box .cg input:focus{border-color:var(--gold-dim)}
+#cfg-box .cg input::placeholder{color:#444}
+#cfg-box .provider-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px}
+#cfg-box .provider-card{padding:10px;border-radius:8px;border:2px solid rgba(255,255,255,0.06);background:rgba(255,255,255,0.03);cursor:pointer;text-align:center;font-size:13px;transition:all 0.15s}
+#cfg-box .provider-card.selected{border-color:var(--gold);background:rgba(212,160,0,0.08)}
+#cfg-box .provider-card:active{transform:scale(0.96)}
+#cfg-box .cfg-actions{display:flex;gap:8px;margin-top:16px}
+#cfg-box .cfg-actions button{flex:1;padding:12px;border-radius:8px;border:none;font-size:14px;font-weight:600;cursor:pointer}
+#cfg-box .cfg-save{background:var(--gold);color:#000}
+#cfg-box .cfg-cancel{background:rgba(255,255,255,0.06);color:#888}
+#cfg-box .cfg-status{text-align:center;font-size:12px;margin-top:10px;min-height:18px}
+#cfg-box .cfg-status.ok{color:#22c55e}
+#cfg-box .cfg-status.err{color:#ef4444}
+#cfg-box .cfg-summary{margin:12px 0;padding:12px;background:rgba(255,255,255,0.03);border-radius:8px;font-size:12px;color:#aaa;line-height:1.6}
+
 #char-bar{flex-shrink:0;display:flex;align-items:flex-start;justify-content:center;gap:10px;padding:6px 14px 10px;overflow-x:auto;scrollbar-width:none}
 #char-bar::-webkit-scrollbar{display:none}
 #char-bar .cw{display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer;flex-shrink:0;opacity:0.55;transition:all 0.2s}
@@ -111,7 +134,7 @@ html,body{width:100%;height:100%;overflow:hidden;font-family:'PingFang SC','Micr
     <span class="t">🐉 小龙人</span>
     <div class="r">
       <button class="memo-btn" onclick="toggleMemo()" title="备忘录">📝</button>
-      <button class="cfg-btn" onclick="location.href='config.html'" title="配置模型">⚙</button>
+      <button class="cfg-btn" onclick="window.open('config.html','_self')" title="配置模型">⚙</button>
     </div>
   </div>
 
@@ -162,6 +185,22 @@ html,body{width:100%;height:100%;overflow:hidden;font-family:'PingFang SC','Micr
   <span class="ib-close" onclick="this.parentElement.classList.remove('show')">✕</span>
   <div class="ib-txt">📲 安装到桌面，像App一样使用</div>
   <button onclick="installPWA()">安装</button>
+</div>
+
+<!-- 配置弹窗 -->
+<div id="cfg-overlay" onclick="if(event.target===this)closeConfig()">
+  <div id="cfg-box">
+    <h2>⚙ 配置大模型</h2>
+    <div class="cg"><label>选择模型提供商</label><div class="provider-grid" id="cfg-provider-grid"></div></div>
+    <div class="cg"><label>🔑 API Key</label><input type="password" id="cfg-api-key" placeholder="sk-..." autocomplete="off"></div>
+    <div class="cg" id="cfg-model-group"><label>🤖 模型</label><select id="cfg-model-select"></select></div>
+    <div class="cfg-summary" id="cfg-summary"></div>
+    <div class="cfg-status" id="cfg-status"></div>
+    <div class="cfg-actions">
+      <button class="cfg-cancel" onclick="closeConfig()">取消</button>
+      <button class="cfg-save" onclick="saveConfig()">保存</button>
+    </div>
+  </div>
 </div>
 
 <script src="plugin-loader.js"></script>
@@ -565,6 +604,21 @@ window.addEventListener('appinstalled', () => {
 (function() {
   if (!hasConfig()) {
     document.getElementById('empty-sub').textContent = '点右上角 ⚙ 配置模型，开始对话';
+  } else {
+    // 已配置，检查是否从config.html跳转回来
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('configured') === '1') {
+      // 显示配置成功的欢迎消息
+      const msgsEl = document.getElementById('msgs');
+      const eh = document.getElementById('empty-hint');
+      if (eh) eh.remove();
+      const div = document.createElement('div');
+      div.className = 'msg ai';
+      div.innerHTML = '<div class="mb">✅ 配置成功！说点什么开始吧</div>';
+      msgsEl.appendChild(div);
+      // 清除URL参数
+      window.history.replaceState({}, '', 'mobile.html');
+    }
   }
   // 恢复上次的聊天记录
   loadMessages();
@@ -574,11 +628,126 @@ window.addEventListener('appinstalled', () => {
 window.addEventListener('load', function() {
   const msgs = document.getElementById('msgs');
   if (msgs && msgs.children.length <= 1) {
-    // 只有empty或空白，尝试恢复
     loadMessages();
   }
 });
 
+// ====== 配置弹窗（内嵌，不跳转）======
+const CFG_PROVIDERS = [
+  {id:'deepseek',name:'DeepSeek',url:'https://api.deepseek.com/v1',models:['deepseek-v4-flash','deepseek-v4-pro','deepseek-chat','deepseek-reasoner'],tag:'free'},
+  {id:'openai',name:'OpenAI',url:'https://api.openai.com/v1',models:['gpt-4o','gpt-4o-mini','gpt-4','gpt-3.5-turbo']},
+  {id:'moonshot',name:'Moonshot',url:'https://api.moonshot.cn/v1',models:['moonshot-v1-8k','moonshot-v1-32k','moonshot-v1-128k']},
+  {id:'zhipu',name:'智谱GLM',url:'https://open.bigmodel.cn/api/paas/v4',models:['glm-4-plus','glm-4','glm-4-air']},
+  {id:'qwen',name:'通义千问',url:'https://dashscope.aliyuncs.com/compatible-mode/v1',models:['qwen-plus','qwen-turbo','qwen-max']},
+];
+let cfgSelectedProvider = 'deepseek';
+let cfgSelectedModel = 'deepseek-chat';
+
+function toggleConfig() {
+  const ov = document.getElementById('cfg-overlay');
+  const isOpen = ov.classList.contains('show');
+  if (isOpen) { closeConfig(); return; }
+  // 读取已有配置
+  const saved = getConfig();
+  if (saved) {
+    cfgSelectedProvider = saved.provider || 'deepseek';
+    cfgSelectedModel = saved.model || 'deepseek-chat';
+    document.getElementById('cfg-api-key').value = saved.api_key || '';
+  } else {
+    cfgSelectedProvider = 'deepseek';
+    cfgSelectedModel = 'deepseek-chat';
+    document.getElementById('cfg-api-key').value = '';
+  }
+  renderConfig();
+  document.getElementById('cfg-status').textContent = '';
+  ov.classList.add('show');
+}
+
+function closeConfig() {
+  document.getElementById('cfg-overlay').classList.remove('show');
+}
+
+function selectCfgProvider(id) {
+  cfgSelectedProvider = id;
+  const p = CFG_PROVIDERS.find(x => x.id === id);
+  cfgSelectedModel = p ? p.models[0] : '';
+  renderConfig();
+}
+
+function renderConfig() {
+  const grid = document.getElementById('cfg-provider-grid');
+  grid.innerHTML = CFG_PROVIDERS.map(p =>
+    `<div class="provider-card ${cfgSelectedProvider === p.id ? 'selected' : ''}" onclick="selectCfgProvider('${p.id}')">${p.name}${p.tag ? '<br><small>★免费</small>' : ''}</div>`
+  ).join('');
+  
+  const pdata = CFG_PROVIDERS.find(p => p.id === cfgSelectedProvider);
+  const sel = document.getElementById('cfg-model-select');
+  if (pdata && pdata.models.length) {
+    sel.innerHTML = pdata.models.map(m =>
+      `<option value="${m}" ${m === cfgSelectedModel ? 'selected' : ''}>${m}</option>`
+    ).join('');
+    document.getElementById('cfg-model-group').style.display = 'block';
+  } else {
+    document.getElementById('cfg-model-group').style.display = 'none';
+  }
+  
+  // 摘要
+  const summary = document.getElementById('cfg-summary');
+  const key = document.getElementById('cfg-api-key').value.trim();
+  summary.innerHTML = '🔌 ' + (pdata ? pdata.name : cfgSelectedProvider) + ' · ' + cfgSelectedModel +
+    '<br>🔑 ' + (key ? '●●●●' + key.slice(-4) : '<span style="color:#ef4444">未设置</span>');
+}
+
+function saveConfig() {
+  const key = document.getElementById('cfg-api-key').value.trim();
+  const model = document.getElementById('cfg-model-select').value || cfgSelectedModel;
+  const status = document.getElementById('cfg-status');
+  
+  if (!key) {
+    status.textContent = '🔑 请填写 API Key';
+    status.className = 'cfg-status err';
+    return;
+  }
+  if (key.length < 10) {
+    status.textContent = '🔑 API Key 太短了，请确认完整复制';
+    status.className = 'cfg-status err';
+    return;
+  }
+  
+  const config = {
+    provider: cfgSelectedProvider,
+    model: model,
+    api_key: key,
+    base_url: CFG_PROVIDERS.find(p => p.id === cfgSelectedProvider)?.url || '',
+    character: charId,
+    language: 'zh',
+    configured_at: new Date().toISOString(),
+  };
+  
+  try {
+    localStorage.setItem('xiaolongren_config', JSON.stringify(config));
+    status.textContent = '✅ 配置已保存！';
+    status.className = 'cfg-status ok';
+    // 更新空状态提示
+    const es = document.getElementById('empty-sub');
+    if (es) es.textContent = '说话或打字，我在这里';
+    setTimeout(closeConfig, 800);
+  } catch(e) {
+    status.textContent = '❌ 保存失败: ' + e.message;
+    status.className = 'cfg-status err';
+  }
+}
+
+// 监听API Key输入变化，实时更新摘要
+document.addEventListener('input', function(e) {
+  if (e.target.id === 'cfg-api-key') {
+    const summary = document.getElementById('cfg-summary');
+    if (summary) {
+      const key = e.target.value.trim();
+      summary.innerHTML = summary.innerHTML.replace(/🔑.*/, '🔑 ' + (key ? '●●●●' + key.slice(-4) : '<span style="color:#ef4444">未设置</span>'));
+    }
+  }
+});
 
 </script>
 </body>
