@@ -31,7 +31,8 @@ jobs:
       - name: Build debug APK
         run: |
           cd android
-          ANDROID_HOME=$ANDROID_HOME gradle assembleDebug --no-daemon --console=plain 2>&1
+          chmod +x gradlew
+          ANDROID_HOME=$ANDROID_HOME ./gradlew assembleDebug --no-daemon --console=plain 2>&1
           echo "=== APK SEARCH ==="
           find . -name "*.apk" -type f -ls
 
