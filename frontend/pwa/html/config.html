@@ -590,11 +590,12 @@ function saveAndLaunch() {
   btn.textContent = i18n[lang].saving;
   
   const baseUrl = window._customBaseUrl || document.getElementById('baseUrl')?.value?.trim() || '';
+  const key = document.getElementById('apiKey')?.value?.trim() || apiKey;
   
   const config = {
     provider: selectedProvider,
     model: selectedModel,
-    api_key: apiKey,
+    api_key: key,
     base_url: baseUrl,
     character: selectedCharacter,
     language: lang,
@@ -606,7 +607,7 @@ function saveAndLaunch() {
     localStorage.setItem('xiaolongren_config', JSON.stringify(config));
     showStatus(i18n[lang].saveOk, '');
     setTimeout(() => {
-      window.location.href = 'mobile.html';
+      window.location.href = 'mobile.html?configured=1';
     }, 800);
   } catch (err) {
     console.error('保存失败:', err);

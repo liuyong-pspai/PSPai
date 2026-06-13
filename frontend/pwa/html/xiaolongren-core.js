@@ -1,228 +1,374 @@
-// 小龙人核心引擎 v3.0 — 全功能版
-// 含：八层永生记忆 + SmartRouter + Agent循环 + 工具调用
-// 嫁接铁律：不定义 PROVIDERS/getConfig（mobile.html 内联已有）
+/**
+ * 小龙人 PSPAI 前端桥接层 v2.0
+ * 纯UI桥接——所有逻辑走后端API，前端只做展示和用户交互
+ * 
+ * 后端地址: pspai_server.py (默认 :8089)
+ * 通信协议: REST JSON (/api/chat, /api/tool/exec, /api/*)
+ */
 
-// ============================================================
-// 八层永生记忆 (IndexedDB + 内存降级)
-// ============================================================
-const memory = (function() {
-  let db = null;
-  let fallbackMode = false;
-  const fallbackStore = new Map();
-  const DB_NAME = 'xiaolongren_memory';
-  const DB_VER = 7;
-  const MEMORY_VERSION = 2;
+// ===================================================================
+// 配置
+// ===================================================================
+const API_BASE = window.location.origin || 'http://localhost:8089';
 
-  async function open() {
-    if (db && db !== 'fallback') {
-      try {
-        if (db.version !== MEMORY_VERSION) {
-          console.warn('[沙箱] 记忆版本不匹配，清空重建');
-          indexedDB.deleteDatabase('XiaoLongRenMemory');
-          db = null;
-          fallbackMode = false;
-        }
-      } catch(e) {}
-    }
-    if (typeof indexedDB === 'undefined') {
-      console.warn('[记忆] IndexedDB不可用，降级为内存存储');
-      fallbackMode = true;
-      return 'fallback';
-    }
-    return new Promise((resolve, reject) => {
-      const req = indexedDB.open(DB_NAME, DB_VER);
-      req.onupgradeneeded = (e) => {
-        const d = e.target.result;
-        if (!d.objectStoreNames.contains('l1')) d.createObjectStore('l1', {keyPath:'key'});
-        if (!d.objectStoreNames.contains('l4')) d.createObjectStore('l4', {keyPath:'id',autoIncrement:true});
-        if (!d.objectStoreNames.contains('l5')) d.createObjectStore('l5', {keyPath:'name'});
-        if (!d.objectStoreNames.contains('l2')) d.createObjectStore('l2', {keyPath:'id',autoIncrement:true});
-        if (!d.objectStoreNames.contains('l2_tags')) d.createObjectStore('l2_tags', {keyPath:'tag'});
-      };
-      req.onsuccess = (e) => { db = e.target.result; resolve(db); };
-      req.onerror = (e) => {
-        console.warn('[记忆] IndexedDB打开失败，降级为内存存储:', e.target.error?.message);
-        fallbackMode = true;
-        resolve('fallback');
-      };
-    });
-  }
-
-  function tx(store, mode='readwrite') {
-    if (fallbackMode) return null;
-    if (!db || typeof db === 'string') return null;
-    return db.transaction(store, mode).objectStore(store);
-  }
-
-  async function getL1(key) {
-    if (fallbackMode) return fallbackStore.get('l1_' + key) || null;
-    if (!db || typeof db === 'string') return null;
-    return new Promise(r => { const req=tx('l1','readonly').get(key); req.onsuccess=()=>r(req.result?.value); req.onerror=()=>r(null); });
-  }
-  async function setL1(key, value) {
-    if (fallbackMode) { fallbackStore.set('l1_' + key, value); return true; }
-    if (!db || typeof db === 'string') { fallbackStore.set('l1_' + key, value); return true; }
-    return new Promise(r => { tx('l1').put({key,value,time:Date.now()}).onsuccess=()=>r(true); });
-  }
-  async function addL4(patterns) {
-    if (fallbackMode) { const k='l4_'+Date.now(); fallbackStore.set(k,{patterns,time:Date.now()}); return true; }
-    if (!db || typeof db === 'string') return true;
-    return new Promise(r => { tx('l4').add({patterns,time:Date.now()}).onsuccess=()=>r(true); });
-  }
-
-  // ============================================================
-  // L2 标签索引 — 给记忆打标签，按标签搜索
-  // ============================================================
-  async function tagL1(key, tag, desc) {
-    // l2: 标签→记忆映射
-    if (fallbackMode) { fallbackStore.set('l2_'+Date.now(),{key,tag,desc,time:Date.now()}); return true; }
-    if (!db || typeof db === 'string') return true;
-    return new Promise(r => { tx('l2').add({key,tag,desc:desc||'',time:Date.now()}).onsuccess=()=>r(true); });
-  }
-  async function searchByTag(tag) {
-    if (fallbackMode) {
-      const res=[]; fallbackStore.forEach((v,k)=>{if(k.startsWith('l2_')&&v.tag===tag)res.push(v);}); return res;
-    }
-    if (!db || typeof db === 'string') return [];
-    return new Promise(r => {
-      const all=[]; const req=tx('l2','readonly').openCursor();
-      req.onsuccess=(e)=>{const c=e.target.result;if(c){if(c.value.tag===tag)all.push(c.value);c.continue();}else r(all);};
-    });
-  }
-  async function listTags() {
-    if (fallbackMode) {
-      const tags=new Set(); fallbackStore.forEach((v,k)=>{if(k.startsWith('l2_'))tags.add(v.tag);}); return [...tags];
-    }
-    if (!db || typeof db === 'string') return [];
-    return new Promise(r => {
-      const tags=new Set(); const req=tx('l2','readonly').openCursor();
-      req.onsuccess=(e)=>{const c=e.target.result;if(c){tags.add(c.value.tag);c.continue();}else r([...tags]);};
-    });
-  }
-  async function removeTag(id) {
-    if (fallbackMode) return true;
-    if (!db || typeof db === 'string') return true;
-    return new Promise(r => { tx('l2').delete(id).onsuccess=()=>r(true); });
-  }
-  async function saveSkill(name, desc, rule) {
-    if (fallbackMode) { fallbackStore.set('l5_'+name,{name,description:desc,rule,time:Date.now()}); return true; }
-    if (!db || typeof db === 'string') { fallbackStore.set('l5_'+name,{name,description:desc,rule,time:Date.now()}); return true; }
-    return new Promise(r => { tx('l5').put({name,description:desc,rule,time:Date.now()}).onsuccess=()=>r(true); });
-  }
-  async function getSkills() {
-    if (fallbackMode) { const r=[]; fallbackStore.forEach((v,k)=>{if(k.startsWith('l5_'))r.push(v);}); return r; }
-    if (!db || typeof db === 'string') return [];
-    return new Promise(r => { const req=tx('l5','readonly').getAll(); req.onsuccess=()=>r(req.result||[]); });
-  }
-  async function saveConversation(messages) {
-    if (fallbackMode || !db || typeof db === 'string') {
-      const arr = fallbackStore.get('conversations') || [];
-      if (arr.length > 5) arr.shift();
-      arr.push({messages,time:Date.now()});
-      fallbackStore.set('conversations', arr);
-      return true;
-    }
-    return new Promise(r => {
-      const store=tx('conversations');
-      const countReq=store.count();
-      countReq.onsuccess=async()=>{if(countReq.result>5){const allReq=store.getAllKeys();allReq.onsuccess=()=>{for(let i=0;i<allReq.result.length-5;i++)store.delete(allReq.result[i]);}}};
-      store.add({messages,time:Date.now()}).onsuccess=()=>r(true);
-    });
-  }
-  async function loadConversation() {
-    if (fallbackMode || !db || typeof db === 'string') {
-      const arr=fallbackStore.get('conversations')||[];
-      return arr.length?arr[arr.length-1].messages:[];
-    }
-    return new Promise(r => { const req=tx('conversations','readonly').getAll(); req.onsuccess=()=>{const all=req.result||[]; r(all.length?all[all.length-1].messages:[]);}; });
-  }
-
-  return {
-    init: open,
-    isFallback: ()=>fallbackMode,
-    l1: {get:getL1, set:setL1},
-    l2: {tag:tagL1, search:searchByTag, tags:listTags, remove:removeTag},
-    l4: {add:addL4},
-    l5: {save:saveSkill, getAll:getSkills},
-    conversations: {save:saveConversation, load:loadConversation},
-    l5_skills: {},
-    consecutiveErrors: 0,
-    async skillify(name,description,rule){await saveSkill(name,description,rule);this.l5_skills[name]={description,rule};return true;},
-    async refine(){const s=await getSkills();for(const x of s)this.l5_skills[x.name]={description:x.description,rule:x.rule};return{l5_count:s.length};},
-  };
-})();
-
-// ============================================================
-// Agent 核心循环
-// ============================================================
+// ===================================================================
+// XiaoLongRen Client — 轻量桥接客户端
+// ===================================================================
 class XiaoLongRen {
-  constructor(cfg={}) {
-    this.provider=cfg.provider||'deepseek';
-    this.model=cfg.model||'deepseek-chat';
-    this.apiKey=cfg.apiKey||'';
-    this.baseUrl=cfg.baseUrl||'';
-    this.maxIter=cfg.maxIter||15;
-    this.temp=cfg.temp||0.7;
-    this.messages=[];
-    this.onThink=cfg.onThink||(()=>{});
-    this.onTool=cfg.onTool||(()=>{});
-    this.onReply=cfg.onReply||(()=>{});
+  constructor(cfg = {}) {
+    this.provider = cfg.provider || 'deepseek';
+    this.model = cfg.model || 'deepseek-v4-flash';
+    this.apiKey = cfg.apiKey || '';
+    this.baseUrl = cfg.baseUrl || '';
+    this.charIndex = cfg.charIndex || 0;
+    this.lang = cfg.lang || 'zh';
+    this.onThink = cfg.onThink || (() => {});
+    this.onTool = cfg.onTool || (() => {});
+    this.onReply = cfg.onReply || (() => {});
+    this.onErr = cfg.onErr || (() => {});
   }
 
-  async init() {
-    await memory.init();
-    await memory.refine();
-    try{const h=await memory.conversations.load();if(h&&h.length){let clean=h.slice();while(clean.length&&clean[clean.length-1].role==='tool')clean.pop();clean=clean.filter((m,i,arr)=>{if(m.role==='tool'&&i>0){const p=arr[i-1];return p.role==='assistant'&&p.tool_calls;}return true;});this.messages=clean.slice(-40);}}catch(e){}
-    return true;
-  }
-
-  async run(userMessage, systemPrompt) {
-    this.messages.push({role:'user',content:userMessage});
-    if(this.messages.length>40)this.messages=this.messages.slice(-40);
-    const cleanMessages=this.messages.filter((m,i,arr)=>{if(m.role==='tool'){const p=arr[i-1];return p&&p.role==='assistant'&&p.tool_calls;}return true;});
-    const apiMessages=[{role:'system',content:systemPrompt||'你是小龙人，一个能干的AI助手。'},...cleanMessages];
-    const allToolDefs=typeof XLR!=='undefined'?XLR.getAllTools():(window._allToolDefs||[]);
-    const ep=this.baseUrl||PROVIDERS[this.provider]?.url||'https://api.deepseek.com/v1';
-    const url=ep+'/chat/completions';
-    const headers={'Content-Type':'application/json','Authorization':'Bearer '+this.apiKey};
-
-    for(let iter=0;iter<this.maxIter;iter++){
-      const body=JSON.stringify({model:this.model,messages:apiMessages,tools:allToolDefs.length?allToolDefs:undefined,temperature:this.temp,max_tokens:1024});
-      let resp;
-      try{resp=await fetch(url,{method:'POST',headers,body,signal:AbortSignal.timeout(30000)});}catch(e){memory.consecutiveErrors++;return'网络不通：'+e.message;}
-      if(!resp.ok){
-        memory.consecutiveErrors++;
-        if(memory.consecutiveErrors>=3){console.warn('[沙箱] 连续3次API错误，清空历史自愈');this.messages=[];memory.consecutiveErrors=0;apiMessages.length=0;apiMessages.push({role:'system',content:systemPrompt||'你是小龙人，一个能干的AI助手。'},{role:'user',content:userMessage});continue;}
-        if(resp.status===401)return 'API Key无效，请检查配置';
-        if(resp.status===429)return '请求太频繁，稍后再试';
-        const errText=await resp.text().catch(()=>'');return 'API错误('+resp.status+'): '+errText.substring(0,200);
+  /** 发消息到后端，返回AI回复 */
+  async run(userMsg) {
+    try {
+      this.onThink(1);
+      const resp = await fetch(`${API_BASE}/api/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: userMsg,
+          charIndex: this.charIndex,
+          lang: this.lang,
+          provider: this.provider,
+          model: this.model,
+        }),
+      });
+      if (!resp.ok) {
+        const errText = await resp.text().catch(() => '');
+        throw new Error(`服务器错误 ${resp.status}: ${errText.substring(0, 100)}`);
       }
-      const data=await resp.json();memory.consecutiveErrors=0;
-      const choice=data.choices?.[0];if(!choice)return '模型返回为空';
-      const msg=choice.message;apiMessages.push(msg);
-      if(msg.tool_calls?.length){
-        for(const tc of msg.tool_calls){
-          const toolName=tc.function.name;let args={};try{args=JSON.parse(tc.function.arguments);}catch(e){}
-          this.onTool(toolName,args);
-          let result;
-          if(typeof XLR!=='undefined'&&XLR.hasTool(toolName)){result=await XLR.execute(toolName,args);}
-          else if(window._toolHandlers&&window._toolHandlers[toolName]){result=await window._toolHandlers[toolName](args);}
-          else{result=JSON.stringify({error:'未知工具: '+toolName});}
-          apiMessages.push({role:'tool',tool_call_id:tc.id,content:typeof result==='string'?result:JSON.stringify(result)});
-        }continue;
+      const data = await resp.json();
+      if (data.dna_tools > 0) {
+        this.onTool('dna', { count: data.dna_tools });
       }
-      const reply=msg.content||'';
-      this.messages.push({role:'assistant',content:reply});
-      await memory.conversations.save(this.messages);
-      this.onReply(reply);
-      return reply;
+      this.onReply();
+      return data.reply || '（未收到回复）';
+    } catch (err) {
+      this.onErr(err);
+      throw err;
     }
-    return '思考轮次已达上限，请简化问题重试。';
+  }
+
+  /** 直接调用后端工具 */
+  async execTool(toolName, args = {}) {
+    const resp = await fetch(`${API_BASE}/api/tool/exec`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tool: toolName, args }),
+    });
+    const data = await resp.json();
+    if (!data.success) throw new Error(data.error || '工具调用失败');
+    return data.result;
+  }
+
+  /** 获取DNA进化状态 */
+  async getDNAStatus() {
+    const resp = await fetch(`${API_BASE}/api/dna`);
+    return await resp.json();
+  }
+
+  /** 获取工具列表 */
+  async getTools() {
+    const resp = await fetch(`${API_BASE}/api/tools`);
+    return await resp.json();
+  }
+
+  /** 测试API连接 */
+  async testConnection(provider, apiKey, model, baseUrl) {
+    const ep = baseUrl 
+      ? baseUrl.replace(/\/+$/, '') + '/chat/completions'
+      : ({ deepseek:'https://api.deepseek.com/v1', openai:'https://api.openai.com/v1',
+          moonshot:'https://api.moonshot.cn/v1', zhipu:'https://open.bigmodel.cn/api/paas/v4',
+          qwen:'https://dashscope.aliyuncs.com/compatible-mode/v1',
+          anthropic:'https://api.anthropic.com/v1' }[provider] || '') + '/chat/completions';
+    if (!apiKey) return { ok: false, msg: '请填写API Key' };
+    const resp = await fetch(ep, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + apiKey },
+      body: JSON.stringify({ model: model || 'deepseek-v4-flash', messages: [{ role: 'user', content: 'hi' }], max_tokens: 5 }),
+    });
+    if (resp.ok) return { ok: true, msg: '连接成功' };
+    const text = await resp.text().catch(() => '');
+    return { ok: false, msg: `HTTP ${resp.status}: ${text.substring(0, 100)}` };
   }
 }
 
-// 导出全局接口
-if(typeof window!=='undefined'){
-  window.XiaoLongRen=XiaoLongRen;
-  window.memory=memory;
+
+// ===================================================================
+// 本地存储工具（IndexedDB — 仅用于前端UI状态，不存核心逻辑）
+// ===================================================================
+const DB_NAME = 'PSPAI_UI';
+const DB_VER = 1;
+
+async function uiDB() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(DB_NAME, DB_VER);
+    req.onupgradeneeded = (e) => {
+      const db = e.target.result;
+      if (!db.objectStoreNames.contains('config')) db.createObjectStore('config');
+      if (!db.objectStoreNames.contains('conversations')) db.createObjectStore('conversations', { keyPath: 'id' });
+    };
+    req.onsuccess = (e) => resolve(e.target.result);
+    req.onerror = (e) => reject(e.target.error);
+  });
+}
+
+async function dbGet(store, key) {
+  const db = await uiDB();
+  return new Promise((resolve) => {
+    const t = db.transaction(store, 'readonly');
+    const r = t.objectStore(store).get(key);
+    r.onsuccess = () => resolve(r.result);
+    r.onerror = () => resolve(null);
+  });
+}
+
+async function dbSet(store, key, val) {
+  const db = await uiDB();
+  return new Promise((resolve, reject) => {
+    const t = db.transaction(store, 'readwrite');
+    const r = t.objectStore(store).put(val, key);
+    r.onsuccess = () => resolve();
+    r.onerror = (e) => reject(e.target.error);
+  });
+}
+
+
+// ===================================================================
+// 工具函数
+// ===================================================================
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function formatTime() {
+  const n = new Date();
+  return n.getHours().toString().padStart(2,'0') + ':' + n.getMinutes().toString().padStart(2,'0');
+}
+
+function getCharName(id) {
+  const names = { longyuan:'龙渊', chiyu:'赤羽', ling:'凌', qingmo:'轻墨', shuanghua:'霜华', yeying:'夜影' };
+  return names[id] || '小龙人';
+}
+
+
+// ===================================================================
+// UI 操作函数
+// ===================================================================
+let isBusy = false;
+let agent = null;
+let charId = 'longyuan';
+let convId = 'default';
+
+function gcfg() {
+  try { return JSON.parse(localStorage.getItem('xlr_cfg') || '{}'); }
+  catch(e) { return {}; }
+}
+function scfg(c) { localStorage.setItem('xlr_cfg', JSON.stringify(c)); }
+
+function initAgent() {
+  const c = gcfg();
+  agent = new XiaoLongRen({
+    provider: c.provider || 'deepseek',
+    model: c.model || 'deepseek-v4-flash',
+    apiKey: c.apiKey || '',
+    baseUrl: c.baseUrl || '',
+    charIndex: 0,
+    lang: 'zh',
+    onThink: (i) => {
+      document.getElementById('sd').classList.add('online');
+      const el = document.querySelector('#msgs .msg.ai:last-child .tool-note');
+      if (el) el.textContent = '⚡ DNA思考中...';
+    },
+    onTool: (name, args) => {
+      const el = document.querySelector('#msgs .msg.ai:last-child .tool-note');
+      if (el) el.textContent = '🔧 调用基因工具...';
+    },
+    onReply: () => { document.getElementById('sd').classList.add('online'); },
+    onErr: () => { document.getElementById('sd').classList.remove('online'); },
+  });
+}
+
+function addMsg(type, text) {
+  const d = document.getElementById('msgs');
+  const eh = document.getElementById('empty-hint');
+  if (eh) eh.remove();
+  const el = document.createElement('div');
+  el.className = 'msg ' + type;
+  el.innerHTML = '<div class="mb">' + esc(text) + '</div><div class="mtime">' + formatTime() + '</div>';
+  d.appendChild(el);
+  d.scrollTop = d.scrollHeight;
+  return el;
+}
+
+function showLoading() {
+  const d = document.getElementById('msgs');
+  if (document.getElementById('empty-hint')) document.getElementById('empty-hint').remove();
+  const el = document.createElement('div');
+  el.className = 'msg ai';
+  el.innerHTML = '<div class="mb"><div class="typing-dots"><span></span><span></span><span></span></div></div>';
+  d.appendChild(el);
+  d.scrollTop = d.scrollHeight;
+  return el;
+}
+
+async function sendText() {
+  if (isBusy) return;
+  const inp = document.getElementById('text-input');
+  const text = inp.value.trim();
+  if (!text) return;
+  const c = gcfg();
+  if (!c.apiKey) {
+    addMsg('ai', '请先配置API Key → 点右上角⚙');
+    return;
+  }
+
+  addMsg('user', text);
+  inp.value = ''; inp.style.height = 'auto';
+  isBusy = true;
+  document.getElementById('send-btn').disabled = true;
+  document.getElementById('sd').classList.remove('online');
+
+  initAgent();
+  const loadEl = showLoading();
+
+  try {
+    const reply = await agent.run(text);
+    loadEl.remove();
+    addMsg('ai', reply);
+    document.getElementById('sd').classList.add('online');
+  } catch (err) {
+    loadEl.remove();
+    addMsg('ai', '❌ ' + err.message);
+    document.getElementById('sd').classList.remove('online');
+  } finally {
+    isBusy = false;
+    document.getElementById('send-btn').disabled = false;
+  }
+}
+
+function onKeyDown(e) {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendText(); }
+}
+
+
+// ===================================================================
+// 角色切换
+// ===================================================================
+function switchChar(id) {
+  charId = id;
+  document.getElementById('sel-avatar').src = 'img_' + id + '.jpg';
+  document.getElementById('sel-name').textContent = getCharName(id);
+  document.getElementById('empty-avatar').src = 'img_' + id + '.jpg';
+  document.getElementById('char-picker').style.display = 'none';
+}
+
+function showCharPicker() {
+  const names = { longyuan:'龙渊·沉稳', chiyu:'赤羽·热血', ling:'凌·冷峻',
+                  qingmo:'轻墨·知性', shuanghua:'霜华·通透', yeying:'夜影·神秘' };
+  const g = document.getElementById('char-grid');
+  g.innerHTML = Object.entries(names).map(([k, v]) =>
+    `<div onclick="switchChar('${k}')" style="display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer;padding:8px;border-radius:12px;${k===charId?'background:rgba(200,168,78,0.15);border:1px solid rgba(200,168,78,0.3)':'border:1px solid rgba(255,255,255,0.06)'}">
+       <div style="width:44px;height:44px;border-radius:50%;overflow:hidden;border:2px solid ${k===charId?'var(--gold)':'rgba(255,255,255,0.1)'}"><img src="img_${k}.jpg" style="width:100%;height:100%;object-fit:cover"></div>
+       <span style="font-size:11px;color:${k===charId?'var(--gold)':'#aaa'};white-space:nowrap">${v}</span>
+     </div>`
+  ).join('');
+  document.getElementById('char-picker').style.display = 'flex';
+}
+
+
+// ===================================================================
+// 设置面板
+// ===================================================================
+function toggleSettings() {
+  const p = document.getElementById('settings-panel');
+  p.classList.toggle('show');
+  if (p.classList.contains('show')) loadSettings();
+}
+
+function loadSettings() {
+  const c = gcfg();
+  document.getElementById('cfg-provider').value = c.provider || 'deepseek';
+  document.getElementById('cfg-key').value = c.apiKey || '';
+  document.getElementById('cfg-url').value = c.baseUrl || '';
+  onProviderChange();
+}
+
+function onProviderChange() {
+  const p = document.getElementById('cfg-provider').value;
+  const s = document.getElementById('cfg-model'); s.innerHTML = '';
+  const models = { deepseek:['deepseek-v4-flash','deepseek-reasoner'], openai:['gpt-4o','gpt-4o-mini'],
+    moonshot:['moonshot-v1-8k'], zhipu:['glm-4-flash','glm-4-plus'], qwen:['qwen-turbo','qwen-plus'],
+    anthropic:['claude-sonnet-4-20250514','claude-haiku-3.5'], custom:[] };
+  if (p === 'custom') {
+    s.innerHTML = '<option value="">(手动输入)</option>';
+    document.getElementById('custom-url-sec').style.display = 'block';
+  } else {
+    (models[p] || []).forEach(m => { s.innerHTML += '<option value="'+m+'">'+m+'</option>'; });
+    document.getElementById('custom-url-sec').style.display = 'none';
+  }
+}
+
+async function testConnection() {
+  const p = document.getElementById('cfg-provider').value;
+  const k = document.getElementById('cfg-key').value.trim();
+  const m = document.getElementById('cfg-model').value;
+  const u = document.getElementById('cfg-url').value.trim();
+  const r = document.getElementById('test-result');
+  if (!k) { r.style.display='block'; r.innerHTML='<span style="color:#e74c3c">❌ 填写API Key</span>'; return; }
+  r.style.display='block'; r.innerHTML='⏳ 测试中...';
+  try {
+    const agent = new XiaoLongRen();
+    const res = await agent.testConnection(p, k, m, u);
+    r.innerHTML = res.ok
+      ? '<span style="color:#2ecc71">✅ 连接成功！</span>'
+      : '<span style="color:#e74c3c">🔴 '+res.msg+'</span>';
+  } catch(e) { r.innerHTML = '<span style="color:#e74c3c">🔴 网络不通: '+e.message+'</span>'; }
+}
+
+function saveAndClose() {
+  scfg({
+    provider: document.getElementById('cfg-provider').value,
+    model: document.getElementById('cfg-model').value,
+    apiKey: document.getElementById('cfg-key').value.trim(),
+    baseUrl: document.getElementById('cfg-url').value.trim(),
+  });
+  document.getElementById('settings-panel').classList.remove('show');
+  if (gcfg().apiKey) document.getElementById('sd').classList.add('online');
+  initAgent();
+}
+
+
+// ===================================================================
+// 启动
+// ===================================================================
+switchChar('longyuan');
+
+function closeWelcome() {
+  document.getElementById('welcome').classList.add('hide');
+}
+
+// 无API Key显示欢迎引导
+if (!gcfg().apiKey) {
+  document.getElementById('welcome').classList.remove('hide');
+} else {
+  document.getElementById('welcome').classList.add('hide');
+  document.getElementById('sd').classList.add('online');
+}
+
+initAgent();
+
+// 请求通知权限
+if (Notification && Notification.permission === 'default') {
+  Notification.requestPermission();
 }
