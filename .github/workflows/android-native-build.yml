@@ -32,13 +32,29 @@ jobs:
         run: |
           cd android
           chmod +x gradlew
-          ANDROID_HOME=$ANDROID_HOME ./gradlew assembleDebug --no-daemon --console=plain 2>&1
-          echo "=== APK SEARCH ==="
-          find . -name "*.apk" -type f -ls
+          set +e
+          ANDROID_HOME=$ANDROID_HOME ./gradlew assembleDebug --no-daemon --console=plain --stacktrace 2>&1 | tee build.log
+          GRADLE_EXIT=${PIPESTATUS[0]}
+          echo "GRADLE_EXIT_CODE=$GRADLE_EXIT"
+          exit $GRADLE_EXIT
 
-      - name: Upload APK
+      - name: Show build output
+        if: always()
+        run: |
+          echo "=== BUILD LOG (last 50 lines) ==="
+          tail -50 /home/runner/work/PSPai/PSPai/android/build.log 2>/dev/null || echo "No build.log at expected path"
+          tail -50 android/build.log 2>/dev/null || echo "No build.log at relative path"
+          echo "=== APK SEARCH ==="
+          find . -name "*.apk" -type f -ls 2>/dev/null || echo "No APK found"
+          echo "=== BUILD OUTPUTS ==="
+          find android/app/build/outputs -type f 2>/dev/null || echo "No outputs"
+
+      - name: Upload artifacts (APK + logs)
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: xiaolongren-native-debug
-          path: android/app/build/outputs/apk/debug/
+          name: xiaolongren-build-output
+          path: |
+            android/app/build/outputs/
+            android/build.log
           if-no-files-found: warn
