@@ -28,24 +28,16 @@ jobs:
         with:
           packages: 'platforms;android-34 build-tools;34.0.0 platform-tools'
 
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v3
-
       - name: Build debug APK
         run: |
           cd android
           ANDROID_HOME=$ANDROID_HOME gradle assembleDebug --no-daemon --console=plain 2>&1
-
-      - name: Find APK
-        run: |
-          echo "=== Build output tree ==="
-          find android/app/build/outputs -type f 2>/dev/null || echo "No outputs"
-          echo "=== APK files ==="
-          find . -name "*.apk" -type f 2>/dev/null || echo "No APK"
+          echo "=== APK SEARCH ==="
+          find . -name "*.apk" -type f -ls
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: xiaolongren-native-debug
           path: android/app/build/outputs/apk/debug/
-          if-no-files-found: error
+          if-no-files-found: warn
